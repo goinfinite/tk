@@ -17,6 +17,8 @@ func TestNewCidrBlock(t *testing.T) {
 			{"0.0.0.0/0", CidrBlock("0.0.0.0/0"), false},
 			{"::1/128", CidrBlock("::1/128"), false},
 			{"2001:db8::/32", CidrBlock("2001:db8::/32"), false},
+			{"192.168.1.1", CidrBlock("192.168.1.1/32"), false},
+			{"::1", CidrBlock("::1/128"), false},
 			{"::/0", CidrBlock("::/0"), false},
 			// Invalid CIDR blocks
 			{"192.168.1.256/24", CidrBlock(""), true},
@@ -24,6 +26,8 @@ func TestNewCidrBlock(t *testing.T) {
 			{"300.0.0.0/8", CidrBlock(""), true},
 			{"2001:db8::/130", CidrBlock(""), true},
 			{"invalid", CidrBlock(""), true},
+			{"192.168.1.0/@", CidrBlock(""), true},
+			{"::/@", CidrBlock(""), true},
 			{"", CidrBlock(""), true},
 			{123, CidrBlock(""), true},
 			{true, CidrBlock(""), true},

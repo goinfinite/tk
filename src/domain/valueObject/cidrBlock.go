@@ -3,6 +3,7 @@ package tkValueObject
 import (
 	"errors"
 	"net"
+	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -20,6 +21,15 @@ func NewCidrBlock(value any) (cidrBlock CidrBlock, err error) {
 	}
 
 	if _, _, err := net.ParseCIDR(stringValue); err != nil {
+		if strings.Contains(stringValue, "/") {
+			return cidrBlock, errors.New("InvalidCidrBlock")
+		}
+
+		ipAddress, err := NewIpAddress(stringValue)
+		if err == nil {
+			return ipAddress.ToCidrBlock(), nil
+		}
+
 		return cidrBlock, errors.New("InvalidCidrBlock")
 	}
 
