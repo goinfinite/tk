@@ -9,7 +9,7 @@ import (
 
 type IpAddress string
 
-var IpAddressSystem = IpAddress("127.0.0.1")
+var IpAddressLocal = IpAddress("127.0.0.1")
 
 func NewIpAddress(value any) (ipAddress IpAddress, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
@@ -17,8 +17,11 @@ func NewIpAddress(value any) (ipAddress IpAddress, err error) {
 		return ipAddress, errors.New("IpAddressValueMustBeString")
 	}
 
-	parsedIpAddress := net.ParseIP(stringValue)
-	if parsedIpAddress == nil {
+	if stringValue == "" {
+		return ipAddress, errors.New("IpAddressValueCannotBeEmpty")
+	}
+
+	if net.ParseIP(stringValue) == nil {
 		return ipAddress, errors.New("InvalidIpAddress")
 	}
 
@@ -27,4 +30,39 @@ func NewIpAddress(value any) (ipAddress IpAddress, err error) {
 
 func (vo IpAddress) String() string {
 	return string(vo)
+}
+
+func (vo IpAddress) IsLocal() bool {
+	return vo == IpAddressLocal
+}
+
+func (vo IpAddress) IsIpv4() bool {
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.To4() != nil
+}
+
+func (vo IpAddress) IsIpv6() bool {
+	return !vo.IsIpv4()
+}
+
+func (vo IpAddress) IsPrivate() bool {
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.IsPrivate()
+}
+
+func (vo IpAddress) IsPublic() bool {
+	return !vo.IsPrivate()
+}
+
+func (vo IpAddress) ToCidrBlock() CidrBlock {
+	if vo.IsIpv6() {
+		return CidrBlock(vo.String() + "/128")
+	}
+	return CidrBlock(vo.String() + "/32")
 }
