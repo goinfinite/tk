@@ -179,7 +179,7 @@ func TestUsernameFactory(t *testing.T) {
 	synth := &Synthesizer{}
 
 	t.Run("UsernameGeneration", func(t *testing.T) {
-		usernamesRegex := `^\w{1,256}}$`
+		usernamesRegex := `^\w{1,256}$`
 		re := regexp.MustCompile(usernamesRegex)
 
 		for range 5 {
