@@ -1,6 +1,10 @@
 # Changelog
 
 ```log
+0.0.4 - 2025/06/01
+feat: add UnixTime vo
+feat: add RequiredParamsInspector
+
 0.0.3 - 2025/05/31
 feat: add RequestInputParser
 
