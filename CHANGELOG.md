@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.0.5 - 2025/06/XX
+chore: remove RequestInputParser
+
 0.0.4 - 2025/06/01
 feat: add UnixTime vo
 feat: add RequiredParamsInspector
