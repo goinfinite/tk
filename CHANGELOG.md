@@ -1,8 +1,9 @@
 # Changelog
 
 ```log
-0.0.5 - 2025/06/XX
+0.0.5 - 2025/06/02
 chore: remove RequestInputParser
+fix: StringSliceValueObjectParser nil and empty string check
 
 0.0.4 - 2025/06/01
 feat: add UnixTime vo
