@@ -50,6 +50,10 @@ func StringSliceValueObjectParser[TypedObject any](
 	}
 
 	for _, rawValue := range rawReflectedSlice {
+		if rawValue == nil || rawValue == "" {
+			continue
+		}
+
 		valueObject, err := valueObjectConstructor(rawValue)
 		if err != nil {
 			slog.Debug(err.Error(), slog.Any("rawValue", rawValue))
