@@ -336,4 +336,30 @@ func TestNewUnixTime(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("IsBetweenMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     UnixTime
+			startDate      UnixTime
+			endDate        UnixTime
+			expectedOutput bool
+		}{
+			{UnixTime(1234567890), UnixTime(1234567889), UnixTime(1234567891), true},
+			{UnixTime(1234567890), UnixTime(1234567889), UnixTime(1234567890), true},
+			{UnixTime(1234567890), UnixTime(1234567890), UnixTime(1234567891), true},
+			{UnixTime(1234567890), UnixTime(1234567890), UnixTime(1234567890), true},
+			{UnixTime(1234567890), UnixTime(1234567891), UnixTime(1234567891), false},
+			{UnixTime(1234567890), UnixTime(1234567891), UnixTime(1234567892), false},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.IsBetween(testCase.startDate, testCase.endDate)
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
+					actualOutput, testCase.expectedOutput, testCase.inputValue,
+				)
+			}
+		}
+	})
 }

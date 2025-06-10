@@ -75,6 +75,23 @@ func (vo UnixTime) IsFuture() bool {
 	return vo.ReadAsGoTime().After(time.Now())
 }
 
+func (vo UnixTime) IsBetween(startDate, endDate UnixTime) bool {
+	voGoTime := vo.ReadAsGoTime()
+	startDateGoTime := startDate.ReadAsGoTime()
+	endDateGoTime := endDate.ReadAsGoTime()
+	if voGoTime.Equal(startDateGoTime) || voGoTime.Equal(endDateGoTime) {
+		return true
+	}
+
+	isBeforeStartDate := voGoTime.Before(startDateGoTime)
+	isAfterEndDate := voGoTime.After(endDateGoTime)
+	if isBeforeStartDate || isAfterEndDate {
+		return false
+	}
+
+	return true
+}
+
 func (vo UnixTime) String() string {
 	return strconv.FormatInt(int64(vo), 10)
 }
