@@ -1,5 +1,8 @@
 {
-  "cSpell.words": ["github"],
+  "cSpell.words": [
+    "github",
+    "goinfinite"
+  ],
   "tailwindCSS.includeLanguages": {
     "templ": "html"
   },
