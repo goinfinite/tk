@@ -34,7 +34,7 @@ func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) 
 	}).Run()
 	if err != nil || rawIpAddress == "" {
 		rawIpAddress, err = NewShell(ShellSettings{
-			Command: "dig", Args: []string{"+short", "TXT", "CH", "whoami.cloudflare", "@1.1.1.1"},
+			Command: "dig", Args: []string{"+short", "-c", "CH", "-t", "TXT", "whoami.cloudflare", "@1.1.1.1"},
 		}).Run()
 		if err != nil {
 			return ipAddress, err
