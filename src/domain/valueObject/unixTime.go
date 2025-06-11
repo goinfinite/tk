@@ -83,6 +83,10 @@ func (vo UnixTime) IsBetween(startDate, endDate UnixTime) bool {
 		return true
 	}
 
+	if startDateGoTime.After(endDateGoTime) {
+		startDateGoTime, endDateGoTime = endDateGoTime, startDateGoTime
+	}
+
 	isBeforeStartDate := voGoTime.Before(startDateGoTime)
 	isAfterEndDate := voGoTime.After(endDateGoTime)
 	if isBeforeStartDate || isAfterEndDate {
