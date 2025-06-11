@@ -3,6 +3,7 @@ package tkInfra
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os/exec"
 	"os/user"
 	"slices"
@@ -16,14 +17,15 @@ type Shell struct {
 }
 
 type ShellSettings struct {
-	Command                       string
-	Args                          []string
-	ShouldUseSubShell             bool
-	ShouldDisableTimeoutHardLimit bool
-	Username                      string
-	WorkingDirectory              string
-	ExecutionTimeoutSecs          uint64
-	Envs                          []string
+	Command                         string
+	Args                            []string
+	ShouldUseSubShell               bool
+	ShouldDisableTimeoutHardLimit   bool
+	ShouldIgnoreUsernameLookupError bool
+	Username                        string
+	WorkingDirectory                string
+	ExecutionTimeoutSecs            uint64
+	Envs                            []string
 }
 
 func NewShell(settings ShellSettings) Shell {
@@ -95,6 +97,9 @@ func (shell Shell) prepareCmdExecutor() (*exec.Cmd, *bytes.Buffer, *bytes.Buffer
 		if err == nil {
 			cmdExecutor.SysProcAttr = &syscall.SysProcAttr{Credential: sysCallCredentials}
 		}
+		if err != nil && !shell.runtimeSettings.ShouldIgnoreUsernameLookupError {
+			return nil, nil, nil
+		}
 	}
 
 	if shell.runtimeSettings.WorkingDirectory != "" {
@@ -113,6 +118,9 @@ func (shell Shell) prepareCmdExecutor() (*exec.Cmd, *bytes.Buffer, *bytes.Buffer
 
 func (shell Shell) Run() (string, error) {
 	cmdExecutor, stdoutBytesBuffer, stderrBytesBuffer := shell.prepareCmdExecutor()
+	if cmdExecutor == nil {
+		return "", errors.New("UsernameLookupError")
+	}
 
 	err := cmdExecutor.Run()
 	stdoutStr := strings.TrimSpace(stdoutBytesBuffer.String())
