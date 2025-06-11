@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.0.6 - 2025/06/11
+feat: add Shell
+feat: add ReadServerPublic/PrivateIpAddresses
+feat: add IsBetween() for UnixTime
+
 0.0.5 - 2025/06/02
 chore: remove RequestInputParser
 fix: StringSliceValueObjectParser nil and empty string check
