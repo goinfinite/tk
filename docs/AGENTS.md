@@ -8,6 +8,7 @@
 - Ambiguity SHOULD always be questioned as it generates doubts about the intention of the developer.
 - Value objects, infrastructure and use cases (with complex logic) MUST have unit tests.
 - Unit tests SHOULD use testCases as much as possible.
+- Unit tests error messages SHOULD be descriptive and provide context about what operation failed, what was expected, and help with debugging.
 - During delete operations, you MUST validate all constraints upfront rather than discovering them mid-operation.
 - Prefer native methods over third-party libraries when possible.
 
@@ -36,8 +37,13 @@
 ## Go(lang) Specific Rules
 
 - Prefer using slog.Error or slog.Debug instead of log.Printf depending on the gravity of the log.
+- `slog.Any` MUST NOT be used with `slog.Error` (user-facing logs); it is allowed only with `slog.Debug` (developer logs).
 - Value objects accept interface{}/any directly without the need for pre-assertion.
 - When using struct constructors (New), use multiple arguments per line.
 - Sequential method parameters of the same type SHOULD be combined together on the same line.
 - When a use case or utility has multiple related auxiliary functions, they SHOULD be grouped under a struct.
 - Auxiliary methods SHOULD be ordered according to their appearance/call order in the main method, not alphabetically or by perceived importance.
+- Prefer keeping lines under 85 characters when possible, but can exceed when necessary.
+- Avoid unnecessary line breaks, especially in simple struct initializations that can fit on a single line while remaining readable.
+- When methods are executed automatically via timers or watchdogs, error log messages SHOULD always include slog.String("method", "MethodName") to identify the source method, since these log entries appear without user context and administrators need to know where the error originated.
+- When reviewing Swagger/GoDoc documentation comments, check for consistent spacing and indentation in @Param, @Summary, @Description and other annotation lines.
