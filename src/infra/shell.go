@@ -3,7 +3,7 @@ package tkInfra
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"os"
 	"os/exec"
 	"os/user"
 	"slices"
@@ -26,6 +26,8 @@ type ShellSettings struct {
 	WorkingDirectory                string
 	ExecutionTimeoutSecs            uint64
 	Envs                            []string
+	StdoutFilePath                  string
+	StderrFilePath                  string
 }
 
 func NewShell(settings ShellSettings) Shell {
@@ -62,7 +64,16 @@ func (shell Shell) sysCallCredentialsFactory() (*syscall.Credential, error) {
 	}, nil
 }
 
-func (shell Shell) prepareCmdExecutor() (*exec.Cmd, *bytes.Buffer, *bytes.Buffer) {
+type preparedExec struct {
+	ExecCmd           *exec.Cmd
+	StdoutBytesBuffer *bytes.Buffer
+	StdoutFileHandler *os.File
+	StderrBytesBuffer *bytes.Buffer
+	StderrFileHandler *os.File
+	Err               error
+}
+
+func (shell Shell) prepareExec() preparedExec {
 	if shell.runtimeSettings.ShouldUseSubShell {
 		subShellCmd := shell.runtimeSettings.Command + " " +
 			strings.Join(shell.runtimeSettings.Args, " ")
@@ -89,47 +100,76 @@ func (shell Shell) prepareCmdExecutor() (*exec.Cmd, *bytes.Buffer, *bytes.Buffer
 	shell.runtimeSettings.Command = "timeout"
 	shell.runtimeSettings.Args = timeoutArgs
 
-	cmdExecutor := exec.Command(
+	execCmd := exec.Command(
 		shell.runtimeSettings.Command, shell.runtimeSettings.Args...,
 	)
 	if shell.runtimeSettings.Username != "" {
 		sysCallCredentials, err := shell.sysCallCredentialsFactory()
-		if err == nil {
-			cmdExecutor.SysProcAttr = &syscall.SysProcAttr{Credential: sysCallCredentials}
-		}
 		if err != nil && !shell.runtimeSettings.ShouldIgnoreUsernameLookupError {
-			return nil, nil, nil
+			return preparedExec{Err: err}
+		}
+		if err == nil {
+			execCmd.SysProcAttr = &syscall.SysProcAttr{Credential: sysCallCredentials}
 		}
 	}
 
 	if shell.runtimeSettings.WorkingDirectory != "" {
-		cmdExecutor.Dir = shell.runtimeSettings.WorkingDirectory
+		execCmd.Dir = shell.runtimeSettings.WorkingDirectory
 	}
 
-	var stdoutBytesBuffer, stderrBytesBuffer bytes.Buffer
-	cmdExecutor.Stdout = &stdoutBytesBuffer
-	cmdExecutor.Stderr = &stderrBytesBuffer
+	var stdoutBytesBuffer bytes.Buffer
+	execCmd.Stdout = &stdoutBytesBuffer
+	if shell.runtimeSettings.StdoutFilePath != "" {
+		stdoutFileHandler, err := os.Create(shell.runtimeSettings.StdoutFilePath)
+		if err != nil {
+			return preparedExec{Err: err}
+		}
+		execCmd.Stdout = stdoutFileHandler
+	}
 
-	cmdExecutor.Env = append(cmdExecutor.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	cmdExecutor.Env = slices.Concat(cmdExecutor.Env, shell.runtimeSettings.Envs)
+	var stderrBytesBuffer bytes.Buffer
+	execCmd.Stderr = &stderrBytesBuffer
+	if shell.runtimeSettings.StderrFilePath != "" {
+		stderrFileHandler, err := os.Create(shell.runtimeSettings.StderrFilePath)
+		if err != nil {
+			return preparedExec{Err: err}
+		}
+		execCmd.Stderr = stderrFileHandler
+	}
 
-	return cmdExecutor, &stdoutBytesBuffer, &stderrBytesBuffer
+	execCmd.Env = append(execCmd.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	execCmd.Env = slices.Concat(execCmd.Env, shell.runtimeSettings.Envs)
+
+	return preparedExec{
+		ExecCmd:           execCmd,
+		StdoutBytesBuffer: &stdoutBytesBuffer,
+		StderrBytesBuffer: &stderrBytesBuffer,
+	}
 }
 
-func (shell Shell) Run() (string, error) {
-	cmdExecutor, stdoutBytesBuffer, stderrBytesBuffer := shell.prepareCmdExecutor()
-	if cmdExecutor == nil {
-		return "", errors.New("UsernameLookupError")
+func (shell Shell) Run() (stdoutStr string, err error) {
+	preparedExec := shell.prepareExec()
+	if preparedExec.Err != nil {
+		return stdoutStr, preparedExec.Err
 	}
 
-	err := cmdExecutor.Run()
-	stdoutStr := strings.TrimSpace(stdoutBytesBuffer.String())
-	if err == nil {
+	preparedExec.Err = preparedExec.ExecCmd.Run()
+	if preparedExec.StdoutFileHandler != nil {
+		preparedExec.StdoutFileHandler.Close()
+	}
+	if preparedExec.StderrFileHandler != nil {
+		preparedExec.StderrFileHandler.Close()
+	}
+
+	if preparedExec.StdoutBytesBuffer != nil {
+		stdoutStr = strings.TrimSpace(preparedExec.StdoutBytesBuffer.String())
+	}
+	if preparedExec.Err == nil {
 		return stdoutStr, nil
 	}
 
-	if exitErr, assertOk := err.(*exec.ExitError); assertOk {
-		stdErrStr := stderrBytesBuffer.String()
+	if exitErr, assertOk := preparedExec.Err.(*exec.ExitError); assertOk {
+		stdErrStr := preparedExec.StderrBytesBuffer.String()
 		if exitErr.ExitCode() == 124 {
 			stdErrStr = "CommandDeadlineExceeded"
 		}
@@ -140,5 +180,5 @@ func (shell Shell) Run() (string, error) {
 		}
 	}
 
-	return stdoutStr, err
+	return stdoutStr, preparedExec.Err
 }
