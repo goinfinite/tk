@@ -1241,14 +1241,14 @@ func TestDecompressFile(t *testing.T) {
 
 		for _, testCase := range testCaseStructs {
 			testFile := filepath.Join(tempDir, "decompress_test.txt")
-			testContent := "content to decompress"
+			preCompressedContent := "content to decompress"
 
 			err := clerk.CreateFile(testFile)
 			if err != nil {
 				t.Fatalf("CreateFileFailed: %v", err)
 			}
 
-			err = clerk.UpdateFileContent(testFile, testContent, true)
+			err = clerk.UpdateFileContent(testFile, preCompressedContent, true)
 			if err != nil {
 				t.Fatalf("UpdateFileContentFailed: %v", err)
 			}
@@ -1285,6 +1285,19 @@ func TestDecompressFile(t *testing.T) {
 
 			if decompressedFile == "" && testCase.shouldSucceed {
 				t.Errorf("[%s] DecompressedFilePathShouldNotBeEmpty", testCase.format)
+			}
+
+			if testCase.shouldSucceed && clerk.FileExists(decompressedFile) {
+				decompressedContent, err := clerk.ReadFileContent(decompressedFile, nil)
+				if err != nil {
+					t.Fatalf("[%s]ReadDecompressedFileFailed: %v", testCase.format, err)
+				}
+				if decompressedContent != preCompressedContent {
+					t.Errorf(
+						"[%s] DecompressedContentMismatch: '%s' vs '%s'",
+						testCase.format, preCompressedContent, decompressedContent,
+					)
+				}
 			}
 
 			shouldKeep := false
