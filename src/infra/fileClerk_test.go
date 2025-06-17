@@ -948,11 +948,11 @@ func TestCreateSymlink(t *testing.T) {
 
 		err := clerk.CreateSymlink(nonExistentFile, symlinkPath, false)
 		if err == nil {
-			t.Errorf("MissingExpectedError: FileNotFound")
+			t.Errorf("MissingExpectedError: SourcePathNotFound")
 		}
 
-		if err != nil && err.Error() != "FileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
+		if err != nil && err.Error() != "SourcePathNotFound" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourcePathNotFound", err.Error())
 		}
 	})
 }

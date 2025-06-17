@@ -437,7 +437,7 @@ func (clerk FileClerk) DecompressDir(
 	targetPathPtr *string,
 	shouldKeepSourceFilePtr *bool,
 ) (decompressedDirPath string, err error) {
-	sourcePathExt := filepath.Ext(decompressedDirPath)
+	sourcePathExt := filepath.Ext(sourcePath)
 	if sourcePathExt != ".tar" {
 		sourcePath, err = clerk.DecompressFile(sourcePath, nil, shouldKeepSourceFilePtr)
 		if err != nil {
@@ -480,11 +480,20 @@ func (clerk FileClerk) CreateSymlink(
 	sourcePath, targetPath string,
 	shouldOverwrite bool,
 ) error {
-	if !shouldOverwrite && !clerk.FileExists(sourcePath) {
-		return errors.New("FileNotFound")
+	if !clerk.FileExists(sourcePath) {
+		return errors.New("SourcePathNotFound")
 	}
 
-	if shouldOverwrite {
+	if !shouldOverwrite {
+		if clerk.IsSymlink(targetPath) {
+			return errors.New("SymlinkAlreadyExists")
+		}
+		if clerk.IsFile(targetPath) || clerk.IsDir(targetPath) {
+			return errors.New("TargetPathAlreadyExists")
+		}
+	}
+
+	if clerk.FileExists(targetPath) {
 		err := os.Remove(targetPath)
 		if err != nil {
 			return err
