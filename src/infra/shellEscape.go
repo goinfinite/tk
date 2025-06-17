@@ -6,6 +6,8 @@ import (
 	"unicode"
 )
 
+var escapableCharsRegex = regexp.MustCompile(`[^\w@%+=:,./-]`)
+
 type ShellEscape struct {
 }
 
@@ -14,7 +16,6 @@ func (helper ShellEscape) Quote(inputStr string) string {
 		return "''"
 	}
 
-	escapableCharsRegex := regexp.MustCompile(`[^\w@%+=:,./-]`)
 	if !escapableCharsRegex.MatchString(inputStr) {
 		return inputStr
 	}
