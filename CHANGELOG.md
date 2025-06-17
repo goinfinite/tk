@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.0.7 - 2025/06/17
+feat: add FileClerk
+feat: add CompressionFormat vo
+fix: add stdout and stderr file handlers to shell
+
 0.0.6 - 2025/06/11
 feat: add Shell
 feat: add ReadServerPublic/PrivateIpAddresses
