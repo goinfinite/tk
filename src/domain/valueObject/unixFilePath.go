@@ -39,12 +39,13 @@ func NewUnixFilePath(value any) (filePath UnixFilePath, err error) {
 }
 
 func (vo UnixFilePath) ReadWithoutExtension() UnixFilePath {
-	unixFilePathExtStr := filepath.Ext(string(vo))
-	if unixFilePathExtStr == "" {
+	fileExt, err := vo.ReadCompoundFileExtension()
+	if err != nil {
 		return vo
 	}
 
-	unixFilePathWithoutExtStr := strings.TrimSuffix(string(vo), unixFilePathExtStr)
+	extStr := "." + fileExt.String()
+	unixFilePathWithoutExtStr := strings.TrimSuffix(string(vo), extStr)
 	unixFilePathWithoutExt, _ := NewUnixFilePath(unixFilePathWithoutExtStr)
 	return unixFilePathWithoutExt
 }
