@@ -47,3 +47,4 @@
 - Avoid unnecessary line breaks, especially in simple struct initializations that can fit on a single line while remaining readable.
 - When methods are executed automatically via timers or watchdogs, error log messages SHOULD always include slog.String("method", "MethodName") to identify the source method, since these log entries appear without user context and administrators need to know where the error originated.
 - When reviewing Swagger/GoDoc documentation comments, check for consistent spacing and indentation in @Param, @Summary, @Description and other annotation lines.
+- Error constants SHOULD follow the naming convention of starting with "Err" prefix.
