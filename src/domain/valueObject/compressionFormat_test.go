@@ -33,6 +33,9 @@ func TestNewCompressionFormat(t *testing.T) {
 			{".gz", CompressionFormat("gzip"), false},
 			{".tarball", CompressionFormat("tar"), false},
 			{".brotli", CompressionFormat("br"), false},
+			{"tar.gz", CompressionFormat("tar.gz"), false},
+			{"tgz", CompressionFormat("tar.gz"), false},
+			{"gzipped-tarball", CompressionFormat("tar.gz"), false},
 			// InvalidFormats
 			{"invalid", CompressionFormat(""), true},
 			{"rar", CompressionFormat(""), true},
@@ -93,6 +96,7 @@ func TestNewCompressionFormat(t *testing.T) {
 			{CompressionFormat("zip"), "zip"},
 			{CompressionFormat("xz"), "xz"},
 			{CompressionFormat("br"), "br"},
+			{CompressionFormat("tar.gz"), "tar.gz"},
 		}
 
 		for _, testCase := range testCaseStructs {

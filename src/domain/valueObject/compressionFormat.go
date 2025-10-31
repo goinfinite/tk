@@ -10,15 +10,16 @@ import (
 type CompressionFormat string
 
 const (
-	CompressionFormatTarball CompressionFormat = "tar"
-	CompressionFormatGzip    CompressionFormat = "gzip"
-	CompressionFormatZip     CompressionFormat = "zip"
-	CompressionFormatXz      CompressionFormat = "xz"
-	CompressionFormatBrotli  CompressionFormat = "br"
+	CompressionFormatTarball        CompressionFormat = "tar"
+	CompressionFormatGzippedTarball CompressionFormat = "tar.gz"
+	CompressionFormatGzip           CompressionFormat = "gzip"
+	CompressionFormatZip            CompressionFormat = "zip"
+	CompressionFormatXz             CompressionFormat = "xz"
+	CompressionFormatBrotli         CompressionFormat = "br"
 )
 
 var ValidCompressionFormats = []string{
-	"tar", "gzip", "zip", "xz", "br",
+	"tar", "tar.gz", "gzip", "zip", "xz", "br",
 }
 
 func NewCompressionFormat(value any) (CompressionFormat, error) {
@@ -35,6 +36,8 @@ func NewCompressionFormat(value any) (CompressionFormat, error) {
 		stringValue = "gzip"
 	case "tarball":
 		stringValue = "tar"
+	case "tar.gz", "tgz", "gzipped-tarball":
+		stringValue = "tar.gz"
 	case "brotli":
 		stringValue = "br"
 	case "":
@@ -43,8 +46,8 @@ func NewCompressionFormat(value any) (CompressionFormat, error) {
 
 	stringValueVo := CompressionFormat(stringValue)
 	switch stringValueVo {
-	case CompressionFormatTarball, CompressionFormatGzip, CompressionFormatZip,
-		CompressionFormatXz, CompressionFormatBrotli:
+	case CompressionFormatTarball, CompressionFormatGzippedTarball, CompressionFormatGzip,
+		CompressionFormatZip, CompressionFormatXz, CompressionFormatBrotli:
 		return stringValueVo, nil
 	default:
 		return "", errors.New("InvalidCompressionFormat")
