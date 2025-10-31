@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -31,6 +32,8 @@ func TestNewUnixFilePath(t *testing.T) {
 			{"./file.php", UnixFilePath(""), true},
 			{"file.php", UnixFilePath(""), true},
 			{"/home/../file.php", UnixFilePath(""), true},
+			{"/home/../../file.php", UnixFilePath(""), true},
+			{"/home/file" + strings.Repeat("e", 5000) + ".php", UnixFilePath(""), true},
 			{123, UnixFilePath(""), true},
 			{true, UnixFilePath(""), true},
 			{[]string{"/file.php"}, UnixFilePath(""), true},

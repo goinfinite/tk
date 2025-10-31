@@ -20,6 +20,10 @@ func NewUnixFilePath(value any) (filePath UnixFilePath, err error) {
 		return filePath, errors.New("UnixFilePathValueMustBeString")
 	}
 
+	if len(stringValue) > 5000 {
+		return filePath, errors.New("UnixFilePathTooBig")
+	}
+
 	unixFilePathRegex := regexp.MustCompile(unixFilePathRegexExpression)
 	if !unixFilePathRegex.MatchString(stringValue) {
 		return filePath, errors.New("InvalidUnixFilePath")
