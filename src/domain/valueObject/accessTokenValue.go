@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const accessTokenValueRegex string = `^[a-zA-Z0-9\-_=+/.]+$`
+var accessTokenValueRegex = regexp.MustCompile(`^[a-zA-Z0-9\-_=+/.]+$`)
 
 type AccessTokenValue string
 
@@ -25,8 +25,7 @@ func NewAccessTokenValue(value any) (tokenValue AccessTokenValue, err error) {
 		return tokenValue, errors.New("InvalidAccessTokenValueTooLong")
 	}
 
-	re := regexp.MustCompile(accessTokenValueRegex)
-	if !re.MatchString(stringValue) {
+	if !accessTokenValueRegex.MatchString(stringValue) {
 		return tokenValue, errors.New("InvalidAccessTokenValue")
 	}
 	return AccessTokenValue(stringValue), nil

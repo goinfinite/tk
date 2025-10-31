@@ -9,7 +9,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const fqdnRegex string = `^((\*\.)?([a-zA-Z0-9_]+[\w-]*\.)*)?([a-zA-Z0-9_][\w-]*[a-zA-Z0-9])\.([a-zA-Z]{2,})$`
+var fqdnRegex = regexp.MustCompile(`^((\*\.)?([a-zA-Z0-9_]+[\w-]*\.)*)?([a-zA-Z0-9_][\w-]*[a-zA-Z0-9])\.([a-zA-Z]{2,})$`)
 
 type Fqdn string
 
@@ -25,8 +25,7 @@ func NewFqdn(value any) (fqdn Fqdn, err error) {
 		return fqdn, errors.New("FqdnCannotBeIpAddress")
 	}
 
-	re := regexp.MustCompile(fqdnRegex)
-	if !re.MatchString(stringValue) {
+	if !fqdnRegex.MatchString(stringValue) {
 		return fqdn, errors.New("InvalidFqdn")
 	}
 

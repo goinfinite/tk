@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const unixFileNameRegexExpression = `^[^\n\r\t\f\0\?\[\]\<\>\/]{1,512}$`
+var unixFileNameRegex = regexp.MustCompile(`^[^\n\r\t\f\0\?\[\]\<\>\/]{1,512}$`)
 
 var reservedUnixFileNames = []string{".", "..", "*", "/", "\\"}
 
@@ -20,8 +20,7 @@ func NewUnixFileName(value any) (fileName UnixFileName, err error) {
 		return fileName, errors.New("UnixFileNameValueMustBeString")
 	}
 
-	re := regexp.MustCompile(unixFileNameRegexExpression)
-	if !re.MatchString(stringValue) {
+	if !unixFileNameRegex.MatchString(stringValue) {
 		return fileName, errors.New("InvalidUnixFileName")
 	}
 

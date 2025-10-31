@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const HumanlyUsedCharsRegex string = `^[\p{L}\p{N}\p{Pd}\p{Pi}\p{Pf}\p{Pc}\p{Po}\p{Z}\p{Sc}\(\)\[\]\+\=]+$`
+var HumanlyUsedCharsRegex = regexp.MustCompile(`^[\p{L}\p{N}\p{Pd}\p{Pi}\p{Pf}\p{Pc}\p{Po}\p{Z}\p{Sc}\(\)\[\]\+\=]+$`)
 
 type GenericNotes string
 
@@ -25,8 +25,7 @@ func NewGenericNotes(value any) (genericNotes GenericNotes, err error) {
 		return genericNotes, errors.New("GenericNotesTooBig")
 	}
 
-	re := regexp.MustCompile(HumanlyUsedCharsRegex)
-	if !re.MatchString(stringValue) {
+	if !HumanlyUsedCharsRegex.MatchString(stringValue) {
 		return genericNotes, errors.New("GenericNotesMustOnlyContainHumanlyUsedChars")
 	}
 

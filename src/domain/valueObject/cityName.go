@@ -9,7 +9,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-const cityNameRegex = `^\p{L}[\p{L}\'\ \-]{2,128}$`
+var cityNameRegex = regexp.MustCompile(`^\p{L}[\p{L}\'\ \-]{2,128}$`)
 
 type CityName string
 
@@ -21,8 +21,7 @@ func NewCityName(value any) (cityName CityName, err error) {
 
 	capitalizedCityName := cases.Title(language.English, cases.Compact).String(stringValue)
 
-	re := regexp.MustCompile(cityNameRegex)
-	if !re.MatchString(capitalizedCityName) {
+	if !cityNameRegex.MatchString(capitalizedCityName) {
 		return cityName, errors.New("InvalidCityName")
 	}
 

@@ -9,7 +9,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const unixFileExtensionRegexExpression = `^([\w\-]{1,15}\.)?[\w\-]{1,15}$`
+var unixFileExtensionRegex = regexp.MustCompile(`^([\w\-]{1,15}\.)?[\w\-]{1,15}$`)
 
 type UnixFileExtension string
 
@@ -22,8 +22,7 @@ func NewUnixFileExtension(value any) (
 	}
 	stringValue = strings.TrimPrefix(stringValue, ".")
 
-	re := regexp.MustCompile(unixFileExtensionRegexExpression)
-	if !re.MatchString(stringValue) {
+	if !unixFileExtensionRegex.MatchString(stringValue) {
 		return unixFileExtension, errors.New("InvalidUnixFileExtension")
 	}
 

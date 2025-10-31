@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const streetAddressRegex = `^[\p{L}\d][\p{L}\d\'\.\,\ \-]{2,512}[\p{L}\d\.]$`
+var streetAddressRegex = regexp.MustCompile(`^[\p{L}\d][\p{L}\d\'\.\,\ \-]{2,512}[\p{L}\d\.]$`)
 
 type StreetAddress string
 
@@ -17,8 +17,7 @@ func NewStreetAddress(value any) (streetAddress StreetAddress, err error) {
 		return streetAddress, errors.New("StreetAddressMustBeString")
 	}
 
-	re := regexp.MustCompile(streetAddressRegex)
-	if !re.MatchString(stringValue) {
+	if !streetAddressRegex.MatchString(stringValue) {
 		return streetAddress, errors.New("InvalidStreetAddress")
 	}
 

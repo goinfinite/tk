@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const paginationLastSeenIdRegex string = `^[\w\-]{1,256}$`
+var paginationLastSeenIdRegex = regexp.MustCompile(`^[\w\-]{1,256}$`)
 
 type PaginationLastSeenId string
 
@@ -17,8 +17,7 @@ func NewPaginationLastSeenId(value any) (lastSeenId PaginationLastSeenId, err er
 		return lastSeenId, errors.New("PaginationLastSeenIdMustBeString")
 	}
 
-	re := regexp.MustCompile(paginationLastSeenIdRegex)
-	if !re.MatchString(stringValue) {
+	if !paginationLastSeenIdRegex.MatchString(stringValue) {
 		return lastSeenId, errors.New("InvalidPaginationLastSeenId")
 	}
 

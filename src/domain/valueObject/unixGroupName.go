@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const unixGroupNameRegex string = `^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)$`
+var unixGroupNameRegex = regexp.MustCompile(`^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)$`)
 
 type UnixGroupName string
 
@@ -19,8 +19,7 @@ func NewUnixGroupName(value any) (unixGroupName UnixGroupName, err error) {
 	}
 	stringValue = strings.ToLower(stringValue)
 
-	re := regexp.MustCompile(unixGroupNameRegex)
-	if !re.MatchString(stringValue) {
+	if !unixGroupNameRegex.MatchString(stringValue) {
 		return unixGroupName, errors.New("InvalidUnixGroupName")
 	}
 

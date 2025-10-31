@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const paginationSortByRegex string = `^[\p{L}\d\.\_\-\ ]{1,256}$`
+var paginationSortByRegex = regexp.MustCompile(`^[\p{L}\d\.\_\-\ ]{1,256}$`)
 
 type PaginationSortBy string
 
@@ -17,8 +17,7 @@ func NewPaginationSortBy(value any) (sortBy PaginationSortBy, err error) {
 		return sortBy, errors.New("PaginationSortByMustBeString")
 	}
 
-	re := regexp.MustCompile(paginationSortByRegex)
-	if !re.MatchString(stringValue) {
+	if !paginationSortByRegex.MatchString(stringValue) {
 		return sortBy, errors.New("InvalidPaginationSortBy")
 	}
 

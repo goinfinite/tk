@@ -9,6 +9,12 @@ import (
 
 type Password string
 
+var (
+	hasLetterRegex       = regexp.MustCompile(`[a-zA-Z]`)
+	hasNumberRegex       = regexp.MustCompile(`[0-9]`)
+	hasSpecialCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9]`)
+)
+
 func NewPassword(value any) (password Password, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
@@ -23,18 +29,15 @@ func NewPassword(value any) (password Password, err error) {
 		return password, errors.New("PasswordTooLong")
 	}
 
-	hasLetterRegexp := regexp.MustCompile(`[a-zA-Z]`)
-	if !hasLetterRegexp.MatchString(stringValue) {
+	if !hasLetterRegex.MatchString(stringValue) {
 		return password, errors.New("PasswordMustHaveLetter")
 	}
 
-	hasNumberRegexp := regexp.MustCompile(`[0-9]`)
-	if !hasNumberRegexp.MatchString(stringValue) {
+	if !hasNumberRegex.MatchString(stringValue) {
 		return password, errors.New("PasswordMustHaveNumber")
 	}
 
-	hasSpecialRegexp := regexp.MustCompile(`[^a-zA-Z0-9]`)
-	if !hasSpecialRegexp.MatchString(stringValue) {
+	if !hasSpecialCharsRegex.MatchString(stringValue) {
 		return password, errors.New("PasswordMustHaveSpecialCharacter")
 	}
 

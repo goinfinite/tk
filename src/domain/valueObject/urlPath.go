@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const urlPathRegex string = `^(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?$`
+var urlPathRegex = regexp.MustCompile(`^(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?$`)
 
 type UrlPath string
 
@@ -23,8 +23,7 @@ func NewUrlPath(value any) (urlPath UrlPath, err error) {
 		stringValue = "/" + stringValue
 	}
 
-	re := regexp.MustCompile(urlPathRegex)
-	if !re.MatchString(stringValue) {
+	if !urlPathRegex.MatchString(stringValue) {
 		return urlPath, errors.New("InvalidUrlPath")
 	}
 

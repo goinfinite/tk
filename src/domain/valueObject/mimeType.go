@@ -12,7 +12,7 @@ var (
 	MimeTypeGeneric   MimeType = "generic"
 )
 
-const mimeTypeRegexExpression = `^[A-Za-z0-9\-]{1,64}\/[A-Za-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`
+var mimeTypeRegex = regexp.MustCompile(`^[A-Za-z0-9\-]{1,64}\/[A-Za-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`)
 
 type MimeType string
 
@@ -22,8 +22,7 @@ func NewMimeType(value any) (mimeType MimeType, err error) {
 		return mimeType, errors.New("MimeTypeValueMustBeString")
 	}
 
-	re := regexp.MustCompile(mimeTypeRegexExpression)
-	if !re.MatchString(stringValue) {
+	if !mimeTypeRegex.MatchString(stringValue) {
 		return mimeType, errors.New("InvalidMimeTypeValue")
 	}
 

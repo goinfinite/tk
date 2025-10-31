@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const relativeTimeRegex string = `^(?i)(\d+(?:\.\d+)?)\s*(second|minute|hour|day|week|month|year|s|m|h|d|w|M|y)(?:s?)\s*(ago|from now)?$`
+var relativeTimeRegex = regexp.MustCompile(`^(?i)(\d+(?:\.\d+)?)\s*(second|minute|hour|day|week|month|year|s|m|h|d|w|M|y)(?:s?)\s*(ago|from now)?$`)
 
 type RelativeTime string
 
@@ -17,8 +17,7 @@ func NewRelativeTime(value any) (relativeTime RelativeTime, err error) {
 		return relativeTime, errors.New("RelativeTimeMustBeString")
 	}
 
-	re := regexp.MustCompile(relativeTimeRegex)
-	if !re.MatchString(stringValue) {
+	if !relativeTimeRegex.MatchString(stringValue) {
 		return relativeTime, errors.New("InvalidRelativeTime")
 	}
 

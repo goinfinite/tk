@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const unixUsernameRegex string = `^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)$`
+var unixUsernameRegex = regexp.MustCompile(`^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)$`)
 
 type UnixUsername string
 
@@ -19,8 +19,7 @@ func NewUnixUsername(value any) (unixUsername UnixUsername, err error) {
 	}
 	stringValue = strings.ToLower(stringValue)
 
-	re := regexp.MustCompile(unixUsernameRegex)
-	if !re.MatchString(stringValue) {
+	if !unixUsernameRegex.MatchString(stringValue) {
 		return unixUsername, errors.New("InvalidUnixUsername")
 	}
 

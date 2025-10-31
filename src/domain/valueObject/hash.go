@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const hashRegex string = `^[\w\-\=]{6,512}$`
+var hashRegex = regexp.MustCompile(`^[\w\-\=]{6,512}$`)
 
 type Hash string
 
@@ -17,8 +17,7 @@ func NewHash(value any) (hash Hash, err error) {
 		return hash, errors.New("HashMustBeString")
 	}
 
-	re := regexp.MustCompile(hashRegex)
-	if !re.MatchString(stringValue) {
+	if !hashRegex.MatchString(stringValue) {
 		return hash, errors.New("InvalidHash")
 	}
 

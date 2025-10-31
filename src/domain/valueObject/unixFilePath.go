@@ -9,8 +9,10 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const unixFilePathRegexExpression = `^\/?[^\n\r\t\f\0\?\[\]\<\>]+$`
-const unixFileRelativePathRegexExpression = `\.\.\/|^\.\/|^\/\.\/`
+var (
+	unixFilePathRegex         = regexp.MustCompile(`^\/?[^\n\r\t\f\0\?\[\]\<\>]+$`)
+	unixFileRelativePathRegex = regexp.MustCompile(`\.\.\/|^\.\/|^\/\.\/`)
+)
 
 type UnixFilePath string
 
@@ -24,7 +26,6 @@ func NewUnixFilePath(value any) (filePath UnixFilePath, err error) {
 		return filePath, errors.New("UnixFilePathTooBig")
 	}
 
-	unixFilePathRegex := regexp.MustCompile(unixFilePathRegexExpression)
 	if !unixFilePathRegex.MatchString(stringValue) {
 		return filePath, errors.New("InvalidUnixFilePath")
 	}
@@ -34,7 +35,6 @@ func NewUnixFilePath(value any) (filePath UnixFilePath, err error) {
 		return filePath, errors.New("PathIsFileNameOnly")
 	}
 
-	unixFileRelativePathRegex := regexp.MustCompile(unixFileRelativePathRegexExpression)
 	if unixFileRelativePathRegex.MatchString(stringValue) {
 		return filePath, errors.New("RelativePathNotAllowed")
 	}
