@@ -217,7 +217,7 @@ func TestNewByte(t *testing.T) {
 	t.Run("ToKiBMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
-			expectedOutput int64
+			expectedOutput uint64
 		}{
 			{Byte(0), 0},
 			{Byte(1024), 1},
@@ -236,7 +236,7 @@ func TestNewByte(t *testing.T) {
 	t.Run("ToMiBMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
-			expectedOutput int64
+			expectedOutput uint64
 		}{
 			{Byte(0), 0},
 			{Byte(1048576), 1},
@@ -255,7 +255,7 @@ func TestNewByte(t *testing.T) {
 	t.Run("ToGiBMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
-			expectedOutput int64
+			expectedOutput uint64
 		}{
 			{Byte(0), 0},
 			{Byte(1073741824), 1},
@@ -274,7 +274,7 @@ func TestNewByte(t *testing.T) {
 	t.Run("ToTiBMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
-			expectedOutput int64
+			expectedOutput uint64
 		}{
 			{Byte(0), 0},
 			{Byte(1099511627776), 1},
@@ -314,11 +314,11 @@ func TestNewByte(t *testing.T) {
 			expectedOutput string
 		}{
 			{Byte(0), "0 B"},
-			{Byte(512), "512 B"},      // < 1024
-			{Byte(1024), "1 KiB"},     // >= 1024
-			{Byte(1048576), "1 MiB"},  // >= 1048576
-			{Byte(1073741824), "1 GiB"}, // >= 1073741824
-			{Byte(1099511627776), "1 TiB"}, // >= 1099511627776
+			{Byte(512), "512 B"},                           // < 1024
+			{Byte(1024), "1 KiB"},                          // >= 1024
+			{Byte(1048576), "1 MiB"},                       // >= 1048576
+			{Byte(1073741824), "1 GiB"},                    // >= 1073741824
+			{Byte(1099511627776), "1 TiB"},                 // >= 1099511627776
 			{Byte(1125899906842624), "1125899906842624 B"}, // >= 1125899906842624
 		}
 
