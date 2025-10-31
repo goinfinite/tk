@@ -25,7 +25,7 @@ func TestNewUrlPath(t *testing.T) {
 			{"/app/html@", UrlPath(""), true},
 			{"/path to download", UrlPath(""), true},
 			{"index.js=", UrlPath(""), true},
-			{"no leading slash", UrlPath(""), true},
+			{"spaces are invalid", UrlPath(""), true},
 			{123, UrlPath("/123"), false},
 			{true, UrlPath("/true"), false},
 			{[]string{"/path"}, UrlPath(""), true},

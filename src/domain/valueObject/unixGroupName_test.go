@@ -20,14 +20,14 @@ func TestNewUnixGroupName(t *testing.T) {
 			{"group_name", UnixGroupName("group_name"), false},
 			{"group-name", UnixGroupName("group-name"), false},
 			{"a", UnixGroupName("a"), false},
-			{"groupwith31characters123456789", UnixGroupName("groupwith31characters123456789"), false},
+			{"groupwith32characterslong12345", UnixGroupName("groupwith32characterslong12345"), false}, // 32 chars (max length)
 			// Invalid group names
 			{"", UnixGroupName(""), true},
-			{"1group", UnixGroupName(""), true}, // starts with number
-			{"-group", UnixGroupName(""), true}, // starts with dash
-			{"group!", UnixGroupName(""), true}, // special char
-			{"group@domain", UnixGroupName(""), true}, // special char
-			{"group with space", UnixGroupName(""), true}, // space
+			{"1group", UnixGroupName(""), true},                                              // starts with number
+			{"-group", UnixGroupName(""), true},                                              // starts with dash
+			{"group!", UnixGroupName(""), true},                                              // special char
+			{"group@domain", UnixGroupName(""), true},                                        // special char
+			{"group with space", UnixGroupName(""), true},                                    // space
 			{"groupwith40characters123456789012345678901234567890", UnixGroupName(""), true}, // too long
 			{123, UnixGroupName(""), true},
 			{[]string{"root"}, UnixGroupName(""), true},
