@@ -1,7 +1,15 @@
 {
   "cSpell.words": [
+    "Gibibyte",
+    "Gibibytes",
     "github",
-    "goinfinite"
+    "goinfinite",
+    "Kibibyte",
+    "Kibibytes",
+    "Mebibyte",
+    "Mebibytes",
+    "Tebibyte",
+    "Tebibytes"
   ],
   "tailwindCSS.includeLanguages": {
     "templ": "html"
