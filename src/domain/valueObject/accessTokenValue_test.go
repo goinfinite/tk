@@ -1,0 +1,59 @@
+package tkValueObject
+
+import (
+	"testing"
+)
+
+func TestNewAccessTokenValue(t *testing.T) {
+	t.Run("StringInput", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     any
+			expectedOutput AccessTokenValue
+			expectError    bool
+		}{
+			{"a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef", AccessTokenValue("a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef"), false},
+			{"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=+/.AB", AccessTokenValue("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=+/.AB"), false},
+			{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30", AccessTokenValue("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"), false},
+			{"eyJ0aWNrZXRzIjp7InZpZXciOiIiLCJtdWx0aV92aWV3IjoiIiwibXVsdGlfdmlld19leGlzdHMiOiIiLCJkZXB0aWQiOiIiLCJtdWx0aV9kZXB0X2lkIjoiIiwicHJpb3JpdHkiOiIiLCJjbGllbnQiOiIiLCJjbGllbnRpZCI6IiIsImNsaWVudG5hbWUiOiIiLCJzdWJqZWN0IjoiIiwiZW1haWwiOiIiLCJzZWFyY2hmbGFnIjoiIiwidGFnIjoiIiwibXVsdGlfdGFncyI6IiJ9LCJhZG1pbi1zZXJ2aWNlcy1pbmRleCI6eyJjbGllbnRuYW1lIjoiIiwidHlwZSI6Imhvc3RpbmdhY2NvdW50IiwicGFja2FnZSI6IjkzIiwicHJvZHVjdG5hbWUiOiIiLCJiaWxsaW5nY3ljbGUiOiIiLCJzZXJ2ZXIiOiIiLCJwYXltZW50bWV0aG9kIjoiIiwibmV4dGR1ZWRhdGUiOiIiLCJzdGF0dXMiOiJBY3RpdmUiLCJkb21haW4iOiIiLCJ1c2VybmFtZSI6IiIsImRlZGljYXRlZGlwIjoiIiwiYXNzaWduZWRpcHMiOiIiLCJpZCI6IiIsInN1YnNjcmlwdGlvbmlkIjoiIiwibm90ZXMiOiIiLCJjdXN0b21maWVsZHZhbHVlIjoiIiwiY3VzdG9tZmllbGQiOiIwIn0sIm9yZGVycyI6eyJjbGllbnQiOiIiLCJjbGllbnRpZCI6IiIsImNsaWVudG5hbWUiOiIiLCJvcmRlcmlkIjoiIiwib3JkZXJudW0iOiIiLCJwYXltZW50c3RhdHVzIjoiIiwib3JkZXJkYXRlIjoiIiwic3RhdHVzIjoiUGVuZGluZyIsImFtb3VudCI6IiIsIm9yZGVyaXAiOiIifSwic3lzdGVtYWN0aXZpdHlsb2ciOnsiZGF0ZSI6IiIsImRhdGVSYW5nZSI6IiIsInVzZXJuYW1lIjoiIiwiZGVzY3JpcHRpb24iOiIiLCJpcGFkZHJlc3MiOiIifSwiY2xpZW50cyI6eyJ1c2VyaWQiOiIiLCJuYW1lIjoiIiwiZW1haWwiOiIiLCJjb3VudHJ5LWNhbGxpbmctY29kZS1waG9uZSI6IiIsInBob25lIjoiIiwiZ3JvdXAiOiIiLCJzdGF0dXMiOiIiLCJhZGRyZXNzMSI6IiIsImFkZHJlc3MyIjoiIiwiY2l0eSI6IiIsInN0YXRlIjoiIiwicG9zdGNvZGUiOiIiLCJjb3VudHJ5IjoiIiwicGF5bWVudG1ldGhvZCI6IiIsImNjdHlwZSI6IiIsImNjbGFzdGZvdXIiOiIiLCJhdXRvY2NiaWxsaW5nIjoiIiwiY3JlZGl0IjoiIiwiY3VycmVuY3kiOiIiLCJzaWdudXBkYXRlcmFuZ2UiOiIiLCJsYW5ndWFnZSI6IiIsIm1hcmtldGluZ29wdGluIjoiIiwiYXV0b3N0YXR1cyI6IiIsInRheGV4ZW1wdCI6IiIsImxhdGVmZWVzIjoiIiwib3ZlcmR1ZW5vdGljZXMiOiIiLCJzZXBhcmF0ZWludm9pY2VzIjoiIiwiY3VzdG9tZmllbGRzIjoiIiwiZW1haWwyIjoiIiwiY291bnRyeS1jYWxsaW5nLWNvZGUtcGhvbmUyIjoiIiwicGhvbmUyIjoiIiwiZ3JvdXAyIjoiIn0sImNsaW52Ijp7InNlcnZpY2VpZCI6IiIsImFkZG9uaWQiOiIiLCJkb21haW5pZCI6IiIsImNsaWVudG5hbWUiOiIiLCJpbnZvaWNlbnVtIjoiIiwibGluZWl0ZW0iOiIiLCJwYXltZW50bWV0aG9kIjoiIiwiaW52b2ljZWRhdGUiOiIiLCJkdWVkYXRlIjoiIiwiZGF0ZXBhaWQiOiIiLCJ0b3RhbGZyb210b3RhbHRvIjoiIiwic3RhdHVzIjoiIiwibGFzdF9jYXB0dXJlX2F0dGVtcHQiOiIiLCJkYXRlX3JlZnVuZGVkIjoiIiwiZGF0ZV9jYW5jZWxsZWQiOiIiLCJ0b3RhbGZyb20iOiIiLCJ0b3RhbHRvIjoiIn19", AccessTokenValue("eyJ0aWNrZXRzIjp7InZpZXciOiIiLCJtdWx0aV92aWV3IjoiIiwibXVsdGlfdmlld19leGlzdHMiOiIiLCJkZXB0aWQiOiIiLCJtdWx0aV9kZXB0X2lkIjoiIiwicHJpb3JpdHkiOiIiLCJjbGllbnQiOiIiLCJjbGllbnRpZCI6IiIsImNsaWVudG5hbWUiOiIiLCJzdWJqZWN0IjoiIiwiZW1haWwiOiIiLCJzZWFyY2hmbGFnIjoiIiwidGFnIjoiIiwibXVsdGlfdGFncyI6IiJ9LCJhZG1pbi1zZXJ2aWNlcy1pbmRleCI6eyJjbGllbnRuYW1lIjoiIiwidHlwZSI6Imhvc3RpbmdhY2NvdW50IiwicGFja2FnZSI6IjkzIiwicHJvZHVjdG5hbWUiOiIiLCJiaWxsaW5nY3ljbGUiOiIiLCJzZXJ2ZXIiOiIiLCJwYXltZW50bWV0aG9kIjoiIiwibmV4dGR1ZWRhdGUiOiIiLCJzdGF0dXMiOiJBY3RpdmUiLCJkb21haW4iOiIiLCJ1c2VybmFtZSI6IiIsImRlZGljYXRlZGlwIjoiIiwiYXNzaWduZWRpcHMiOiIiLCJpZCI6IiIsInN1YnNjcmlwdGlvbmlkIjoiIiwibm90ZXMiOiIiLCJjdXN0b21maWVsZHZhbHVlIjoiIiwiY3VzdG9tZmllbGQiOiIwIn0sIm9yZGVycyI6eyJjbGllbnQiOiIiLCJjbGllbnRpZCI6IiIsImNsaWVudG5hbWUiOiIiLCJvcmRlcmlkIjoiIiwib3JkZXJudW0iOiIiLCJwYXltZW50c3RhdHVzIjoiIiwib3JkZXJkYXRlIjoiIiwic3RhdHVzIjoiUGVuZGluZyIsImFtb3VudCI6IiIsIm9yZGVyaXAiOiIifSwic3lzdGVtYWN0aXZpdHlsb2ciOnsiZGF0ZSI6IiIsImRhdGVSYW5nZSI6IiIsInVzZXJuYW1lIjoiIiwiZGVzY3JpcHRpb24iOiIiLCJpcGFkZHJlc3MiOiIifSwiY2xpZW50cyI6eyJ1c2VyaWQiOiIiLCJuYW1lIjoiIiwiZW1haWwiOiIiLCJjb3VudHJ5LWNhbGxpbmctY29kZS1waG9uZSI6IiIsInBob25lIjoiIiwiZ3JvdXAiOiIiLCJzdGF0dXMiOiIiLCJhZGRyZXNzMSI6IiIsImFkZHJlc3MyIjoiIiwiY2l0eSI6IiIsInN0YXRlIjoiIiwicG9zdGNvZGUiOiIiLCJjb3VudHJ5IjoiIiwicGF5bWVudG1ldGhvZCI6IiIsImNjdHlwZSI6IiIsImNjbGFzdGZvdXIiOiIiLCJhdXRvY2NiaWxsaW5nIjoiIiwiY3JlZGl0IjoiIiwiY3VycmVuY3kiOiIiLCJzaWdudXBkYXRlcmFuZ2UiOiIiLCJsYW5ndWFnZSI6IiIsIm1hcmtldGluZ29wdGluIjoiIiwiYXV0b3N0YXR1cyI6IiIsInRheGV4ZW1wdCI6IiIsImxhdGVmZWVzIjoiIiwib3ZlcmR1ZW5vdGljZXMiOiIiLCJzZXBhcmF0ZWludm9pY2VzIjoiIiwiY3VzdG9tZmllbGRzIjoiIiwiZW1haWwyIjoiIiwiY291bnRyeS1jYWxsaW5nLWNvZGUtcGhvbmUyIjoiIiwicGhvbmUyIjoiIiwiZ3JvdXAyIjoiIn0sImNsaW52Ijp7InNlcnZpY2VpZCI6IiIsImFkZG9uaWQiOiIiLCJkb21haW5pZCI6IiIsImNsaWVudG5hbWUiOiIiLCJpbnZvaWNlbnVtIjoiIiwibGluZWl0ZW0iOiIiLCJwYXltZW50bWV0aG9kIjoiIiwiaW52b2ljZWRhdGUiOiIiLCJkdWVkYXRlIjoiIiwiZGF0ZXBhaWQiOiIiLCJ0b3RhbGZyb210b3RhbHRvIjoiIiwic3RhdHVzIjoiIiwibGFzdF9jYXB0dXJlX2F0dGVtcHQiOiIiLCJkYXRlX3JlZnVuZGVkIjoiIiwiZGF0ZV9jYW5jZWxsZWQiOiIiLCJ0b3RhbGZyb20iOiIiLCJ0b3RhbHRvIjoiIn19"), false},
+			{"WHMCSk1SaVXRcUWcO=f42eqmrhmakhk3jb0udbqd28ec", AccessTokenValue("WHMCSk1SaVXRcUWcO=f42eqmrhmakhk3jb0udbqd28ec"), false},
+			// Invalid inputs - too short
+			{"short", AccessTokenValue(""), true},
+			// Invalid inputs - too long
+			{"invalid@token", AccessTokenValue(""), true},
+			{"     ", AccessTokenValue(""), true},
+			{123, AccessTokenValue(""), true},
+			{true, AccessTokenValue(""), true},
+			{[]string{"token"}, AccessTokenValue(""), true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := NewAccessTokenValue(testCase.inputValue)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("StringMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     AccessTokenValue
+			expectedOutput string
+		}{
+			{AccessTokenValue("a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef"), "a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef"},
+			{AccessTokenValue("testtoken123"), "testtoken123"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.String()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+}
