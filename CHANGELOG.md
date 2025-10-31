@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.0.8 - 2025/10/31
+feat: import, refactor and create unit tests for common vos from OS/Ez/Bz projects
+
 0.0.7 - 2025/06/17
 feat: add FileClerk
 feat: add CompressionFormat vo
