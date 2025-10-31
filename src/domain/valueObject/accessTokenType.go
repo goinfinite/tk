@@ -6,12 +6,12 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-type AccessTokenType string
-
-const (
+var (
 	AccessTokenTypeSessionToken AccessTokenType = "sessionToken"
 	AccessTokenTypeSecretKey    AccessTokenType = "secretKey"
 )
+
+type AccessTokenType string
 
 func NewAccessTokenType(value any) (tokenType AccessTokenType, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)

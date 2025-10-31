@@ -7,9 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-type CompressionFormat string
-
-const (
+var (
 	CompressionFormatTarball        CompressionFormat = "tar"
 	CompressionFormatGzippedTarball CompressionFormat = "tar.gz"
 	CompressionFormatGzip           CompressionFormat = "gzip"
@@ -17,6 +15,8 @@ const (
 	CompressionFormatXz             CompressionFormat = "xz"
 	CompressionFormatBrotli         CompressionFormat = "br"
 )
+
+type CompressionFormat string
 
 var ValidCompressionFormats = []string{
 	"tar", "tar.gz", "gzip", "zip", "xz", "br",

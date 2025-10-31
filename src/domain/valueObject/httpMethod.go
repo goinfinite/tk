@@ -6,9 +6,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-type HttpMethod string
-
-const (
+var (
 	HttpMethodGet     HttpMethod = "GET"
 	HttpMethodHead    HttpMethod = "HEAD"
 	HttpMethodPost    HttpMethod = "POST"
@@ -19,6 +17,8 @@ const (
 	HttpMethodTrace   HttpMethod = "TRACE"
 	HttpMethodPatch   HttpMethod = "PATCH"
 )
+
+type HttpMethod string
 
 func NewHttpMethod(value any) (vo HttpMethod, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)

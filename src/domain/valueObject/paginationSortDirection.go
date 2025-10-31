@@ -7,12 +7,12 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-type PaginationSortDirection string
-
-const (
+var (
 	PaginationSortDirectionAsc  PaginationSortDirection = "asc"
 	PaginationSortDirectionDesc PaginationSortDirection = "desc"
 )
+
+type PaginationSortDirection string
 
 func NewPaginationSortDirection(value any) (
 	sortDirection PaginationSortDirection, err error,

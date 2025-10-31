@@ -7,14 +7,14 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-const mimeTypeRegexExpression = `^[A-z0-9\-]{1,64}\/[A-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`
-
-type MimeType string
-
-const (
+var (
 	MimeTypeDirectory MimeType = "directory"
 	MimeTypeGeneric   MimeType = "generic"
 )
+
+const mimeTypeRegexExpression = `^[A-z0-9\-]{1,64}\/[A-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`
+
+type MimeType string
 
 func NewMimeType(value any) (mimeType MimeType, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
