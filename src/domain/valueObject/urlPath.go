@@ -40,7 +40,11 @@ func (vo UrlPath) ReadWithoutQuery() string {
 }
 
 func (vo UrlPath) ReadQuery() string {
-	return strings.Split(vo.String(), "?")[1]
+	pathParts := strings.Split(vo.String(), "?")
+	if len(pathParts) < 2 {
+		return ""
+	}
+	return pathParts[1]
 }
 
 func (vo UrlPath) ReadWithoutTrailingSlash() string {
