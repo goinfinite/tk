@@ -12,7 +12,7 @@ var (
 	MimeTypeGeneric   MimeType = "generic"
 )
 
-const mimeTypeRegexExpression = `^[A-z0-9\-]{1,64}\/[A-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`
+const mimeTypeRegexExpression = `^[A-Za-z0-9\-]{1,64}\/[A-Za-z0-9\-\_\+\.\,]{2,128}$|^(directory|generic)$`
 
 type MimeType string
 
