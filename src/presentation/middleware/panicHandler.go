@@ -33,6 +33,9 @@ type PanicReport struct {
 func readPanicReport() *PanicReport {
 	var recoverErr error
 	recoverFunc := recover()
+	if recoverFunc == nil {
+		return nil
+	}
 
 	recoverErr, isError := recoverFunc.(error)
 	if !isError {
@@ -59,6 +62,11 @@ func readPanicReport() *PanicReport {
 }
 
 func isRequesterTrustworthy(echoContext echo.Context) bool {
+	rawTrustedIps := os.Getenv("TRUSTED_IPS")
+	if rawTrustedIps == "" {
+		return false
+	}
+
 	rawRequesterIpAddress := echoContext.RealIP()
 	if rawRequesterIpAddress == "" {
 		return false
@@ -70,9 +78,8 @@ func isRequesterTrustworthy(echoContext echo.Context) bool {
 	}
 	requesterIpAddressStr := requesterIpAddress.String()
 
-	trustedIps := strings.SplitSeq(os.Getenv("TRUSTED_IPS"), ",")
-	for staffIp := range trustedIps {
-		if requesterIpAddressStr == strings.TrimSpace(staffIp) {
+	for staffIp := range strings.SplitSeq(rawTrustedIps, ",") {
+		if strings.TrimSpace(staffIp) == requesterIpAddressStr {
 			return true
 		}
 	}
@@ -97,23 +104,43 @@ func logPanic(panicReportPtr *PanicReport) {
 	defer logFile.Close()
 
 	slogger := slog.New(slog.NewTextHandler(logFile, nil))
-	slogger.Error("PanicRecovered", slog.String("error", panicReportPtr.RecoverErr.Error()))
-	slogger.Error("StackTrace", slog.String("stackTrace", panicReportPtr.StackTrace))
+	slogger.Error(
+		"PanicRecovered",
+		slog.String("error", panicReportPtr.RecoverErr.Error()),
+		slog.String("stackTrace", panicReportPtr.StackTrace),
+		slog.String("requestUri", panicReportPtr.RequestUri),
+		slog.String("requesterIpAddress", panicReportPtr.RequesterIpAddress),
+	)
 }
 
 func apiHandlePanic(echoContext echo.Context) {
 	panicReportPtr := readPanicReport()
+	if panicReportPtr == nil {
+		return
+	}
+
 	stackTraceStr := panicReportPtr.StackTrace
 
+	// Finding the exact path of the panic in the stack trace is tricky, so we only check
+	// the beginning of the stack trace. If the domain layer path is present, the panic is
+	// (most likely) caused by a business logic error due to invalid input.
+	stackTraceStrBeginning := stackTraceStr
+	if len(stackTraceStr) > 1000 {
+		stackTraceStrBeginning = stackTraceStr[:1000]
+	}
 	statusCode := http.StatusInternalServerError
-	if panicHandlerDomainLayerPathRegex.MatchString(stackTraceStr) {
+	if panicHandlerDomainLayerPathRegex.MatchString(stackTraceStrBeginning) {
 		statusCode = http.StatusBadRequest
 	}
 
-	shortErrStr := "InternalServerError"
-	recoverErrStr := panicReportPtr.RecoverErr.Error()
-	if len(recoverErrStr) > panicHandlerMaxErrorLength {
-		shortErrStr = recoverErrStr[:panicHandlerMaxErrorLength] + "..."
+	fullRecoverErrStr := panicReportPtr.RecoverErr.Error()
+	if fullRecoverErrStr == "" {
+		fullRecoverErrStr = "InternalServerError"
+	}
+
+	shortRecoverErrStr := fullRecoverErrStr
+	if len(shortRecoverErrStr) > panicHandlerMaxErrorLength {
+		shortRecoverErrStr = shortRecoverErrStr[:panicHandlerMaxErrorLength] + "..."
 	}
 
 	jsonResponse := map[string]any{
@@ -121,7 +148,7 @@ func apiHandlePanic(echoContext echo.Context) {
 		"body": map[string]any{
 			"uri":            echoContext.Request().RequestURI,
 			"queryParams":    echoContext.QueryParams(),
-			"exceptionCode":  recoverErrStr,
+			"exceptionCode":  fullRecoverErrStr,
 			"exceptionTrace": stackTraceStr,
 		},
 		"humanReadableMessage": "SomethingWentWrong",
@@ -129,7 +156,7 @@ func apiHandlePanic(echoContext echo.Context) {
 
 	if !isRequesterTrustworthy(echoContext) {
 		jsonResponse["body"] = map[string]any{
-			"exceptionCode": shortErrStr,
+			"exceptionCode": shortRecoverErrStr,
 		}
 	}
 
@@ -151,14 +178,14 @@ func ApiPanicHandler(subsequentHandler echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func cliHandlePanic() {
+// @attention CliPanicHandler MUST be used as a defer statement.
+func CliPanicHandler() {
 	panicReport := readPanicReport()
+	if panicReport == nil {
+		return
+	}
 	logPanic(panicReport)
 
-	fmt.Println("FatalError. Please check the panic.log file for more details.")
+	fmt.Println("FatalError. Please check the 'logs/panic.log' file for more details.")
 	os.Exit(1)
-}
-
-func CliPanicHandler() {
-	defer cliHandlePanic()
 }
