@@ -13,6 +13,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const (
+	panicHandlerMaxStackTraceSize int    = 1 << 16
+	panicHandlerMaxErrorLength    int    = 150
+	panicHandlerLogsDir           string = "logs"
+	panicHandlerLogFileName       string = "panic.log"
+)
+
+var panicHandlerDomainLayerPathRegex = regexp.MustCompile(`domain/(valueObject|entity|useCase)`)
+
 type StackTrace struct {
 	trace string
 }
@@ -22,21 +31,20 @@ func (st *StackTrace) String() string {
 }
 
 func readStackTrace() *StackTrace {
-	traceBuffer := make([]byte, 1<<16)
+	traceBuffer := make([]byte, panicHandlerMaxStackTraceSize)
 	stackBufBytesCount := runtime.Stack(traceBuffer, true)
 	stackTraceStr := string(traceBuffer[:stackBufBytesCount])
-	traceLines := strings.Split(stackTraceStr, "\n")
 
 	filteredTraceLines := []string{}
-	for _, traceLine := range traceLines {
-		filteredTraceLines = append(filteredTraceLines, traceLine)
+	for traceLine := range strings.SplitSeq(stackTraceStr, "\n") {
 		if strings.Contains(traceLine, "created by net/http") {
 			break
 		}
+		filteredTraceLines = append(filteredTraceLines, traceLine)
 	}
 
-	filteredStackTrace := strings.Join(filteredTraceLines, "\n")
-	return &StackTrace{trace: filteredStackTrace}
+	filteredStackTraceStr := strings.Join(filteredTraceLines, "\n")
+	return &StackTrace{trace: filteredStackTraceStr}
 }
 
 func isRequesterTrustworthy(echoContext echo.Context) bool {
@@ -56,19 +64,17 @@ func isRequesterTrustworthy(echoContext echo.Context) bool {
 }
 
 func logPanic(err error, stackTrace *StackTrace) {
-	logsDir := "logs"
-	if _, err := os.Stat(logsDir); os.IsNotExist(err) {
-		err = os.Mkdir(logsDir, 0755)
-		if err != nil {
-			slog.Error("CreateLogDirectoryError", slog.String("error", err.Error()))
+	if _, statErr := os.Stat(panicHandlerLogsDir); os.IsNotExist(statErr) {
+		if mkdirErr := os.Mkdir(panicHandlerLogsDir, 0755); mkdirErr != nil {
+			slog.Error("CreateLogDirectoryError", slog.String("error", mkdirErr.Error()))
 			return
 		}
 	}
 
-	logFilePath := filepath.Join(logsDir, "panic.log")
-	logFile, errOpen := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if errOpen != nil {
-		slog.Error("OpenLogFileError", slog.String("error", errOpen.Error()))
+	logFilePath := filepath.Join(panicHandlerLogsDir, panicHandlerLogFileName)
+	logFile, openErr := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if openErr != nil {
+		slog.Error("OpenLogFileError", slog.String("error", openErr.Error()))
 		return
 	}
 	defer logFile.Close()
@@ -77,8 +83,6 @@ func logPanic(err error, stackTrace *StackTrace) {
 	slogger.Error("PanicRecovered", slog.String("error", err.Error()))
 	slogger.Error("StackTrace", slog.String("stackTrace", stackTrace.String()))
 }
-
-var domainLayerPathRegex = regexp.MustCompile(`domain/(valueObject|entity|useCase)`)
 
 func handlePanic(echoContext echo.Context) {
 	recoverFunc := recover()
@@ -93,10 +97,9 @@ func handlePanic(echoContext echo.Context) {
 
 	stackTrace := readStackTrace()
 	requestUri := echoContext.Request().RequestURI
-	queryParams := echoContext.QueryParams()
 
 	statusCode := http.StatusInternalServerError
-	if domainLayerPathRegex.MatchString(stackTrace.String()) {
+	if panicHandlerDomainLayerPathRegex.MatchString(stackTrace.String()) {
 		statusCode = http.StatusBadRequest
 	}
 
@@ -104,23 +107,25 @@ func handlePanic(echoContext echo.Context) {
 	humanReadableErrStr := "SomethingWentWrong"
 
 	shortErrStr := "InternalServerError"
-	shortErrStrIdealLength := 150
-	if len(errStr) > shortErrStrIdealLength {
-		shortErrStr = errStr[:shortErrStrIdealLength]
+	if len(errStr) > panicHandlerMaxErrorLength {
+		shortErrStr = errStr[:panicHandlerMaxErrorLength] + "..."
 	}
 
 	jsonResponse := map[string]any{
 		"status": statusCode,
 		"body": map[string]any{
 			"uri":            requestUri,
-			"queryParams":    queryParams,
+			"queryParams":    echoContext.QueryParams(),
 			"exceptionCode":  errStr,
 			"exceptionTrace": stackTrace.String(),
 		},
 		"humanReadableMessage": humanReadableErrStr,
 	}
+
 	if !isRequesterTrustworthy(echoContext) {
-		jsonResponse["body"] = shortErrStr
+		jsonResponse["body"] = map[string]any{
+			"exceptionCode": shortErrStr,
+		}
 	}
 
 	echoContext.JSON(statusCode, jsonResponse)
