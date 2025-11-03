@@ -26,6 +26,13 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"file.php", UnixAbsoluteFilePath("/file.php"), false},
 			{123, UnixAbsoluteFilePath("/123"), false},
 			{true, UnixAbsoluteFilePath("/true"), false},
+			{"/var/log/syslog", UnixAbsoluteFilePath("/var/log/syslog"), false},
+			{"/usr/local/bin/script.sh", UnixAbsoluteFilePath("/usr/local/bin/script.sh"), false},
+			{"/etc/nginx/nginx.conf", UnixAbsoluteFilePath("/etc/nginx/nginx.conf"), false},
+			{"/opt/app/config.yaml", UnixAbsoluteFilePath("/opt/app/config.yaml"), false},
+			{"/tmp/.hidden", UnixAbsoluteFilePath("/tmp/.hidden"), false},
+			{"/var//log///syslog", UnixAbsoluteFilePath("/var//log///syslog"), false},
+			{"/etc/passwd\r\n", UnixAbsoluteFilePath("/etc/passwd"), false}, // InterfaceToString trims whitespace
 			// Invalid file paths
 			{"", UnixAbsoluteFilePath(""), true},
 			{"/home/@directory/file.gif", UnixAbsoluteFilePath(""), true},
@@ -40,6 +47,11 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"/home/../../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/file" + strings.Repeat("e", 5000) + ".php", UnixAbsoluteFilePath(""), true},
 			{[]string{"/file.php"}, UnixAbsoluteFilePath(""), true},
+			{"/etc/passwd%00", UnixAbsoluteFilePath(""), true},
+			{"/etc/passwd\x00", UnixAbsoluteFilePath(""), true},
+			{"/var/www/<script>alert(1)</script>", UnixAbsoluteFilePath(""), true},
+			{"/home/user/file\nanother", UnixAbsoluteFilePath(""), true},
+			{"//../etc/passwd", UnixAbsoluteFilePath(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -80,6 +92,16 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"/home/user/file.php?blabla", UnixAbsoluteFilePath("/home/user/file.php?blabla"), false},
 			{"/home/sandbox/domains/@<php52.sandbox.ntorga.com>", UnixAbsoluteFilePath("/home/sandbox/domains/@<php52.sandbox.ntorga.com>"), false},
 			{"~file.php", UnixAbsoluteFilePath("/~file.php"), false},
+			{"/var/log/syslog", UnixAbsoluteFilePath("/var/log/syslog"), false},
+			{"/usr/local/bin/script.sh", UnixAbsoluteFilePath("/usr/local/bin/script.sh"), false},
+			{"/etc/nginx/nginx.conf", UnixAbsoluteFilePath("/etc/nginx/nginx.conf"), false},
+			{"/opt/app/config.yaml", UnixAbsoluteFilePath("/opt/app/config.yaml"), false},
+			{"/tmp/.hidden", UnixAbsoluteFilePath("/tmp/.hidden"), false},
+			{"/var//log///syslog", UnixAbsoluteFilePath("/var//log///syslog"), false},
+			{"/var/www/index.html#fragment", UnixAbsoluteFilePath("/var/www/index.html#fragment"), false},
+			{"/var/www/<script>alert(1)</script>", UnixAbsoluteFilePath("/var/www/<script>alert(1)</script>"), false},
+			{"/etc/passwd%00", UnixAbsoluteFilePath("/etc/passwd%00"), false},
+			{"/etc/passwd\r\n", UnixAbsoluteFilePath("/etc/passwd"), false},
 			// Invalid file paths
 			{"", UnixAbsoluteFilePath(""), true},
 			{"../file.php", UnixAbsoluteFilePath(""), true},
@@ -90,6 +112,9 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"/home/../../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/file" + strings.Repeat("e", 5000) + ".php", UnixAbsoluteFilePath(""), true},
 			{[]string{"/file.php"}, UnixAbsoluteFilePath(""), true},
+			{"/etc/passwd\x00", UnixAbsoluteFilePath(""), true},
+			{"/home/user/file\nanother", UnixAbsoluteFilePath(""), true},
+			{"//../etc/passwd", UnixAbsoluteFilePath(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
