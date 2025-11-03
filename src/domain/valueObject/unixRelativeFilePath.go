@@ -12,7 +12,7 @@ import (
 // There is no allowUnsafeChars param because relative paths are always unsafe anyway.
 var (
 	unixRelativeFilePathRegex        = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\~][\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.\/]*$`)
-	unixTypicalRelativeFilePathRegex = regexp.MustCompile(`^\.\/|^\/?\~|\/?\.\.\/`)
+	unixTypicalRelativeFilePathRegex = regexp.MustCompile(`^\.\/|^\~\/|\/?\.\.\/`)
 )
 
 type UnixRelativeFilePath string
