@@ -22,8 +22,6 @@ func NewUnixRelativeFilePath(value any) (filePath UnixRelativeFilePath, err erro
 	if err != nil {
 		return filePath, errors.New("UnixRelativeFilePathValueMustBeString")
 	}
-	stringValue = strings.TrimPrefix(stringValue, "/")
-
 	if len(stringValue) == 0 {
 		return filePath, errors.New("UnixRelativeFilePathValueMustNotBeEmpty")
 	}
@@ -32,13 +30,10 @@ func NewUnixRelativeFilePath(value any) (filePath UnixRelativeFilePath, err erro
 		return filePath, errors.New("UnixRelativeFilePathTooBig")
 	}
 
-	if !unixRelativeFilePathRegex.MatchString(stringValue) {
-		return filePath, errors.New("InvalidUnixRelativeFilePath")
-	}
-
+	stringValue = strings.TrimPrefix(stringValue, "/")
 	if !unixTypicalRelativeFilePathRegex.MatchString(stringValue) {
 		switch stringValue {
-		case ".":
+		case "", ".":
 			stringValue = "./"
 		case "..":
 			stringValue = "../"
@@ -49,6 +44,10 @@ func NewUnixRelativeFilePath(value any) (filePath UnixRelativeFilePath, err erro
 		if !unixTypicalRelativeFilePathRegex.MatchString(stringValue) {
 			return filePath, errors.New("PathMustBeRelative")
 		}
+	}
+
+	if !unixRelativeFilePathRegex.MatchString(stringValue) {
+		return filePath, errors.New("InvalidUnixRelativeFilePath")
 	}
 
 	return UnixRelativeFilePath(stringValue), nil

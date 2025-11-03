@@ -14,6 +14,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		}{
 			{".", UnixRelativeFilePath("./"), false},
 			{"..", UnixRelativeFilePath("../"), false},
+			{"/", UnixRelativeFilePath("./"), false},
 			{"file.php", UnixRelativeFilePath("./file.php"), false},
 			{"./file.php", UnixRelativeFilePath("./file.php"), false},
 			{"../file.php", UnixRelativeFilePath("../file.php"), false},
@@ -30,10 +31,21 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{"file.php?blabla", UnixRelativeFilePath("./file.php?blabla"), false},
 			{"/file.php", UnixRelativeFilePath("./file.php"), false},
 			{"/home/file.php", UnixRelativeFilePath("./home/file.php"), false},
+			{[]string{"file.php"}, UnixRelativeFilePath(""), true},
+			{"файл.txt", UnixRelativeFilePath("./файл.txt"), false},
+			{"file_ñame.go", UnixRelativeFilePath("./file_ñame.go"), false},
+			{"dir/file+test.md", UnixRelativeFilePath("./dir/file+test.md"), false},
+			{"path/to/file(1).txt", UnixRelativeFilePath("./path/to/file(1).txt"), false},
+			{"file[bracket].js", UnixRelativeFilePath("./file[bracket].js"), false},
+			{"~/config", UnixRelativeFilePath("~/config"), false},
+			{"/~/home", UnixRelativeFilePath("~/home"), false},
+			{"../../file", UnixRelativeFilePath("../../file"), false},
+			{"./../file", UnixRelativeFilePath("./../file"), false},
+			{"file@domain.com", UnixRelativeFilePath("./file@domain.com"), false},
+			{"dir/sub-file_name.ext", UnixRelativeFilePath("./dir/sub-file_name.ext"), false},
 			// Invalid file paths
 			{"", UnixRelativeFilePath(""), true},
 			{"file" + strings.Repeat("e", 5000) + ".php", UnixRelativeFilePath(""), true},
-			{[]string{"file.php"}, UnixRelativeFilePath(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -58,6 +70,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.php"), "./file.php"},
 			{UnixRelativeFilePath("./file.php"), "./file.php"},
 			{UnixRelativeFilePath("../dir/file.txt"), "../dir/file.txt"},
+			{UnixRelativeFilePath("~/config"), "~/config"},
+			{UnixRelativeFilePath("./файл.txt"), "./файл.txt"},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -76,6 +90,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.php"), UnixRelativeFilePath("./file")},
 			{UnixRelativeFilePath("./dir/file.txt"), UnixRelativeFilePath("./dir/file")},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixRelativeFilePath("./file")},
+			{UnixRelativeFilePath("./file"), UnixRelativeFilePath("./file")},
+			{UnixRelativeFilePath("./файл.txt"), UnixRelativeFilePath("./файл")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -94,6 +110,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.php"), UnixFileName("file.php")},
 			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file.txt")},
 			{UnixRelativeFilePath("./subdir/file.txt"), UnixFileName("file.txt")},
+			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл.txt")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -112,8 +129,9 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		}{
 			{UnixRelativeFilePath("./file.php"), UnixFileExtension("php"), false},
 			{UnixRelativeFilePath("./dir/file.txt"), UnixFileExtension("txt"), false},
-			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixFileExtension("gz"), false},
+			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
+			{UnixRelativeFilePath("./file.файл"), UnixFileExtension("файл"), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -138,8 +156,9 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		}{
 			{UnixRelativeFilePath("./file.php"), UnixFileExtension("php"), false},
 			{UnixRelativeFilePath("./file.txt"), UnixFileExtension("txt"), false},
-			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixFileExtension("tar.gz"), false},
+			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
+			{UnixRelativeFilePath("./file.tar.gz.bz2"), UnixFileExtension("tar.gz.bz2"), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -164,6 +183,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.php"), UnixFileName("file")},
 			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file")},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixFileName("file")},
+			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -183,6 +203,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./dir/file.txt"), UnixRelativeFilePath("./dir")},
 			{UnixRelativeFilePath("./subdir/file.txt"), UnixRelativeFilePath("./subdir")},
 			{UnixRelativeFilePath("../file.txt"), UnixRelativeFilePath("../")},
+			{UnixRelativeFilePath("./a/b/c/file.txt"), UnixRelativeFilePath("./a/b/c")},
+			{UnixRelativeFilePath("~/dir/file"), UnixRelativeFilePath("~/dir")},
 		}
 
 		for _, testCase := range testCaseStructs {
