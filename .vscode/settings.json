@@ -11,8 +11,10 @@
     "Mebibyte",
     "Mebibytes",
     "Nogroup",
+    "samber",
     "Tebibyte",
-    "Tebibytes"
+    "Tebibytes",
+    "zerolog"
   ],
   "tailwindCSS.includeLanguages": {
     "templ": "html"
