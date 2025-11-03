@@ -22,15 +22,20 @@ const (
 
 var panicHandlerDomainLayerPathRegex = regexp.MustCompile(`domain/(valueObject|entity|useCase)`)
 
-type StackTrace struct {
-	trace string
+type PanicReport struct {
+	RecoverErr error
+	StackTrace string
 }
 
-func (st *StackTrace) String() string {
-	return st.trace
-}
+func readPanicReport() *PanicReport {
+	var recoverErr error
+	recoverFunc := recover()
 
-func readStackTrace() *StackTrace {
+	recoverErr, isError := recoverFunc.(error)
+	if !isError {
+		recoverErr = fmt.Errorf("%v", recoverFunc)
+	}
+
 	traceBuffer := make([]byte, panicHandlerMaxStackTraceSize)
 	stackBufBytesCount := runtime.Stack(traceBuffer, true)
 	stackTraceStr := string(traceBuffer[:stackBufBytesCount])
@@ -42,9 +47,12 @@ func readStackTrace() *StackTrace {
 		}
 		filteredTraceLines = append(filteredTraceLines, traceLine)
 	}
-
 	filteredStackTraceStr := strings.Join(filteredTraceLines, "\n")
-	return &StackTrace{trace: filteredStackTraceStr}
+
+	return &PanicReport{
+		StackTrace: filteredStackTraceStr,
+		RecoverErr: recoverErr,
+	}
 }
 
 func isRequesterTrustworthy(echoContext echo.Context) bool {
@@ -63,7 +71,7 @@ func isRequesterTrustworthy(echoContext echo.Context) bool {
 	return false
 }
 
-func logPanic(err error, stackTrace *StackTrace) {
+func logPanic(panicReport *PanicReport) {
 	if _, statErr := os.Stat(panicHandlerLogsDir); os.IsNotExist(statErr) {
 		if mkdirErr := os.Mkdir(panicHandlerLogsDir, 0755); mkdirErr != nil {
 			slog.Error("CreateLogDirectoryError", slog.String("error", mkdirErr.Error()))
@@ -80,46 +88,35 @@ func logPanic(err error, stackTrace *StackTrace) {
 	defer logFile.Close()
 
 	slogger := slog.New(slog.NewTextHandler(logFile, nil))
-	slogger.Error("PanicRecovered", slog.String("error", err.Error()))
-	slogger.Error("StackTrace", slog.String("stackTrace", stackTrace.String()))
+	slogger.Error("PanicRecovered", slog.String("error", panicReport.RecoverErr.Error()))
+	slogger.Error("StackTrace", slog.String("stackTrace", panicReport.StackTrace))
 }
 
-func handlePanic(echoContext echo.Context) {
-	recoverFunc := recover()
-	if recoverFunc == nil {
-		return
-	}
-
-	err, isError := recoverFunc.(error)
-	if !isError {
-		err = fmt.Errorf("%v", recoverFunc)
-	}
-
-	stackTrace := readStackTrace()
-	requestUri := echoContext.Request().RequestURI
+func apiHandlePanic(echoContext echo.Context) {
+	panicReport := readPanicReport()
+	stackTraceStr := panicReport.StackTrace
 
 	statusCode := http.StatusInternalServerError
-	if panicHandlerDomainLayerPathRegex.MatchString(stackTrace.String()) {
+	if panicHandlerDomainLayerPathRegex.MatchString(stackTraceStr) {
 		statusCode = http.StatusBadRequest
 	}
 
-	errStr := err.Error()
-	humanReadableErrStr := "SomethingWentWrong"
+	recoverErrStr := panicReport.RecoverErr.Error()
 
 	shortErrStr := "InternalServerError"
-	if len(errStr) > panicHandlerMaxErrorLength {
-		shortErrStr = errStr[:panicHandlerMaxErrorLength] + "..."
+	if len(recoverErrStr) > panicHandlerMaxErrorLength {
+		shortErrStr = recoverErrStr[:panicHandlerMaxErrorLength] + "..."
 	}
 
 	jsonResponse := map[string]any{
 		"status": statusCode,
 		"body": map[string]any{
-			"uri":            requestUri,
+			"uri":            echoContext.Request().RequestURI,
 			"queryParams":    echoContext.QueryParams(),
-			"exceptionCode":  errStr,
-			"exceptionTrace": stackTrace.String(),
+			"exceptionCode":  recoverErrStr,
+			"exceptionTrace": stackTraceStr,
 		},
-		"humanReadableMessage": humanReadableErrStr,
+		"humanReadableMessage": "SomethingWentWrong",
 	}
 
 	if !isRequesterTrustworthy(echoContext) {
@@ -130,12 +127,24 @@ func handlePanic(echoContext echo.Context) {
 
 	echoContext.JSON(statusCode, jsonResponse)
 
-	logPanic(err, stackTrace)
+	logPanic(panicReport)
 }
 
-func PanicHandler(subsequentHandler echo.HandlerFunc) echo.HandlerFunc {
+func ApiPanicHandler(subsequentHandler echo.HandlerFunc) echo.HandlerFunc {
 	return func(echoContext echo.Context) error {
-		defer handlePanic(echoContext)
+		defer apiHandlePanic(echoContext)
 		return subsequentHandler(echoContext)
 	}
+}
+
+func cliHandlePanic() {
+	panicReport := readPanicReport()
+	logPanic(panicReport)
+
+	fmt.Println("FatalError. Please check the panic.log file for more details.")
+	os.Exit(1)
+}
+
+func CliPanicHandler() {
+	defer cliHandlePanic()
 }
