@@ -17,8 +17,8 @@ var (
 	// Unsafe allows for additional characters:
 	// \p{S}	math symbols, currency signs, dingbats, box-drawing characters, etc.
 	// \p{P}	any kind of punctuation character.
-	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.][\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
-	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.][\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
+	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
+	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
 	forbiddenUnixFileNameRegex = regexp.MustCompile(`^(\.|\.\.|\~|\^|\*|\/|\\)$|[\|\/\\]`)
 )
 

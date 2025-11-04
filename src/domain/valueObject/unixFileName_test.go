@@ -11,6 +11,7 @@ func TestNewUnixFileName(t *testing.T) {
 			expectedOutput UnixFileName
 			expectError    bool
 		}{
+			{"a", UnixFileName("a"), false},
 			{"17795713_1253219528108045_4440713319482755723_n (1).png", UnixFileName("17795713_1253219528108045_4440713319482755723_n (1).png"), false},
 			{"hello.php", UnixFileName("hello.php"), false},
 			{"hello_file.php", UnixFileName("hello_file.php"), false},
@@ -125,13 +126,13 @@ func TestNewUnixFileName(t *testing.T) {
 			{true, UnixFileName("true"), false},
 			{"file.php?blabla", UnixFileName("file.php?blabla"), false},
 			{"file.php;id", UnixFileName("file.php;id"), false},
+			{"@<php52.sandbox.ntorga.com>.php", UnixFileName("@<php52.sandbox.ntorga.com>.php"), false},
 			// Invalid file names
 			{"", UnixFileName(""), true},
 			{".", UnixFileName(""), true},
 			{"..", UnixFileName(""), true},
 			{"/", UnixFileName(""), true},
 			{"\\", UnixFileName(""), true},
-			{"@<php52.sandbox.ntorga.com>.php", UnixFileName(""), true},
 			{"../file.php", UnixFileName(""), true},
 			{"hello10/info.php", UnixFileName(""), true},
 			{"../../../etc/passwd", UnixFileName(""), true},
