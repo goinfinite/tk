@@ -13,6 +13,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			expectError    bool
 		}{
 			{"/", UnixAbsoluteFilePath("/"), false},
+			{"a", UnixAbsoluteFilePath("/a"), false},
 			{"/root", UnixAbsoluteFilePath("/root"), false},
 			{"/root/", UnixAbsoluteFilePath("/root/"), false},
 			{"/home/sandbox/file.php", UnixAbsoluteFilePath("/home/sandbox/file.php"), false},
@@ -43,6 +44,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"~/", UnixAbsoluteFilePath(""), true},
 			{"~file.php", UnixAbsoluteFilePath(""), true},
 			{"~/file.php", UnixAbsoluteFilePath(""), true},
+			{"/~/file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/../../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/file" + strings.Repeat("e", 5000) + ".php", UnixAbsoluteFilePath(""), true},
@@ -75,6 +77,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			expectError    bool
 		}{
 			{"/", UnixAbsoluteFilePath("/"), false},
+			{"a", UnixAbsoluteFilePath("/a"), false},
 			{"/root", UnixAbsoluteFilePath("/root"), false},
 			{"/root/", UnixAbsoluteFilePath("/root/"), false},
 			{"/home/sandbox/file.php", UnixAbsoluteFilePath("/home/sandbox/file.php"), false},
@@ -108,6 +111,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"./file.php", UnixAbsoluteFilePath(""), true},
 			{"~/", UnixAbsoluteFilePath(""), true},
 			{"~/file.php", UnixAbsoluteFilePath(""), true},
+			{"/~/file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/../../file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/file" + strings.Repeat("e", 5000) + ".php", UnixAbsoluteFilePath(""), true},

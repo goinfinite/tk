@@ -34,7 +34,7 @@ func NewUnixAbsoluteFilePath(value any, allowUnsafeChars bool) (
 		return filePath, errors.New("UnixAbsoluteFilePathTooBig")
 	}
 
-	if !strings.Contains(stringValue, "/") {
+	if !strings.HasPrefix(stringValue, "/") {
 		stringValue = "/" + stringValue
 	}
 
