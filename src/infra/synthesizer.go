@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	mathRand "math/rand"
 	"strings"
@@ -161,4 +162,36 @@ func (synth *Synthesizer) SelfSignedCertificatePairFactory(
 	)
 
 	return tls.X509KeyPair(certPemBytes, privateKeyPemBytes)
+}
+
+func (synth *Synthesizer) SelfSignedCertificatePairPemFactory(
+	commonName *tkValueObject.Fqdn,
+	altNames []tkValueObject.Fqdn,
+) (certPem string, keyPem string, err error) {
+	certPair, err := synth.SelfSignedCertificatePairFactory(commonName, altNames)
+	if err != nil {
+		return certPem, keyPem, err
+	}
+
+	certPemContent := ""
+	for _, derEncodedCertBytes := range certPair.Certificate {
+		pemEncodedCertBytes := pem.EncodeToMemory(
+			&pem.Block{Type: "CERTIFICATE", Bytes: derEncodedCertBytes},
+		)
+		certPemContent += string(pemEncodedCertBytes)
+	}
+
+	assertedPrivateKey, assertOk := certPair.PrivateKey.(*ecdsa.PrivateKey)
+	if !assertOk {
+		return certPem, keyPem, errors.New("SelfSignedCertificatePairPrivateKeyInvalidFormat")
+	}
+	derEncodedPrivateKeyBytes, err := x509.MarshalECPrivateKey(assertedPrivateKey)
+	if err != nil {
+		return certPem, keyPem, err
+	}
+	keyPemContent := string(pem.EncodeToMemory(
+		&pem.Block{Type: "EC PRIVATE KEY", Bytes: derEncodedPrivateKeyBytes},
+	))
+
+	return certPemContent, keyPemContent, nil
 }
