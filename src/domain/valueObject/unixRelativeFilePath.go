@@ -17,6 +17,10 @@ var (
 
 type UnixRelativeFilePath string
 
+// Besides validating the input, NewUnixRelativeFilePath will also normalize the path.
+// If the path is not relative, it will be converted to a relative path. For example,
+// "/my/file.go" will be converted to "./my/file.go". Be careful with relative paths.
+// Consider using UnixAbsoluteFilePath VO whenever possible.
 func NewUnixRelativeFilePath(value any) (filePath UnixRelativeFilePath, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
