@@ -1,6 +1,13 @@
 # Changelog
 
 ```log
+0.0.9 - 2025/11/03
+feat: split unix file path into relative and absolute vos
+feat: add panic handler middleware
+feat: add log handler middleware
+chore: add echo as dependency
+chore: add zerolog as dependency
+
 0.0.8 - 2025/10/31
 feat: import, refactor and create unit tests for common vos from OS/Ez/Bz projects
 fix: move regex must compile to pkg level
