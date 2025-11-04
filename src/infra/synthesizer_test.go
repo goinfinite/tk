@@ -1,9 +1,11 @@
 package tkInfra
 
 import (
+	"crypto/x509"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
@@ -225,6 +227,108 @@ func TestMailAddressFactory(t *testing.T) {
 			if !strings.HasPrefix(mailAddress.String(), username) {
 				t.Errorf("MissingUsername: '%s' does not start with '%s'", mailAddress, username)
 			}
+		}
+	})
+}
+
+func TestSelfSignedCertificatePairFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("WithNilCommonNameAndEmptyAltNames", func(t *testing.T) {
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		if certPair.Leaf == nil {
+			t.Error("CertificateLeafIsNil")
+		}
+
+		if certPair.Leaf.Subject.CommonName != "localhost" {
+			t.Errorf("UnexpectedCommonName: '%s' vs 'localhost'", certPair.Leaf.Subject.CommonName)
+		}
+
+		if len(certPair.Leaf.DNSNames) != 0 {
+			t.Errorf("UnexpectedDNSNames: %v", certPair.Leaf.DNSNames)
+		}
+
+		if certPair.Leaf.Subject.Organization[0] != "ACME Corp" {
+			t.Errorf("UnexpectedOrganization: '%s' vs 'ACME Corp'", certPair.Leaf.Subject.Organization[0])
+		}
+
+		if certPair.Leaf.SerialNumber == nil || certPair.Leaf.SerialNumber.Sign() <= 0 {
+			t.Error("InvalidSerialNumber")
+		}
+
+		validFrom := certPair.Leaf.NotBefore
+		validUntil := certPair.Leaf.NotAfter
+		if validUntil.Sub(validFrom) != 365*24*time.Hour {
+			t.Errorf("UnexpectedValidityPeriod: %v", validUntil.Sub(validFrom))
+		}
+	})
+
+	t.Run("WithProvidedCommonName", func(t *testing.T) {
+		commonName, err := tkValueObject.NewFqdn("example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+
+		certPair, err := synth.SelfSignedCertificatePairFactory(&commonName, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		if certPair.Leaf.Subject.CommonName != "example.com" {
+			t.Errorf("UnexpectedCommonName: '%s' vs 'example.com'", certPair.Leaf.Subject.CommonName)
+		}
+	})
+
+	t.Run("WithAltNames", func(t *testing.T) {
+		altName1, err := tkValueObject.NewFqdn("alt1.example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+		altName2, err := tkValueObject.NewFqdn("alt2.example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+
+		altNames := []tkValueObject.Fqdn{altName1, altName2}
+
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, altNames)
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		expectedDNSNames := []string{"alt1.example.com", "alt2.example.com"}
+		if len(certPair.Leaf.DNSNames) != len(expectedDNSNames) {
+			t.Errorf("UnexpectedDNSNamesCount: %d vs %d", len(certPair.Leaf.DNSNames), len(expectedDNSNames))
+		}
+
+		for i, expected := range expectedDNSNames {
+			if i >= len(certPair.Leaf.DNSNames) || certPair.Leaf.DNSNames[i] != expected {
+				t.Errorf("UnexpectedDNSName: '%s' vs '%s'", certPair.Leaf.DNSNames[i], expected)
+			}
+		}
+	})
+
+	t.Run("CertificateUsage", func(t *testing.T) {
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		expectedKeyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+		if certPair.Leaf.KeyUsage != expectedKeyUsage {
+			t.Errorf("UnexpectedKeyUsage: %v vs %v", certPair.Leaf.KeyUsage, expectedKeyUsage)
+		}
+
+		if len(certPair.Leaf.ExtKeyUsage) != 1 || certPair.Leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
+			t.Errorf("UnexpectedExtKeyUsage: %v", certPair.Leaf.ExtKeyUsage)
+		}
+
+		if !certPair.Leaf.BasicConstraintsValid {
+			t.Error("BasicConstraintsNotValid")
 		}
 	})
 }

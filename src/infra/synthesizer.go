@@ -1,8 +1,19 @@
 package tkInfra
 
 import (
-	"math/rand"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	cryptoRand "crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	mathRand "math/rand"
 	"strings"
+	"time"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
 const (
@@ -23,7 +34,7 @@ func (synth *Synthesizer) CharsetPresenceGuarantor(
 		return originalString
 	}
 
-	randomStringIndex := rand.Intn(len(originalString))
+	randomStringIndex := mathRand.Intn(len(originalString))
 	isFirstChar := randomStringIndex == 0
 	if isFirstChar {
 		randomStringIndex++
@@ -36,7 +47,7 @@ func (synth *Synthesizer) CharsetPresenceGuarantor(
 		randomStringIndex = len(originalString) - 1
 	}
 
-	randomCharsetIndex := rand.Intn(len(charset))
+	randomCharsetIndex := mathRand.Intn(len(charset))
 	originalString[randomStringIndex] = charset[randomCharsetIndex]
 
 	return originalString
@@ -51,7 +62,7 @@ func (synth *Synthesizer) PasswordFactory(
 
 	passwordBytes := make([]byte, desiredLength)
 	for charIdx := 0; charIdx < desiredLength; charIdx++ {
-		passwordBytes[charIdx] = alphanumericCharset[rand.Intn(alphanumericCharsetLength)]
+		passwordBytes[charIdx] = alphanumericCharset[mathRand.Intn(alphanumericCharsetLength)]
 	}
 
 	if desiredLength > 4 {
@@ -71,7 +82,7 @@ func (synth *Synthesizer) UsernameFactory() string {
 	dummyUsernames := []string{
 		"pike", "spock", "kirk", "scotty", "bones", "uhura", "sulu", "chekov",
 	}
-	return dummyUsernames[rand.Intn(len(dummyUsernames))]
+	return dummyUsernames[mathRand.Intn(len(dummyUsernames))]
 }
 
 func (synth *Synthesizer) MailAddressFactory(username *string) string {
@@ -83,5 +94,71 @@ func (synth *Synthesizer) MailAddressFactory(username *string) string {
 	atDomains := []string{
 		"@ufp.gov", "@starfleet.gov", "@academy.edu", "@terran.gov",
 	}
-	return *username + atDomains[rand.Intn(len(atDomains))]
+	return *username + atDomains[mathRand.Intn(len(atDomains))]
+}
+
+func (synth *Synthesizer) SelfSignedCertificatePairFactory(
+	commonName *tkValueObject.Fqdn,
+	altNames []tkValueObject.Fqdn,
+) (certPair tls.Certificate, err error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptoRand.Reader)
+	if err != nil {
+		return certPair, err
+	}
+
+	validFromTime := time.Now()
+	validUntilTime := validFromTime.Add(365 * 24 * time.Hour)
+
+	certSerialNumber, err := cryptoRand.Int(
+		cryptoRand.Reader, new(big.Int).Lsh(big.NewInt(1), 128),
+	)
+	if err != nil {
+		return certPair, err
+	}
+
+	commonNameStr := "localhost"
+	if commonName != nil {
+		commonNameStr = commonName.String()
+	}
+	altNamesStrSlice := []string{}
+	for _, altName := range altNames {
+		altNamesStrSlice = append(altNamesStrSlice, altName.String())
+	}
+
+	certificateTemplate := x509.Certificate{
+		SerialNumber: certSerialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"ACME Corp"},
+			CommonName:   commonNameStr,
+		},
+		NotBefore:             validFromTime,
+		NotAfter:              validUntilTime,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              altNamesStrSlice,
+	}
+
+	derEncodedCertBytes, err := x509.CreateCertificate(
+		cryptoRand.Reader, &certificateTemplate, &certificateTemplate,
+		&privateKey.PublicKey, privateKey,
+	)
+	if err != nil {
+		return certPair, err
+	}
+
+	certPemBytes := pem.EncodeToMemory(
+		&pem.Block{Type: "CERTIFICATE", Bytes: derEncodedCertBytes},
+	)
+
+	derEncodedPrivateKeyBytes, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return certPair, err
+	}
+
+	privateKeyPemBytes := pem.EncodeToMemory(
+		&pem.Block{Type: "EC PRIVATE KEY", Bytes: derEncodedPrivateKeyBytes},
+	)
+
+	return tls.X509KeyPair(certPemBytes, privateKeyPemBytes)
 }
