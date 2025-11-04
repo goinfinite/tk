@@ -129,8 +129,12 @@ func (synth *Synthesizer) SelfSignedCertificatePairFactory(
 	certificateTemplate := x509.Certificate{
 		SerialNumber: certSerialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"ACME Corp"},
-			CommonName:   commonNameStr,
+			Country:            []string{"Japan"},
+			Organization:       []string{"Daystrom Institute"},
+			OrganizationalUnit: []string{"Infrastructure Software Division"},
+			Locality:           []string{"Naha"},
+			Province:           []string{"Okinawa"},
+			CommonName:         commonNameStr,
 		},
 		NotBefore:             validFromTime,
 		NotAfter:              validUntilTime,

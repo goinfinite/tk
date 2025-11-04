@@ -253,8 +253,8 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 			t.Errorf("UnexpectedAltNames: %v", certPair.Leaf.DNSNames)
 		}
 
-		if certPair.Leaf.Subject.Organization[0] != "ACME Corp" {
-			t.Errorf("UnexpectedOrganization: '%s' vs 'ACME Corp'", certPair.Leaf.Subject.Organization[0])
+		if certPair.Leaf.Subject.Organization[0] != "Daystrom Institute" {
+			t.Errorf("UnexpectedOrganization: '%s' vs 'Daystrom Institute'", certPair.Leaf.Subject.Organization[0])
 		}
 
 		if certPair.Leaf.SerialNumber == nil || certPair.Leaf.SerialNumber.Sign() <= 0 {
