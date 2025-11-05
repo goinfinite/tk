@@ -40,6 +40,10 @@ func TestShellEscape(t *testing.T) {
 				"mix ed'chars and spaces",
 				"'mix ed'\"'\"'chars and spaces'",
 			},
+			{
+				"hello 世界",
+				"'hello 世界'",
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -73,6 +77,18 @@ func TestShellEscape(t *testing.T) {
 			{
 				"mix\x7f\x80ed",
 				"mixed",
+			},
+			{
+				"café",
+				"café",
+			},
+			{
+				"hello 世界",
+				"hello 世界",
+			},
+			{
+				string([]byte{0xff, 0xfe, 0xfd}), // InvalidUtf8
+				"",
 			},
 		}
 
