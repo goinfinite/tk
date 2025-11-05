@@ -11,15 +11,19 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	LogHandlerLogLevelEnvVarName string = "LOG_LEVEL"
+)
+
 type LogHandler struct {
 }
 
 func (LogHandler) ReadLevel() string {
-	return os.Getenv("LOG_LEVEL")
+	return os.Getenv(LogHandlerLogLevelEnvVarName)
 }
 
 func (LogHandler) SetLevel(logLevel string) {
-	os.Setenv("LOG_LEVEL", logLevel)
+	os.Setenv(LogHandlerLogLevelEnvVarName, logLevel)
 }
 
 func (logHandler LogHandler) Init() {

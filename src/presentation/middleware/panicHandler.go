@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	panicHandlerMaxStackTraceSize int    = 1 << 16
-	panicHandlerMaxErrorLength    int    = 150
-	panicHandlerLogsDir           string = "logs"
-	panicHandlerLogFileName       string = "panic.log"
+	panicHandlerMaxStackTraceSize    int    = 1 << 16
+	panicHandlerMaxErrorLength       int    = 150
+	panicHandlerLogsDir              string = "logs"
+	panicHandlerLogFileName          string = "panic.log"
+	PanicHandlerTrustedIpsEnvVarName string = "TRUSTED_IPS"
 )
 
 var panicHandlerDomainLayerPathRegex = regexp.MustCompile(`domain/(valueObject|entity|useCase)`)
@@ -62,7 +63,7 @@ func readPanicReport() *PanicReport {
 }
 
 func isRequesterTrustworthy(echoContext echo.Context) bool {
-	rawTrustedIps := os.Getenv("TRUSTED_IPS")
+	rawTrustedIps := os.Getenv(PanicHandlerTrustedIpsEnvVarName)
 	if rawTrustedIps == "" {
 		return false
 	}
