@@ -77,7 +77,10 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	if err != nil {
 		return certPath, keyPath, errors.New("SelfSignedCertPathInvalid")
 	}
-	fileClerk.UpdateFileContent(certPath.String(), selfSignedCertPem, true)
+	err = fileClerk.UpdateFileContent(certPath.String(), selfSignedCertPem, true)
+	if err != nil {
+		return certPath, keyPath, errors.New("SelfSignedCertContentUpdateFailed")
+	}
 
 	rawKeyPath, err = filepath.Abs(pkiDir + "/key.pem")
 	if err != nil {
@@ -87,7 +90,10 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	if err != nil {
 		return certPath, keyPath, errors.New("SelfSignedKeyPathInvalid")
 	}
-	fileClerk.UpdateFileContent(keyPath.String(), selfSignedKeyPem, true)
+	err = fileClerk.UpdateFileContent(keyPath.String(), selfSignedKeyPem, true)
+	if err != nil {
+		return certPath, keyPath, errors.New("SelfSignedKeyContentUpdateFailed")
+	}
 
 	return certPath, keyPath, nil
 }
