@@ -8,14 +8,20 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
+const (
+	ReadThroughCertPairCertPathEnvVarName string = "CERTIFICATE_PAIR_CERT_PATH"
+	ReadThroughCertPairKeyPathEnvVarName  string = "CERTIFICATE_PAIR_KEY_PATH"
+	ReadThroughPkiDirEnvVarName           string = "PKI_DIR"
+)
+
 // Provides methods for reading information that when not found, are generated on the fly.
 type ReadThrough struct {
 }
 
 // Attempts to retrieve the certificate pair file paths from the environment variables
 // "CERTIFICATE_PAIR_CERT_PATH" and "CERTIFICATE_PAIR_KEY_PATH", otherwise generates a
-// self-signed certificate pair on local 'pki' directory and returns the absolute paths to
-// the generated files.
+// self-signed certificate pair on local 'pki' directory (or the directory specified by the
+// environment variable "PKI_DIR") and returns the absolute paths to the generated files.
 func (rt *ReadThrough) CertPairFilePathsReader() (
 	certPath tkValueObject.UnixAbsoluteFilePath,
 	keyPath tkValueObject.UnixAbsoluteFilePath,
@@ -24,7 +30,7 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	allowUnsafeFilePathChars := false
 
 	isCertPathValid := false
-	rawCertPath := os.Getenv("CERTIFICATE_PAIR_CERT_PATH")
+	rawCertPath := os.Getenv(ReadThroughCertPairCertPathEnvVarName)
 	if rawCertPath != "" {
 		certPath, err = tkValueObject.NewUnixAbsoluteFilePath(rawCertPath, allowUnsafeFilePathChars)
 		if err != nil {
@@ -34,7 +40,7 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	}
 
 	isKeyPathValid := false
-	rawKeyPath := os.Getenv("CERTIFICATE_PAIR_KEY_PATH")
+	rawKeyPath := os.Getenv(ReadThroughCertPairKeyPathEnvVarName)
 	if rawKeyPath != "" {
 		keyPath, err = tkValueObject.NewUnixAbsoluteFilePath(rawKeyPath, allowUnsafeFilePathChars)
 		if err != nil {
@@ -55,6 +61,9 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 
 	fileClerk := FileClerk{}
 	pkiDir := "pki"
+	if os.Getenv(ReadThroughPkiDirEnvVarName) != "" {
+		pkiDir = os.Getenv(ReadThroughPkiDirEnvVarName)
+	}
 	err = fileClerk.CreateDir(pkiDir)
 	if err != nil {
 		return certPath, keyPath, err
