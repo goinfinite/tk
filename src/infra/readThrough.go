@@ -60,16 +60,26 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	}
 
 	fileClerk := FileClerk{}
-	pkiDir := "pki"
+	rawPkiDir := "pki"
 	if os.Getenv(ReadThroughPkiDirEnvVarName) != "" {
-		pkiDir = os.Getenv(ReadThroughPkiDirEnvVarName)
+		rawPkiDir = os.Getenv(ReadThroughPkiDirEnvVarName)
 	}
-	err = fileClerk.CreateDir(pkiDir)
+	rawPkiDir, err = filepath.Abs(rawPkiDir)
+	if err != nil {
+		return certPath, keyPath, errors.New("RetrievePkiDirFailed")
+	}
+	pkiDir, err := tkValueObject.NewUnixAbsoluteFilePath(rawPkiDir, false)
+	if err != nil {
+		return certPath, keyPath, errors.New("InvalidPkiAbsoluteDirPath")
+	}
+	pkiDirStr := pkiDir.String()
+
+	err = fileClerk.CreateDir(pkiDirStr)
 	if err != nil {
 		return certPath, keyPath, err
 	}
 
-	rawCertPath, err = filepath.Abs(pkiDir + "/cert.pem")
+	rawCertPath, err = filepath.Abs(pkiDirStr + "/cert.pem")
 	if err != nil {
 		return certPath, keyPath, errors.New("RetrieveSelfSignedCertAbsolutePathFailed")
 	}
@@ -82,7 +92,7 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 		return certPath, keyPath, errors.New("SelfSignedCertContentUpdateFailed")
 	}
 
-	rawKeyPath, err = filepath.Abs(pkiDir + "/key.pem")
+	rawKeyPath, err = filepath.Abs(pkiDirStr + "/key.pem")
 	if err != nil {
 		return certPath, keyPath, errors.New("RetrieveSelfSignedKeyAbsolutePathFailed")
 	}
