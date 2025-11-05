@@ -1,9 +1,12 @@
 package tkInfra
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
@@ -227,4 +230,190 @@ func TestMailAddressFactory(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSelfSignedCertificatePairFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("WithNilCommonNameAndEmptyAltNames", func(t *testing.T) {
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		if certPair.Leaf == nil {
+			t.Error("CertificateLeafIsNil")
+		}
+
+		if certPair.Leaf.Subject.CommonName != "localhost" {
+			t.Errorf("UnexpectedCommonName: '%s' vs 'localhost'", certPair.Leaf.Subject.CommonName)
+		}
+
+		if len(certPair.Leaf.DNSNames) != 0 {
+			t.Errorf("UnexpectedAltNames: %v", certPair.Leaf.DNSNames)
+		}
+
+		if certPair.Leaf.Subject.Organization[0] != "Daystrom Institute" {
+			t.Errorf("UnexpectedOrganization: '%s' vs 'Daystrom Institute'", certPair.Leaf.Subject.Organization[0])
+		}
+
+		if certPair.Leaf.SerialNumber == nil || certPair.Leaf.SerialNumber.Sign() <= 0 {
+			t.Error("InvalidSerialNumber")
+		}
+
+		validFrom := certPair.Leaf.NotBefore
+		validUntil := certPair.Leaf.NotAfter
+		if validUntil.Sub(validFrom) != 365*24*time.Hour {
+			t.Errorf("UnexpectedValidityPeriod: %v", validUntil.Sub(validFrom))
+		}
+	})
+
+	t.Run("WithProvidedCommonName", func(t *testing.T) {
+		commonName, err := tkValueObject.NewFqdn("example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+
+		certPair, err := synth.SelfSignedCertificatePairFactory(&commonName, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		if certPair.Leaf.Subject.CommonName != "example.com" {
+			t.Errorf("UnexpectedCommonName: '%s' vs 'example.com'", certPair.Leaf.Subject.CommonName)
+		}
+	})
+
+	t.Run("WithAltNames", func(t *testing.T) {
+		altName1, err := tkValueObject.NewFqdn("alt1.example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+		altName2, err := tkValueObject.NewFqdn("alt2.example.com")
+		if err != nil {
+			t.Fatalf("CreateFqdnFailed: %v", err)
+		}
+
+		altNames := []tkValueObject.Fqdn{altName1, altName2}
+
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, altNames)
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		expectedAltNames := []string{"alt1.example.com", "alt2.example.com"}
+		if len(certPair.Leaf.DNSNames) != len(expectedAltNames) {
+			t.Errorf("UnexpectedAltNamesCount: %d vs %d", len(certPair.Leaf.DNSNames), len(expectedAltNames))
+		}
+
+		for i, expected := range expectedAltNames {
+			if i >= len(certPair.Leaf.DNSNames) || certPair.Leaf.DNSNames[i] != expected {
+				t.Errorf("UnexpectedDNSName: '%s' vs '%s'", certPair.Leaf.DNSNames[i], expected)
+			}
+		}
+	})
+
+	t.Run("CertificateUsage", func(t *testing.T) {
+		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+		}
+
+		expectedKeyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+		if certPair.Leaf.KeyUsage != expectedKeyUsage {
+			t.Errorf("UnexpectedKeyUsage: %v vs %v", certPair.Leaf.KeyUsage, expectedKeyUsage)
+		}
+
+		if len(certPair.Leaf.ExtKeyUsage) != 1 || certPair.Leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
+			t.Errorf("UnexpectedExtKeyUsage: %v", certPair.Leaf.ExtKeyUsage)
+		}
+	})
+}
+
+func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	commonNameExample, _ := tkValueObject.NewFqdn("test.example.com")
+	altName1, _ := tkValueObject.NewFqdn("alt1.test.com")
+	altName2, _ := tkValueObject.NewFqdn("alt2.test.com")
+
+	testCases := []struct {
+		name               string
+		commonNamePtr      *tkValueObject.Fqdn
+		altNames           []tkValueObject.Fqdn
+		expectedCommonName string
+		expectedAltNames   []string
+	}{
+		{
+			name:               "WithNilCommonNameAndEmptyAltNames",
+			commonNamePtr:      nil,
+			altNames:           []tkValueObject.Fqdn{},
+			expectedCommonName: "localhost",
+			expectedAltNames:   []string{},
+		},
+		{
+			name:               "WithProvidedCommonName",
+			commonNamePtr:      &commonNameExample,
+			altNames:           []tkValueObject.Fqdn{},
+			expectedCommonName: "test.example.com",
+			expectedAltNames:   []string{},
+		},
+		{
+			name:               "WithAltNames",
+			commonNamePtr:      nil,
+			altNames:           []tkValueObject.Fqdn{altName1, altName2},
+			expectedCommonName: "localhost",
+			expectedAltNames:   []string{"alt1.test.com", "alt2.test.com"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			certPem, keyPem, err := synth.SelfSignedCertificatePairPemFactory(testCase.commonNamePtr, testCase.altNames)
+			if err != nil {
+				t.Errorf("SelfSignedCertificatePairPemFactoryError: %v", err)
+			}
+
+			if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
+				t.Error("CertPemHeaderInvalid")
+			}
+			if !strings.HasSuffix(certPem, "-----END CERTIFICATE-----\n") {
+				t.Error("CertPemFooterInvalid")
+			}
+
+			if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
+				t.Error("KeyPemHeaderInvalid")
+			}
+			if !strings.HasSuffix(keyPem, "-----END EC PRIVATE KEY-----\n") {
+				t.Error("KeyPemFooterInvalid")
+			}
+
+			certificatePemBlock, _ := pem.Decode([]byte(certPem))
+			if certificatePemBlock == nil || certificatePemBlock.Type != "CERTIFICATE" {
+				t.Error("CertPemBlockDecodeFail")
+			}
+			parsedCert, err := x509.ParseCertificate(certificatePemBlock.Bytes)
+			if err != nil {
+				t.Errorf("CertParseFail: %v", err)
+			}
+			if parsedCert.Subject.CommonName != testCase.expectedCommonName {
+				t.Errorf("CommonNameMismatch: Expected '%s', Got '%s'", testCase.expectedCommonName, parsedCert.Subject.CommonName)
+			}
+			if len(parsedCert.DNSNames) != len(testCase.expectedAltNames) {
+				t.Errorf("AltNamesCountMismatch: Expected %d, Got %d", len(testCase.expectedAltNames), len(parsedCert.DNSNames))
+			}
+			for altNameIndex, expectedAltName := range testCase.expectedAltNames {
+				if altNameIndex >= len(parsedCert.DNSNames) || parsedCert.DNSNames[altNameIndex] != expectedAltName {
+					t.Errorf("AltNameMismatch: Expected '%s', Got '%s'", expectedAltName, parsedCert.DNSNames[altNameIndex])
+				}
+			}
+
+			if len(certPem) == 0 {
+				t.Error("CertPemEmpty")
+			}
+			if len(keyPem) == 0 {
+				t.Error("KeyPemEmpty")
+			}
+		})
+	}
 }

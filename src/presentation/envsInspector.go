@@ -1,0 +1,108 @@
+package tkPresentation
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
+	tkInfra "github.com/goinfinite/tk/src/infra"
+	"github.com/joho/godotenv"
+)
+
+const (
+	EnvsInspectorEnvFilePathEnvVarName string = "ENV_FILE_PATH"
+)
+
+type EnvsInspector struct {
+	envFilePath         *tkValueObject.UnixAbsoluteFilePath
+	requiredEnvVars     []string
+	autoFillableEnvVars []string
+}
+
+func NewEnvsInspector(
+	envFilePath *tkValueObject.UnixAbsoluteFilePath,
+	requiredEnvVars, autoFillableEnvVars []string,
+) *EnvsInspector {
+	return &EnvsInspector{
+		envFilePath:         envFilePath,
+		requiredEnvVars:     requiredEnvVars,
+		autoFillableEnvVars: autoFillableEnvVars,
+	}
+}
+
+func (envsInspector *EnvsInspector) Inspect() (err error) {
+	if envsInspector.envFilePath == nil {
+		rawEnvFilePath := os.Getenv(EnvsInspectorEnvFilePathEnvVarName)
+		if rawEnvFilePath == "" {
+			rawEnvFilePath, err = filepath.Abs(".env")
+			if err != nil {
+				return errors.New("RetrieveEnvFilePathFailed")
+			}
+		}
+		envFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(rawEnvFilePath, false)
+		if err != nil {
+			return errors.New("InvalidEnvFilePath")
+		}
+		envsInspector.envFilePath = &envFilePath
+	}
+	envFilePathStr := envsInspector.envFilePath.String()
+
+	fileClerk := tkInfra.FileClerk{}
+	if !fileClerk.FileExists(envFilePathStr) {
+		err = fileClerk.CreateFile(envFilePathStr)
+		if err != nil {
+			return errors.New("EnvsInspectorEnvCreateFileError")
+		}
+	}
+	envFileWritePermissions := int(0600)
+	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileWritePermissions)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvUpdateFileWritePermissionsError")
+	}
+
+	err = godotenv.Load(envFilePathStr)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvLoadError: " + err.Error())
+	}
+
+	missingRequiredEnvVars := []string{}
+	synthesizer := tkInfra.Synthesizer{}
+	for _, envVarName := range envsInspector.requiredEnvVars {
+		envVarValue := os.Getenv(envVarName)
+		if envVarValue != "" {
+			continue
+		}
+
+		if !slices.Contains(envsInspector.autoFillableEnvVars, envVarName) {
+			missingRequiredEnvVars = append(missingRequiredEnvVars, envVarName)
+			continue
+		}
+
+		envVarValue = synthesizer.PasswordFactory(32, true)
+		envVarStr := envVarName + "=" + envVarValue + "\n"
+
+		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
+		if err != nil {
+			return errors.New("EnvsInspectorEnvWriteFileError")
+		}
+
+		os.Setenv(envVarName, envVarValue)
+	}
+
+	envFileReadOnlyPermissions := int(0400)
+	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileReadOnlyPermissions)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvUpdateFileReadOnlyPermissionsError")
+	}
+
+	if len(missingRequiredEnvVars) > 0 {
+		return errors.New(
+			"EnvsInspectorMissingRequiredEnvVars: " + strings.Join(missingRequiredEnvVars, ", "),
+		)
+	}
+
+	return nil
+}
