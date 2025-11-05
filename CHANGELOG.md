@@ -1,6 +1,13 @@
 # Changelog
 
 ```log
+0.1.0 - 2025/11/05
+feat: add SelfSignedCertificatePairFactory to Synthesizer
+feat: add CertPairFilePathsReader to ReadThrough
+feat: add envsInspector presentation helper
+fix: decompress using source dir as working dir
+fix: keep only utf8 chars on StripUnsafe
+
 0.0.9 - 2025/11/03
 feat: split unix file path into relative and absolute vos
 feat: add panic handler middleware
