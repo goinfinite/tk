@@ -303,7 +303,11 @@ func (clerk FileClerk) DecompressFile(
 	}
 
 	shell := NewShell(
-		ShellSettings{Command: decompressionCmd, Args: decompressionArgs},
+		ShellSettings{
+			Command:          decompressionCmd,
+			Args:             decompressionArgs,
+			WorkingDirectory: filepath.Dir(sourcePath),
+		},
 	)
 	switch sourcePathExtNoDotStr {
 	case "gz", "gzip", "xz":
