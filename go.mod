@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/goccy/go-yaml v1.18.0
+	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/rs/zerolog v1.34.0
 	github.com/samber/slog-zerolog/v2 v2.8.0
