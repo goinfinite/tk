@@ -22,6 +22,17 @@ type EnvsInspector struct {
 	autoFillableEnvVars []string
 }
 
+func NewEnvsInspector(
+	envFilePath *tkValueObject.UnixAbsoluteFilePath,
+	requiredEnvVars, autoFillableEnvVars []string,
+) *EnvsInspector {
+	return &EnvsInspector{
+		envFilePath:         envFilePath,
+		requiredEnvVars:     requiredEnvVars,
+		autoFillableEnvVars: autoFillableEnvVars,
+	}
+}
+
 func (envsInspector *EnvsInspector) Inspect() (err error) {
 	if envsInspector.envFilePath == nil {
 		rawEnvFilePath := os.Getenv(EnvsInspectorEnvFilePathEnvVarName)
