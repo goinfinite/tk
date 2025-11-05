@@ -129,7 +129,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 
 		err = envsInspector.Inspect()
 		if err == nil {
-			t.Errorf("InspectSucceededWhenItShouldFail: missing required env var")
+			t.Errorf("InspectSucceededWhenItShouldFail: MissingRequiredEnvVar")
 		}
 
 		expectedError := "EnvsInspectorMissingRequiredEnvVars: DB_USER"
@@ -176,8 +176,8 @@ func TestEnvsInspectorInspect(t *testing.T) {
 			t.Errorf("InspectSucceededWhenItShouldFail: InvalidEnvFilePath")
 		}
 
-		if !strings.Contains(err.Error(), "EnvsInspectorEnvOpenFileError") {
-			t.Errorf("UnexpectedError: expected EnvsInspectorEnvOpenFileError, got %v", err)
+		if !strings.Contains(err.Error(), "EnvsInspectorEnvCreateFileError") {
+			t.Errorf("UnexpectedError: expected EnvsInspectorEnvCreateFileError, got %v", err)
 		}
 	})
 }

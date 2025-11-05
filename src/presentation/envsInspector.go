@@ -50,13 +50,18 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	}
 	envFilePathStr := envsInspector.envFilePath.String()
 
-	envFileHandler, err := os.OpenFile(
-		envFilePathStr, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0400,
-	)
-	if err != nil {
-		return errors.New("EnvsInspectorEnvOpenFileError")
+	fileClerk := tkInfra.FileClerk{}
+	if !fileClerk.FileExists(envFilePathStr) {
+		err = fileClerk.CreateFile(envFilePathStr)
+		if err != nil {
+			return errors.New("EnvsInspectorEnvCreateFileError")
+		}
 	}
-	defer envFileHandler.Close()
+	envFileWritePermissions := int(0600)
+	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileWritePermissions)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvUpdateFileWritePermissionsError")
+	}
 
 	err = godotenv.Load(envFilePathStr)
 	if err != nil {
@@ -77,13 +82,20 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		}
 
 		envVarValue = synthesizer.PasswordFactory(32, true)
+		envVarStr := envVarName + "=" + envVarValue + "\n"
 
-		_, err = envFileHandler.WriteString(envVarName + "=" + envVarValue + "\n")
+		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
 		if err != nil {
 			return errors.New("EnvsInspectorEnvWriteFileError")
 		}
 
 		os.Setenv(envVarName, envVarValue)
+	}
+
+	envFileReadOnlyPermissions := int(0400)
+	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileReadOnlyPermissions)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvUpdateFileReadOnlyPermissionsError")
 	}
 
 	if len(missingRequiredEnvVars) > 0 {
