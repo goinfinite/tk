@@ -27,7 +27,7 @@ func TestNewPaginationLastSeenId(t *testing.T) {
 			{"with space", PaginationLastSeenId(""), true},
 			{"with.dot", PaginationLastSeenId(""), true},
 			{"with/slash", PaginationLastSeenId(""), true},
-			{"with\backslash", PaginationLastSeenId(""), true},
+			{"with\\backslash", PaginationLastSeenId(""), true},
 			{"-withDashAtStart", PaginationLastSeenId(""), true},
 			{[]string{"abc"}, PaginationLastSeenId(""), true},
 		}
