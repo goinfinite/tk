@@ -74,6 +74,10 @@ func LiaisonApiResponseEmitter(
 		httpStatus = http.StatusMultiStatus
 	case LiaisonResponseStatusUserError:
 		httpStatus = http.StatusBadRequest
+	case LiaisonResponseStatusUnauthorized:
+		httpStatus = http.StatusUnauthorized
+	case LiaisonResponseStatusForbidden:
+		httpStatus = http.StatusForbidden
 	case LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError:
 		httpStatus = http.StatusInternalServerError
 	}
@@ -87,7 +91,8 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	exitCode := 0
 	switch liaisonResponse.Status {
 	case LiaisonResponseStatusMultiStatus, LiaisonResponseStatusUserError,
-		LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError:
+		LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError,
+		LiaisonResponseStatusUnauthorized, LiaisonResponseStatusForbidden:
 		exitCode = 1
 	default:
 		exitCode = 0
