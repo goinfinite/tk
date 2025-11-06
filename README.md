@@ -34,7 +34,7 @@ Infinite TK provides various infrastructure helpers for common tasks:
 For web applications built with Echo:
 
 - **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` env var to mask sensitive information. It can be used with CLI applications as well.
-- **RequiredParamsInspector**: Normalizes parameters from HTTP requests into a `map[string]any` regardless of the request type (JSON, form data, multipart files or query params).
+- **RequiredParamsInspector**: Normalizes parameters from HTTP requests into a `map[string]any` regardless of the request type (JSON, form data, multipart files, path or query params).
 
 ### Presentation Helpers
 

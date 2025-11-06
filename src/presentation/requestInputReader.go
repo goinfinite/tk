@@ -87,6 +87,43 @@ func (RequestInputReader) MultipartFilesProcessor(
 	return fileHeaders
 }
 
+// RequestInputReader.Reader extracts and normalizes input data from an HTTP request
+// into a flat map[string]any.
+//
+// It processes the request body based on Content-Type, merges query parameters,
+// path parameters, and optionally includes operator context information.
+//
+// Content-Type handling:
+//   - application/json: Parses JSON body directly into the map. Returns "InvalidJsonBody"
+//     error if JSON is malformed.
+//   - application/x-www-form-urlencoded: Processes form data, preserving multiple values
+//     as string slices when a key appears more than once. Supports dot notation for nested
+//     structures (e.g., "user.name" becomes map["user"]["name"]).
+//   - multipart/form-data: Processes form fields similar to URL-encoded data. File uploads
+//     are normalized under the "files" key, with multiple files indexed as "key_0", "key_1", etc.
+//     Returns "InvalidMultipartFormData" error if the multipart form cannot be parsed.
+//   - Other/missing Content-Type: Returns "InvalidContentType" error.
+//
+// Query parameters:
+//
+//	Query parameters are merged into the result map. When a query parameter has multiple
+//	values (e.g., ?tags=tag1&tags=tag2), only the FIRST value is captured. This is a design
+//	decision to optimize for the common single-value case (~99% of use cases).
+//
+//	For the rare cases where multiple values are needed, use a delimiter at the controller
+//	level. For example: ?tags=tag1;tag2 and split on ";" in your controller logic.
+//
+// Route Path parameters:
+//
+//	All Echo route path parameters (e.g., :id, :name) are merged into the result map.
+//
+// Operator context (if present in Echo context):
+//   - operatorAccountId: Extracted from context key and included in the result map.
+//   - operatorIpAddress: Always populated using the real client IP address via RealIP().
+//
+// Returns:
+//   - A map[string]any containing all extracted request data, or
+//   - An echo.HTTPError with status 400 (Bad Request) and a descriptive message if parsing fails.
 func (reader RequestInputReader) Reader(echoContext echo.Context) (map[string]any, error) {
 	requestBody := map[string]any{}
 
@@ -128,8 +165,8 @@ func (reader RequestInputReader) Reader(echoContext echo.Context) (map[string]an
 		requestBody[queryParamName] = queryParamValues[0]
 	}
 
-	for _, urlParamName := range echoContext.ParamNames() {
-		requestBody[urlParamName] = echoContext.Param(urlParamName)
+	for _, routeParamName := range echoContext.ParamNames() {
+		requestBody[routeParamName] = echoContext.Param(routeParamName)
 	}
 
 	if echoContext.Get("operatorAccountId") != nil {
