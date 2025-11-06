@@ -170,7 +170,7 @@ func TestTimeParamsParser(t *testing.T) {
 					if actualValue != nil {
 						t.Errorf("Unexpected%s: ShouldBeNil, got '%v'", paramName, actualValue)
 					}
-					return
+					continue
 				}
 
 				if actualValue == nil {
