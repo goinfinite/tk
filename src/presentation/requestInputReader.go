@@ -27,8 +27,13 @@ func (reader RequestInputReader) StringDotNotationToHierarchicalMap(
 		hierarchicalMap[parentKey] = make(map[string]any)
 	}
 
+	parentHierarchicalMap, assertOk := hierarchicalMap[parentKey].(map[string]any)
+	if !assertOk {
+		return hierarchicalMap
+	}
+
 	hierarchicalMap[parentKey] = reader.StringDotNotationToHierarchicalMap(
-		hierarchicalMap[parentKey].(map[string]any), nextKeys, finalValue,
+		parentHierarchicalMap, nextKeys, finalValue,
 	)
 
 	return hierarchicalMap
@@ -54,10 +59,6 @@ func (reader RequestInputReader) FormUrlEncodedDataProcessor(
 		}
 
 		keyParts := strings.Split(formKey, ".")
-		if len(keyParts) < 2 {
-			continue
-		}
-
 		requestBody = reader.StringDotNotationToHierarchicalMap(
 			requestBody, keyParts, formValue,
 		)
@@ -109,11 +110,10 @@ func (reader RequestInputReader) Reader(echoContext echo.Context) (map[string]an
 			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidMultipartFormData")
 		}
 
-		for formKey, formValues := range multipartForm.Value {
-			if len(formValues) == 1 {
-				requestBody[formKey] = formValues[0]
-			}
+		if multipartForm == nil {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidMultipartFormData")
 		}
+		requestBody = reader.FormUrlEncodedDataProcessor(requestBody, multipartForm.Value)
 
 		if len(multipartForm.File) > 0 {
 			fileHeaders := reader.MultipartFilesProcessor(multipartForm.File)

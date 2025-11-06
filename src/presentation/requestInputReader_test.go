@@ -74,6 +74,17 @@ func TestStringDotNotationToHierarchicalMap(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "KeyConflictScalarToNested",
+			initialMap: map[string]any{
+				"user": "simpleString",
+			},
+			keys:  []string{"user", "name"},
+			value: "john",
+			expectedResult: map[string]any{
+				"user": "simpleString",
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
