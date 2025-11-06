@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var paginationLastSeenIdRegex = regexp.MustCompile(`^[\w\-]{1,256}$`)
+var paginationLastSeenIdRegex = regexp.MustCompile(`^\w[\w\-]{0,255}$`)
 
 type PaginationLastSeenId string
 

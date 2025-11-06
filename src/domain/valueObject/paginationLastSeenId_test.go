@@ -19,12 +19,16 @@ func TestNewPaginationLastSeenId(t *testing.T) {
 			{strings.Repeat("a", 256), PaginationLastSeenId(strings.Repeat("a", 256)), false},
 			{123, PaginationLastSeenId("123"), false},
 			{true, PaginationLastSeenId("true"), false},
+			{"withDashAtEnd-", PaginationLastSeenId("withDashAtEnd-"), false},
 			// Invalid pagination last seen IDs
 			{"", PaginationLastSeenId(""), true},
 			{strings.Repeat("a", 257), PaginationLastSeenId(""), true},
 			{"invalid@id", PaginationLastSeenId(""), true},
 			{"with space", PaginationLastSeenId(""), true},
 			{"with.dot", PaginationLastSeenId(""), true},
+			{"with/slash", PaginationLastSeenId(""), true},
+			{"with\\backslash", PaginationLastSeenId(""), true},
+			{"-withDashAtStart", PaginationLastSeenId(""), true},
 			{[]string{"abc"}, PaginationLastSeenId(""), true},
 		}
 

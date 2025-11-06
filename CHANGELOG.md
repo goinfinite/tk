@@ -1,6 +1,14 @@
 # Changelog
 
 ```log
+0.1.1 - 2025/11/06
+feat: add request input reader
+feat: add trusted ip reader
+feat: add pagination parser
+feat: add time params parser
+feat: add response wrappers
+fix: turn last seen id vo regex stricter
+
 0.1.0 - 2025/11/05
 feat: add SelfSignedCertificatePairFactory to Synthesizer
 feat: add CertPairFilePathsReader to ReadThrough
