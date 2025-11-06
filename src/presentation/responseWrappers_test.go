@@ -73,12 +73,20 @@ func TestNewApiResponseWrapper(t *testing.T) {
 				)
 			}
 
-			actualJson, _ := json.Marshal(result.Body)
-			expectedJson, _ := json.Marshal(testCase.expectedBody)
+			actualJson, err := json.Marshal(result.Body)
+			if err != nil {
+				t.Fatalf("ActualJsonMarshalingFailed: %v", err)
+			}
+
+			expectedJson, err := json.Marshal(testCase.expectedBody)
+			if err != nil {
+				t.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
+			}
+
 			if string(actualJson) != string(expectedJson) {
 				t.Errorf(
-					"BodyMismatch: expected %v, got %v",
-					testCase.expectedBody, result.Body,
+					"BodyMismatch: expected '%s', got '%s'",
+					string(expectedJson), string(actualJson),
 				)
 			}
 		})
@@ -316,12 +324,20 @@ func TestNewLiaisonResponse(t *testing.T) {
 				)
 			}
 
-			actualJson, _ := json.Marshal(result.Body)
-			expectedJson, _ := json.Marshal(testCase.expectedBody)
+			actualJson, err := json.Marshal(result.Body)
+			if err != nil {
+				t.Fatalf("ActualJsonMarshalingFailed: %v", err)
+			}
+
+			expectedJson, err := json.Marshal(testCase.expectedBody)
+			if err != nil {
+				t.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
+			}
+
 			if string(actualJson) != string(expectedJson) {
 				t.Errorf(
-					"BodyMismatch: expected %v, got %v",
-					testCase.expectedBody, result.Body,
+					"BodyMismatch: expected '%s', got '%s'",
+					string(expectedJson), string(actualJson),
 				)
 			}
 		})
