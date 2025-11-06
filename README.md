@@ -13,3 +13,42 @@ To use Infinite TK in your project, you can install it using Go modules. Run the
 ```bash
 go get github.com/goinfinite/tk
 ```
+
+## Components
+
+### Infrastructure Helpers
+
+Infinite TK provides various infrastructure helpers for common tasks:
+
+- **Deserializer**: Deserialize JSON and YAML files into maps for configuration handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, and symlink handling.
+- **Shell**: Execute system commands with configurable user, timeout, environment variables, and output redirection to files.
+- **Synthesizer**: Generate secure passwords with charset guarantees, random usernames/emails, and self-signed TLS certificates.
+- **ServerIpAddress**: Retrieve the server's private and public IP addresses.
+- **TrustedIpsReader**: Parse a comma-separated list of trusted IP addresses from the `TRUSTED_IPS` environment variable.
+- **ReadThrough**: Read-through utilities for TLS certificate pairs from `CERTIFICATE_PAIR_CERT_PATH` and `CERTIFICATE_PAIR_KEY_PATH` env vars, generating self-signed certificates in `PKI_DIR` if not provided.
+- **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
+
+### Presentation Middlewares
+
+For web applications built with Echo:
+
+- **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` env var to mask sensitive information. It can be used with CLI applications as well.
+- **RequiredParamsInspector**: Normalizes parameters from HTTP requests into a `map[string]any` regardless of the request type (JSON, form data, multipart files or query params).
+
+### Presentation Helpers
+
+- **EnvsInspector**: Inspect and validate environment variables from .env files loaded via `ENV_FILE_PATH` env var, supporting required and auto-fillable variables.
+- **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests.
+- **RequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data.
+- **StringSliceVoParser**: Convert comma-separated, semicolon-separated, or array strings into value object slices.
+- **TimeParamsParser**: Parse date ranges, timestamps, and relative times from request parameters.
+- **ResponseWrapper**: A wrapper struct for liaison responses and when needed, used to emit API and CLI responses.
+
+### Value Objects
+
+The library includes over 50 value objects for domain modeling, ensuring type safety and validation. Examples include Email, Password, URL, IPAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, and more. Just like all other components, they have 100% test coverage.
+
+### Value Object Utilities
+
+- **InterfaceTo**: Safely convert interface{} to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
