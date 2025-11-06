@@ -128,8 +128,8 @@ func (reader RequestInputReader) Reader(echoContext echo.Context) (map[string]an
 		requestBody[queryParamName] = queryParamValues[0]
 	}
 
-	for _, paramName := range echoContext.ParamNames() {
-		requestBody[paramName] = echoContext.Param(paramName)
+	for _, urlParamName := range echoContext.ParamNames() {
+		requestBody[urlParamName] = echoContext.Param(urlParamName)
 	}
 
 	if echoContext.Get("operatorAccountId") != nil {
