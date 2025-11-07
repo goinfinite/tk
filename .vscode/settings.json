@@ -5,6 +5,7 @@
     "github",
     "godotenv",
     "goinfinite",
+    "gorm",
     "Grpcs",
     "Kibibyte",
     "Kibibytes",
