@@ -399,9 +399,7 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 
 go 1.25.3
 
-require (
-	github.com/goinfinite/tk v0.1.1
-)
+require github.com/goinfinite/tk v0.1.1
 `
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
@@ -414,23 +412,11 @@ require (
 		t.Fatalf("WriteGoModFailed: %v", err)
 	}
 
-	goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
-		Command:          "go",
-		Args:             []string{"mod", "tidy"},
-		WorkingDirectory: workingDir,
-	})
-	_, err = goModShell.Run()
-	if err != nil {
-		t.Fatalf("RunGoModTidyFailed: %v", err)
-	}
-
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testProgramMain := `package main
 
-import (
-	tkPresentation "github.com/goinfinite/tk/src/presentation"
-)
+import tkPresentation "github.com/goinfinite/tk/src/presentation"
 
 func main() {
 	liaisonResponse := tkPresentation.NewLiaisonResponse(
@@ -443,6 +429,18 @@ func main() {
 			err = fileClerk.UpdateFileContent(testFile, testProgramMain, true)
 			if err != nil {
 				t.Fatalf("WriteTestProgramFailed: %v", err)
+			}
+
+			if !fileClerk.FileExists(workingDir + "/go.sum") {
+				goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
+					Command:          "go",
+					Args:             []string{"mod", "tidy"},
+					WorkingDirectory: workingDir,
+				})
+				_, err = goModShell.Run()
+				if err != nil {
+					t.Fatalf("RunGoModTidyFailed: %v", err)
+				}
 			}
 
 			goRunShell := tkInfra.NewShell(tkInfra.ShellSettings{
