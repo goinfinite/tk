@@ -55,8 +55,8 @@ func TestNewApiResponseWrapper(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := NewApiResponseWrapper(
 				testCase.status,
-				testCase.readableMessage,
 				testCase.body,
+				testCase.readableMessage,
 			)
 
 			if result.Status != testCase.expectedStatus {
@@ -208,7 +208,7 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
 			liaisonResponse := NewLiaisonResponse(
-				testCase.liaisonStatus, testCase.readableMessage, testCase.body,
+				testCase.liaisonStatus, testCase.body, testCase.readableMessage,
 			)
 
 			err := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
@@ -306,8 +306,8 @@ func TestNewLiaisonResponse(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := NewLiaisonResponse(
 				testCase.status,
-				testCase.readableMessage,
 				testCase.body,
+				testCase.readableMessage,
 			)
 
 			if result.Status != testCase.expectedStatus {
