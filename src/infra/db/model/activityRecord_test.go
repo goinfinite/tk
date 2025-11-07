@@ -207,7 +207,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("InvalidRecordLevel", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:                1,
-			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
+			RecordLevel:       "InvalidRecordLevel",
 			RecordCode:        "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{},
 			RecordDetails:     nil,
