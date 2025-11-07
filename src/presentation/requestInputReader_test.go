@@ -16,7 +16,7 @@ import (
 )
 
 func TestStringDotNotationToHierarchicalMap(t *testing.T) {
-	requestInputReader := RequestInputReader{}
+	requestInputReader := ApiRequestInputReader{}
 
 	testCases := []struct {
 		name           string
@@ -114,7 +114,7 @@ func TestStringDotNotationToHierarchicalMap(t *testing.T) {
 }
 
 func TestFormUrlEncodedDataProcessor(t *testing.T) {
-	requestInputReader := RequestInputReader{}
+	requestInputReader := ApiRequestInputReader{}
 
 	testCases := []struct {
 		name           string
@@ -218,7 +218,7 @@ func TestFormUrlEncodedDataProcessor(t *testing.T) {
 }
 
 func TestMultipartFilesProcessor(t *testing.T) {
-	requestInputReader := RequestInputReader{}
+	requestInputReader := ApiRequestInputReader{}
 
 	t.Run("SingleFilePerKey", func(t *testing.T) {
 		uploadedFilesByKey := map[string][]*multipart.FileHeader{
@@ -302,8 +302,8 @@ func TestMultipartFilesProcessor(t *testing.T) {
 	})
 }
 
-func TestRequestInputReader(t *testing.T) {
-	requestInputReader := RequestInputReader{}
+func TestApiRequestInputReader(t *testing.T) {
+	requestInputReader := ApiRequestInputReader{}
 
 	t.Run("JsonContentType", func(t *testing.T) {
 		testCases := []struct {

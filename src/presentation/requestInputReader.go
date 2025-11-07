@@ -9,10 +9,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type RequestInputReader struct {
+type ApiRequestInputReader struct {
 }
 
-func (reader RequestInputReader) StringDotNotationToHierarchicalMap(
+func (reader ApiRequestInputReader) StringDotNotationToHierarchicalMap(
 	hierarchicalMap map[string]any, remainingKeys []string, finalValue string,
 ) map[string]any {
 	if len(remainingKeys) == 1 {
@@ -39,7 +39,7 @@ func (reader RequestInputReader) StringDotNotationToHierarchicalMap(
 	return hierarchicalMap
 }
 
-func (reader RequestInputReader) FormUrlEncodedDataProcessor(
+func (reader ApiRequestInputReader) FormUrlEncodedDataProcessor(
 	requestBody map[string]any, formData map[string][]string,
 ) map[string]any {
 	for formKey, formValues := range formData {
@@ -67,7 +67,7 @@ func (reader RequestInputReader) FormUrlEncodedDataProcessor(
 	return requestBody
 }
 
-func (RequestInputReader) MultipartFilesProcessor(
+func (ApiRequestInputReader) MultipartFilesProcessor(
 	filesByKey map[string][]*multipart.FileHeader,
 ) map[string]*multipart.FileHeader {
 	fileHeaders := map[string]*multipart.FileHeader{}
@@ -87,7 +87,7 @@ func (RequestInputReader) MultipartFilesProcessor(
 	return fileHeaders
 }
 
-// RequestInputReader.Reader extracts and normalizes input data from an HTTP request
+// ApiRequestInputReader.Reader extracts and normalizes input data from an HTTP request
 // into a flat map[string]any.
 //
 // It processes the request body based on Content-Type, merges query parameters,
@@ -124,7 +124,7 @@ func (RequestInputReader) MultipartFilesProcessor(
 // Returns:
 //   - A map[string]any containing all extracted request data, or
 //   - An echo.HTTPError with status 400 (Bad Request) and a descriptive message if parsing fails.
-func (reader RequestInputReader) Reader(echoContext echo.Context) (map[string]any, error) {
+func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string]any, error) {
 	requestBody := map[string]any{}
 
 	contentType := echoContext.Request().Header.Get("Content-Type")
