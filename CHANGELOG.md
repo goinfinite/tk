@@ -4,6 +4,7 @@
 0.1.2 - 2025/11/07
 feat: add trail database service
 feat: add activity record entity, vos and models
+feat: add activity record use cases, repositories and implementations
 feat: add system resource identifier vo
 feat: add account id vo
 feat: add weak password
