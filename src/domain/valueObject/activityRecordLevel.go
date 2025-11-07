@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	ActivityRecordLevelDebug ActivityRecordLevel = "DEBUG"
-	ActivityRecordLevelInfo  ActivityRecordLevel = "INFO"
-	ActivityRecordLevelWarn  ActivityRecordLevel = "WARN"
-	ActivityRecordLevelError ActivityRecordLevel = "ERROR"
-	ActivityRecordLevelSec   ActivityRecordLevel = "SEC"
+	ActivityRecordLevelDebug    ActivityRecordLevel = "DEBUG"
+	ActivityRecordLevelInfo     ActivityRecordLevel = "INFO"
+	ActivityRecordLevelWarning  ActivityRecordLevel = "WARNING"
+	ActivityRecordLevelError    ActivityRecordLevel = "ERROR"
+	ActivityRecordLevelSecurity ActivityRecordLevel = "SECURITY"
 )
 
 type ActivityRecordLevel string
@@ -26,13 +26,13 @@ func NewActivityRecordLevel(value any) (recordLevel ActivityRecordLevel, err err
 
 	stringValueVo := ActivityRecordLevel(stringValue)
 	switch stringValueVo {
-	case ActivityRecordLevelDebug, ActivityRecordLevelInfo, ActivityRecordLevelWarn,
-		ActivityRecordLevelError, ActivityRecordLevelSec:
+	case ActivityRecordLevelDebug, ActivityRecordLevelInfo, ActivityRecordLevelWarning,
+		ActivityRecordLevelError, ActivityRecordLevelSecurity:
 		return stringValueVo, nil
-	case "SECURITY":
-		return ActivityRecordLevelSec, nil
-	case "WARNING":
-		return ActivityRecordLevelWarn, nil
+	case "SEC":
+		return ActivityRecordLevelSecurity, nil
+	case "WARN":
+		return ActivityRecordLevelWarning, nil
 	default:
 		return stringValueVo, errors.New("InvalidActivityRecordLevel")
 	}

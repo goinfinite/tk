@@ -10,16 +10,14 @@ func TestNewActivityRecordLevel(t *testing.T) {
 		}{
 			{"DEBUG", false},
 			{"INFO", false},
-			{"WARN", false},
 			{"ERROR", false},
-			{"SEC", false},
 			{"debug", false}, // case insensitive
 			{"info", false},
-			{"warn", false},
+			{"SECURITY", false},
+			{"WARNING", false},
 			{"error", false},
-			{"sec", false},
-			{"SECURITY", false}, // alias
-			{"WARNING", false},  // alias
+			{"sec", false},  // alias
+			{"warn", false}, // alias
 		}
 
 		for _, testCase := range testCaseStructs {
