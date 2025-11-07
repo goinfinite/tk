@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
 func TestNewActivityRecord(t *testing.T) {
@@ -20,7 +22,7 @@ func TestNewActivityRecord(t *testing.T) {
 		}{
 			{
 				recordId:          0,
-				recordLevel:       "info",
+				recordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 				recordCode:        "TEST_CODE",
 				affectedResources: []ActivityRecordAffectedResource{},
 				recordDetails:     nil,
@@ -30,7 +32,7 @@ func TestNewActivityRecord(t *testing.T) {
 			},
 			{
 				recordId:    0,
-				recordLevel: "error",
+				recordLevel: tkValueObject.ActivityRecordLevelError.String(),
 				recordCode:  "ANOTHER_CODE",
 				affectedResources: []ActivityRecordAffectedResource{
 					{SystemResourceIdentifier: "test-resource"},
@@ -80,7 +82,7 @@ func TestNewActivityRecord(t *testing.T) {
 		}{
 			{
 				recordId:    42,
-				recordLevel: "warn",
+				recordLevel: tkValueObject.ActivityRecordLevelWarning.String(),
 				recordCode:  "UPDATE_CODE",
 				affectedResources: []ActivityRecordAffectedResource{
 					{SystemResourceIdentifier: "resource-1"},
@@ -123,7 +125,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("ValidData", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:          42,
-			RecordLevel: "INFO",
+			RecordLevel: tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:  "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{
 				{SystemResourceIdentifier: "sri://1:account/120"},
@@ -176,7 +178,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("ValidDataWithNilPointers", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:                1,
-			RecordLevel:       "ERROR",
+			RecordLevel:       tkValueObject.ActivityRecordLevelError.String(),
 			RecordCode:        "LoginFailed",
 			AffectedResources: []ActivityRecordAffectedResource{},
 			RecordDetails:     nil,
@@ -205,7 +207,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("InvalidRecordLevel", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:                1,
-			RecordLevel:       "INVALID_LEVEL",
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:        "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{},
 			RecordDetails:     nil,
@@ -227,7 +229,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("InvalidRecordCode", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:                1,
-			RecordLevel:       "INFO",
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:        "a",
 			AffectedResources: []ActivityRecordAffectedResource{},
 			RecordDetails:     nil,
@@ -248,7 +250,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("InvalidSystemResourceIdentifier", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:          1,
-			RecordLevel: "INFO",
+			RecordLevel: tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:  "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{
 				{SystemResourceIdentifier: "invalid-sri"},
@@ -271,7 +273,7 @@ func TestToEntity(t *testing.T) {
 	t.Run("InvalidOperatorIpAddress", func(t *testing.T) {
 		model := ActivityRecord{
 			ID:                1,
-			RecordLevel:       "INFO",
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:        "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{},
 			RecordDetails:     nil,

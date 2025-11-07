@@ -3,7 +3,7 @@ package tkInfraDbModel
 import (
 	"time"
 
-	"github.com/goinfinite/tk/src/domain/entity"
+	tkEntity "github.com/goinfinite/tk/src/domain/entity"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
@@ -46,7 +46,7 @@ func NewActivityRecord(
 	return model
 }
 
-func (model ActivityRecord) ToEntity() (recordEntity entity.ActivityRecord, err error) {
+func (model ActivityRecord) ToEntity() (recordEntity tkEntity.ActivityRecord, err error) {
 	recordId, err := tkValueObject.NewActivityRecordId(model.ID)
 	if err != nil {
 		return recordEntity, err
@@ -94,7 +94,7 @@ func (model ActivityRecord) ToEntity() (recordEntity entity.ActivityRecord, err 
 		operatorIpAddressPtr = &operatorIpAddress
 	}
 
-	return entity.NewActivityRecord(
+	return tkEntity.NewActivityRecord(
 		recordId, recordLevel, recordCode, affectedResources, recordDetails,
 		operatorAccountIdPtr, operatorIpAddressPtr,
 		tkValueObject.NewUnixTimeWithGoTime(model.CreatedAt),
