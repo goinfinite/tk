@@ -188,6 +188,55 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 		}
 	})
 
+	t.Run("ReadWithMultipleMatchingAffectedResources", func(t *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(t)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+
+		recordCodeVo, err := tkValueObject.NewActivityRecordCode("MULTI_RES_TEST")
+		if err != nil {
+			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+		}
+
+		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/multi1")
+		if err != nil {
+			t.Fatalf("CreateRes1VoFailed: %v", err)
+		}
+		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/multi2")
+		if err != nil {
+			t.Fatalf("CreateRes2VoFailed: %v", err)
+		}
+
+		createDto := tkDto.CreateActivityRecord{
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+			RecordCode:        recordCodeVo,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
+		}
+
+		_, err = createTestActivityRecord(dbSvc, createDto)
+		if err != nil {
+			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+		}
+
+		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
+			Pagination:        tkDto.PaginationUnpaginated,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
+		})
+		if err != nil {
+			t.Errorf("ReadWithMultipleMatchingAffectedResourcesFailed: %v", err)
+		}
+
+		if len(responseDto.ActivityRecords) != 1 {
+			t.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
+		}
+
+		if responseDto.Pagination.ItemsTotal == nil {
+			t.Fatalf("Expected ItemsTotal to be non-nil")
+		}
+		if *responseDto.Pagination.ItemsTotal != 1 {
+			t.Errorf("ExpectedTotalItemsToBeOne: got %d", *responseDto.Pagination.ItemsTotal)
+		}
+	})
+
 	t.Run("ReadWithTimeFilters", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)

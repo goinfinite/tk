@@ -57,11 +57,13 @@ func (repo *ActivityRecordQueryRepo) Read(
 		for _, sri := range requestDto.AffectedResources {
 			systemResourceIdentifiersStrSlice = append(systemResourceIdentifiersStrSlice, sri.String())
 		}
-		affectedResourcesTableName := tkInfraDbModel.ActivityRecordAffectedResource{}.TableName()
-		dbQuery = dbQuery.
-			Joins("JOIN "+affectedResourcesTableName+
-				" affected_resources ON activity_records.id = affected_resources.activity_record_id").
-			Where("affected_resources.system_resource_identifier IN ?", systemResourceIdentifiersStrSlice)
+
+		affectedResourcesSubQuery := repo.trailDbSvc.Handler.
+			Model(&tkInfraDbModel.ActivityRecordAffectedResource{}).
+			Select("DISTINCT activity_record_id").
+			Where("system_resource_identifier IN ?", systemResourceIdentifiersStrSlice)
+
+		dbQuery = dbQuery.Where("activity_records.id IN (?)", affectedResourcesSubQuery)
 	}
 
 	if requestDto.CreatedBeforeAt != nil {
