@@ -11,7 +11,7 @@ import (
 )
 
 type testPaginationModel struct {
-	ID   string `gorm:"primaryKey"`
+	ID   uint64 `gorm:"primaryKey"`
 	Name string
 }
 
@@ -171,9 +171,8 @@ func setupTestDb(t *testing.T) *gorm.DB {
 	}
 
 	for itemIndex := 1; itemIndex <= 10; itemIndex++ {
-		itemId := fmt.Sprintf("%d", itemIndex)
 		itemName := fmt.Sprintf("item%d", itemIndex)
-		err = dbSvc.Create(&testPaginationModel{ID: itemId, Name: itemName}).Error
+		err = dbSvc.Create(&testPaginationModel{ID: uint64(itemIndex), Name: itemName}).Error
 		if err != nil {
 			t.Fatalf("InsertTestDataFailed: %v", err)
 		}
