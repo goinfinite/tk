@@ -30,13 +30,13 @@ func TestNewUnixHostname(t *testing.T) {
 			{"/path\n/path", UnixHostname(""), true},
 			{"?param=value", UnixHostname(""), true},
 			{"/path/'; DROP TABLE users; --", UnixHostname(""), true},
-			{"-hostname", UnixHostname(""), true}, // starts with dash
-			{"hostname-", UnixHostname(""), true}, // ends with dash
+			{"-hostname", UnixHostname(""), true},  // starts with dash
+			{"hostname-", UnixHostname(""), true},  // ends with dash
 			{"host..name", UnixHostname(""), true}, // double dot
-			{"host name", UnixHostname(""), true}, // space
-			{"host!name", UnixHostname(""), true}, // special char
-			{"123", UnixHostname("123"), false}, // numeric string is valid hostname
-			{"true", UnixHostname("true"), false}, // boolean string is valid hostname
+			{"host name", UnixHostname(""), true},  // space
+			{"host!name", UnixHostname(""), true},  // special char
+			{"123", UnixHostname("123"), false},    // numeric string is valid hostname
+			{"true", UnixHostname("true"), false},  // boolean string is valid hostname
 			{[]string{"localhost"}, UnixHostname(""), true},
 			{nil, UnixHostname(""), true},
 		}
