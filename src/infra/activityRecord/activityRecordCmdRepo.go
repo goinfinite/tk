@@ -15,11 +15,10 @@ type ActivityRecordCmdRepo struct {
 
 func NewActivityRecordCmdRepo(
 	trailDbSvc *tkInfraDb.TrailDatabaseService,
-	queryRepo *ActivityRecordQueryRepo,
 ) *ActivityRecordCmdRepo {
 	return &ActivityRecordCmdRepo{
 		trailDbSvc: trailDbSvc,
-		queryRepo:  queryRepo,
+		queryRepo:  NewActivityRecordQueryRepo(trailDbSvc),
 	}
 }
 

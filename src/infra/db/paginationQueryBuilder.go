@@ -41,17 +41,16 @@ func PaginationQueryBuilder(
 		paginatedQuery = paginatedQuery.Where("id > ?", requestPagination.LastSeenId.String())
 	}
 
-	sortDirectionStr := tkValueObject.PaginationSortDirectionAsc.String()
-	orderStatement := "id " + sortDirectionStr
+	orderStatement := "id " + tkValueObject.PaginationSortDirectionAsc.String()
 	if requestPagination.SortBy != nil {
 		orderStatement = requestPagination.SortBy.String()
 		orderStatement = strings.ToLower(orderStatement)
 		orderStatement = strcase.ToSnake(orderStatement)
 		if requestPagination.SortDirection != nil {
-			sortDirectionStr = requestPagination.SortDirection.String()
+			orderStatement += " " + requestPagination.SortDirection.String()
 		}
 	}
-	paginatedQuery = paginatedQuery.Order(orderStatement + " " + sortDirectionStr)
+	paginatedQuery = paginatedQuery.Order(orderStatement)
 
 	itemsTotalUint := uint64(itemsTotal)
 	pagesTotal := uint32(

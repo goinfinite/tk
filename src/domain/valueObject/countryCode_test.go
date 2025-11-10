@@ -13,8 +13,8 @@ func TestNewCountryCode(t *testing.T) {
 		}{
 			{"BR", CountryCode("BR"), false},
 			{"US", CountryCode("US"), false},
-			{"jp", CountryCode("JP"), false}, // gets uppercased
-			{"ru ", CountryCode("RU"), false}, // gets trimmed
+			{"jp", CountryCode("JP"), false},   // gets uppercased
+			{"ru ", CountryCode("RU"), false},  // gets trimmed
 			{"  CN", CountryCode("CN"), false}, // gets trimmed and uppercased
 			{"GB", CountryCode("GB"), false},
 			{"DE", CountryCode("DE"), false},

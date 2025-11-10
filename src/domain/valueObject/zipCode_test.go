@@ -27,9 +27,9 @@ func TestNewZipCode(t *testing.T) {
 			{"<script>alert('xss')</script>", ZipCode(""), true},
 			{"rm -rf /", ZipCode(""), true},
 			{"@nDr3A5_", ZipCode(""), true},
-			{"12", ZipCode(""), true}, // too short
+			{"12", ZipCode(""), true},          // too short
 			{"12345678901", ZipCode(""), true}, // too long
-			{123, ZipCode("123"), false}, // valid numeric
+			{123, ZipCode("123"), false},       // valid numeric
 			{true, ZipCode(""), true},
 			{[]string{"12345"}, ZipCode(""), true},
 		}
