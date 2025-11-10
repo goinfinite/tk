@@ -10,21 +10,32 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	errItemsPerPageCannotBeZero string = "ItemsPerPageCannotBeZero"
+	errCountItemsTotalError     string = "CountItemsTotalError"
+)
+
 func PaginationQueryBuilder(
 	dbQuery *gorm.DB,
 	requestPagination tkDto.Pagination,
 ) (paginatedQuery *gorm.DB, responsePagination tkDto.Pagination, err error) {
+	if requestPagination.ItemsPerPage == 0 {
+		return paginatedQuery, responsePagination, errors.New(errItemsPerPageCannotBeZero)
+	}
+
 	var itemsTotal int64
 	err = dbQuery.Count(&itemsTotal).Error
 	if err != nil {
-		return paginatedQuery, responsePagination, errors.New("CountItemsTotalError: " + err.Error())
+		return paginatedQuery, responsePagination, errors.New(errCountItemsTotalError + ": " + err.Error())
 	}
 
 	paginatedQuery = dbQuery.Limit(int(requestPagination.ItemsPerPage))
 	switch requestPagination.LastSeenId {
 	case nil:
-		offset := int(requestPagination.PageNumber) * int(requestPagination.ItemsPerPage)
-		paginatedQuery = paginatedQuery.Offset(offset)
+		if requestPagination.PageNumber > 0 {
+			offset := int(requestPagination.PageNumber) * int(requestPagination.ItemsPerPage)
+			paginatedQuery = paginatedQuery.Offset(offset)
+		}
 	default:
 		paginatedQuery = paginatedQuery.Where("id > ?", requestPagination.LastSeenId.String())
 	}
