@@ -1,6 +1,13 @@
 # Changelog
 
 ```log
+0.1.3 - 2025/11/10
+fix: fix pagination query builder order statement declaration bug
+fix: missing gofmt run on a few VO unit tests
+fix: init query repo on activity record cmd construct
+docs: add activity record mgmt and enhance existing docs
+chore: upgrade deps
+
 0.1.2 - 2025/11/07
 feat: add trail database service
 feat: add activity record entity, vos and models
