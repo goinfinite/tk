@@ -104,7 +104,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithRecordId", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_ID_TEST")
 		if err != nil {
@@ -152,7 +152,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithRecordLevel", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode1Vo, err := tkValueObject.NewActivityRecordCode("DELETE_LEVEL_1")
 		if err != nil {
@@ -216,7 +216,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithRecordCode", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode3Vo, err := tkValueObject.NewActivityRecordCode("DELETE_CODE_1")
 		if err != nil {
@@ -285,7 +285,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithTimeFilters", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode5Vo, err := tkValueObject.NewActivityRecordCode("DELETE_TIME_TEST")
 		if err != nil {
@@ -333,7 +333,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithMultipleMatchingAffectedResources", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_MULTI_RES_TEST")
 		if err != nil {
@@ -413,7 +413,7 @@ func createTestActivityRecord(
 	createDto tkDto.CreateActivityRecord,
 ) (recordEntity tkEntity.ActivityRecord, err error) {
 	queryRepo := NewActivityRecordQueryRepo(trailDbSvc)
-	cmdRepo := NewActivityRecordCmdRepo(trailDbSvc, queryRepo)
+	cmdRepo := NewActivityRecordCmdRepo(trailDbSvc)
 	err = cmdRepo.Create(createDto)
 	if err != nil {
 		return recordEntity, err
