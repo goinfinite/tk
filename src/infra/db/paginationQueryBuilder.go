@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/iancoleman/strcase"
 	"gorm.io/gorm"
 )
@@ -40,17 +41,17 @@ func PaginationQueryBuilder(
 		paginatedQuery = paginatedQuery.Where("id > ?", requestPagination.LastSeenId.String())
 	}
 
+	sortDirectionStr := tkValueObject.PaginationSortDirectionAsc.String()
+	orderStatement := "id " + sortDirectionStr
 	if requestPagination.SortBy != nil {
-		orderStatement := requestPagination.SortBy.String()
+		orderStatement = requestPagination.SortBy.String()
 		orderStatement = strings.ToLower(orderStatement)
 		orderStatement = strcase.ToSnake(orderStatement)
-
 		if requestPagination.SortDirection != nil {
-			orderStatement += " " + requestPagination.SortDirection.String()
+			sortDirectionStr = requestPagination.SortDirection.String()
 		}
-
-		paginatedQuery = paginatedQuery.Order(orderStatement)
 	}
+	paginatedQuery = paginatedQuery.Order(orderStatement + " " + sortDirectionStr)
 
 	itemsTotalUint := uint64(itemsTotal)
 	pagesTotal := uint32(
