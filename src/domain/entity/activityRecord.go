@@ -24,7 +24,7 @@ func NewActivityRecord(
 	operatorAccountId *tkValueObject.AccountId,
 	operatorIpAddress *tkValueObject.IpAddress,
 	createdAt tkValueObject.UnixTime,
-) (ActivityRecord, error) {
+) ActivityRecord {
 	return ActivityRecord{
 		RecordId:          recordId,
 		RecordLevel:       recordLevel,
@@ -34,5 +34,5 @@ func NewActivityRecord(
 		OperatorAccountId: operatorAccountId,
 		OperatorIpAddress: operatorIpAddress,
 		CreatedAt:         createdAt,
-	}, nil
+	}
 }

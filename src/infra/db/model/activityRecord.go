@@ -98,5 +98,5 @@ func (model ActivityRecord) ToEntity() (recordEntity tkEntity.ActivityRecord, er
 		recordId, recordLevel, recordCode, affectedResources, recordDetails,
 		operatorAccountIdPtr, operatorIpAddressPtr,
 		tkValueObject.NewUnixTimeWithGoTime(model.CreatedAt),
-	)
+	), nil
 }
