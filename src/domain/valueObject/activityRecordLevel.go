@@ -34,7 +34,7 @@ func NewActivityRecordLevel(value any) (recordLevel ActivityRecordLevel, err err
 	case "WARN":
 		return ActivityRecordLevelWarning, nil
 	default:
-		return stringValueVo, errors.New("InvalidActivityRecordLevel")
+		return recordLevel, errors.New("InvalidActivityRecordLevel")
 	}
 }
 
