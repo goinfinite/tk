@@ -103,7 +103,8 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 func TestActivityRecordCmdRepoDelete(t *testing.T) {
 	t.Run("DeleteWithRecordId", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_ID_TEST")
 		if err != nil {
@@ -136,7 +137,6 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			t.Errorf("DeleteWithRecordIdFailed: %v", err)
 		}
 
-		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 			RecordId:   &recordIdVo,
@@ -151,7 +151,8 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 	t.Run("DeleteWithRecordLevel", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
 
 		recordCode1Vo, err := tkValueObject.NewActivityRecordCode("DELETE_LEVEL_1")
 		if err != nil {
@@ -195,7 +196,6 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			t.Errorf("DeleteWithRecordLevelFailed: %v", err)
 		}
 
-		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
@@ -215,7 +215,9 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 	t.Run("DeleteWithRecordCode", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+
 		recordCode3Vo, err := tkValueObject.NewActivityRecordCode("DELETE_CODE_1")
 		if err != nil {
 			t.Fatalf("CreateRecordCode3VoFailed: %v", err)
@@ -263,7 +265,6 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			t.Errorf("DeleteWithRecordCodeFailed: %v", err)
 		}
 
-		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
@@ -283,7 +284,8 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 	t.Run("DeleteWithTimeFilters", func(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
-		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
 
 		recordCode5Vo, err := tkValueObject.NewActivityRecordCode("DELETE_TIME_TEST")
 		if err != nil {
@@ -317,7 +319,6 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			t.Errorf("DeleteWithTimeFiltersFailed: %v", err)
 		}
 
-		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
@@ -326,6 +327,57 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 		}
 		if len(responseDto.ActivityRecords) != 1 {
 			t.Errorf("RecordShouldStillExist: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
+		}
+	})
+
+	t.Run("DeleteWithMultipleMatchingAffectedResources", func(t *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(t)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+		cmdRepo := NewActivityRecordCmdRepo(dbSvc, queryRepo)
+
+		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_MULTI_RES_TEST")
+		if err != nil {
+			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+		}
+
+		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/del-multi1")
+		if err != nil {
+			t.Fatalf("CreateRes1VoFailed: %v", err)
+		}
+		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/del-multi2")
+		if err != nil {
+			t.Fatalf("CreateRes2VoFailed: %v", err)
+		}
+
+		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+			RecordCode:        recordCodeVo,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
+		})
+		if err != nil {
+			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+		}
+
+		deleteDto := tkDto.NewDeleteActivityRecord(
+			nil, nil, nil, []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
+			nil, nil, nil, nil,
+		)
+
+		err = cmdRepo.Delete(deleteDto)
+		if err != nil {
+			t.Errorf("DeleteWithMultipleMatchingAffectedResourcesFailed: %v", err)
+		}
+
+		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
+			Pagination:        tkDto.PaginationUnpaginated,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
+		})
+		if err != nil {
+			t.Errorf("VerifyDeleteMultipleResourcesFailed: %v", err)
+		}
+
+		if len(responseDto.ActivityRecords) != 0 {
+			t.Errorf("ExpectedZeroRecords: got %d", len(responseDto.ActivityRecords))
 		}
 	})
 }
@@ -359,13 +411,13 @@ func createTestActivityRecord(
 	trailDbSvc *tkInfraDb.TrailDatabaseService,
 	createDto tkDto.CreateActivityRecord,
 ) (recordEntity tkEntity.ActivityRecord, err error) {
-	cmdRepo := NewActivityRecordCmdRepo(trailDbSvc)
+	queryRepo := NewActivityRecordQueryRepo(trailDbSvc)
+	cmdRepo := NewActivityRecordCmdRepo(trailDbSvc, queryRepo)
 	err = cmdRepo.Create(createDto)
 	if err != nil {
 		return recordEntity, err
 	}
 
-	queryRepo := NewActivityRecordQueryRepo(trailDbSvc)
 	requestDto := tkDto.ReadActivityRecordsRequest{
 		Pagination: tkDto.PaginationUnpaginated,
 		RecordCode: &createDto.RecordCode,

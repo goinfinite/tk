@@ -10,12 +10,17 @@ import (
 
 type ActivityRecordCmdRepo struct {
 	trailDbSvc *tkInfraDb.TrailDatabaseService
+	queryRepo  *ActivityRecordQueryRepo
 }
 
 func NewActivityRecordCmdRepo(
 	trailDbSvc *tkInfraDb.TrailDatabaseService,
+	queryRepo *ActivityRecordQueryRepo,
 ) *ActivityRecordCmdRepo {
-	return &ActivityRecordCmdRepo{trailDbSvc: trailDbSvc}
+	return &ActivityRecordCmdRepo{
+		trailDbSvc: trailDbSvc,
+		queryRepo:  queryRepo,
+	}
 }
 
 func (repo *ActivityRecordCmdRepo) Create(createDto tkDto.CreateActivityRecord) error {
@@ -58,46 +63,29 @@ func (repo *ActivityRecordCmdRepo) Create(createDto tkDto.CreateActivityRecord) 
 }
 
 func (repo *ActivityRecordCmdRepo) Delete(deleteDto tkDto.DeleteActivityRecord) error {
-	deleteModel := tkInfraDbModel.ActivityRecord{}
-	if deleteDto.RecordId != nil {
-		deleteModel.ID = deleteDto.RecordId.Uint64()
+	readResponseDto, err := repo.queryRepo.Read(tkDto.ReadActivityRecordsRequest{
+		Pagination:        tkDto.PaginationUnpaginated,
+		RecordId:          deleteDto.RecordId,
+		RecordLevel:       deleteDto.RecordLevel,
+		RecordCode:        deleteDto.RecordCode,
+		AffectedResources: deleteDto.AffectedResources,
+		OperatorAccountId: deleteDto.OperatorAccountId,
+		OperatorIpAddress: deleteDto.OperatorIpAddress,
+		CreatedBeforeAt:   deleteDto.CreatedBeforeAt,
+		CreatedAfterAt:    deleteDto.CreatedAfterAt,
+	})
+	if err != nil {
+		return err
 	}
 
-	if deleteDto.RecordLevel != nil {
-		deleteModel.RecordLevel = deleteDto.RecordLevel.String()
+	if len(readResponseDto.ActivityRecords) == 0 {
+		return nil
 	}
 
-	if deleteDto.RecordCode != nil {
-		deleteModel.RecordCode = deleteDto.RecordCode.String()
+	recordIds := []uint64{}
+	for _, record := range readResponseDto.ActivityRecords {
+		recordIds = append(recordIds, record.RecordId.Uint64())
 	}
 
-	affectedResources := []tkInfraDbModel.ActivityRecordAffectedResource{}
-	for _, affectedResourceSri := range deleteDto.AffectedResources {
-		affectedResourceModel := tkInfraDbModel.ActivityRecordAffectedResource{
-			SystemResourceIdentifier: affectedResourceSri.String(),
-		}
-		affectedResources = append(affectedResources, affectedResourceModel)
-	}
-	deleteModel.AffectedResources = affectedResources
-
-	if deleteDto.OperatorAccountId != nil {
-		operatorAccountId := deleteDto.OperatorAccountId.Uint64()
-		deleteModel.OperatorAccountId = &operatorAccountId
-	}
-
-	if deleteDto.OperatorIpAddress != nil {
-		operatorIpAddressStr := deleteDto.OperatorIpAddress.String()
-		deleteModel.OperatorIpAddress = &operatorIpAddressStr
-	}
-
-	dbQuery := repo.trailDbSvc.Handler.Model(&deleteModel).Where(&deleteModel)
-
-	if deleteDto.CreatedBeforeAt != nil {
-		dbQuery.Where("created_at < ?", deleteDto.CreatedBeforeAt.ReadAsGoTime())
-	}
-	if deleteDto.CreatedAfterAt != nil {
-		dbQuery.Where("created_at > ?", deleteDto.CreatedAfterAt.ReadAsGoTime())
-	}
-
-	return dbQuery.Delete(&tkInfraDbModel.ActivityRecord{}).Error
+	return repo.trailDbSvc.Handler.Delete(&tkInfraDbModel.ActivityRecord{}, recordIds).Error
 }
