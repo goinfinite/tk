@@ -7,6 +7,8 @@ import (
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
 )
 
+// CreateActivityRecord persists an activity record as a non-blocking side effect.
+// Errors are logged but not returned to avoid failing the caller's primary operation.
 func CreateActivityRecord(
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
 	createDto tkDto.CreateActivityRecord,
