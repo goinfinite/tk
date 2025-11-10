@@ -35,12 +35,12 @@ For web applications built with Echo:
 
 - **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` env var to mask sensitive information. It can be used with CLI applications as well.
 - **RequiredParamsInspector**: Normalizes parameters from HTTP requests into a `map[string]any` regardless of the request type (JSON, form data, multipart files, path or query params).
+- **ApiRequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data.
 
 ### Presentation Helpers
 
 - **EnvsInspector**: Inspect and validate environment variables from .env files loaded via `ENV_FILE_PATH` env var, supporting required and auto-fillable variables.
 - **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests.
-- **RequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data.
 - **StringSliceVoParser**: Convert comma-separated, semicolon-separated, or array strings into value object slices.
 - **TimeParamsParser**: Parse date ranges, timestamps, and relative times from request parameters.
 - **ResponseWrapper**: A wrapper struct for liaison responses and when needed, used to emit API and CLI responses.

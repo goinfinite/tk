@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -55,8 +56,8 @@ func TestNewApiResponseWrapper(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := NewApiResponseWrapper(
 				testCase.status,
-				testCase.readableMessage,
 				testCase.body,
+				testCase.readableMessage,
 			)
 
 			if result.Status != testCase.expectedStatus {
@@ -208,7 +209,7 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
 			liaisonResponse := NewLiaisonResponse(
-				testCase.liaisonStatus, testCase.readableMessage, testCase.body,
+				testCase.liaisonStatus, testCase.body, testCase.readableMessage,
 			)
 
 			err := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
@@ -306,8 +307,8 @@ func TestNewLiaisonResponse(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := NewLiaisonResponse(
 				testCase.status,
-				testCase.readableMessage,
 				testCase.body,
+				testCase.readableMessage,
 			)
 
 			if result.Status != testCase.expectedStatus {
@@ -348,46 +349,55 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 	testCases := []struct {
 		name             string
 		status           LiaisonResponseStatus
+		readableMessage  string
 		expectedExitCode int
 	}{
 		{
 			name:             "SuccessStatus",
 			status:           LiaisonResponseStatusSuccess,
+			readableMessage:  "OperationSuccessful",
 			expectedExitCode: 0,
 		},
 		{
 			name:             "CreatedStatus",
 			status:           LiaisonResponseStatusCreated,
+			readableMessage:  "ResourceCreated",
 			expectedExitCode: 0,
 		},
 		{
 			name:             "MultiStatus",
 			status:           LiaisonResponseStatusMultiStatus,
+			readableMessage:  "MultipleOperationsOccurred",
 			expectedExitCode: 1,
 		},
 		{
 			name:             "UserErrorStatus",
 			status:           LiaisonResponseStatusUserError,
+			readableMessage:  "InvalidUserInput",
 			expectedExitCode: 1,
 		},
 		{
 			name:             "UnauthorizedStatus",
 			status:           LiaisonResponseStatusUnauthorized,
+			readableMessage:  "AuthorizationRequired",
 			expectedExitCode: 1,
 		},
 		{
 			name:             "ForbiddenStatus",
 			status:           LiaisonResponseStatusForbidden,
+			readableMessage:  "AccessDenied",
 			expectedExitCode: 1,
 		},
 		{
 			name:             "InfraErrorStatus",
 			status:           LiaisonResponseStatusInfraError,
+			readableMessage:  "InternalInfrastructureError",
 			expectedExitCode: 1,
 		},
 		{
 			name:             "UnknownErrorStatus",
 			status:           LiaisonResponseStatusUnknownError,
+			readableMessage:  "AnUnknownErrorOccurred",
 			expectedExitCode: 1,
 		},
 	}
@@ -399,9 +409,7 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 
 go 1.25.3
 
-require (
-	github.com/goinfinite/tk v0.1.1
-)
+require github.com/goinfinite/tk v0.1.2
 `
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
@@ -414,27 +422,17 @@ require (
 		t.Fatalf("WriteGoModFailed: %v", err)
 	}
 
-	goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
-		Command:          "go",
-		Args:             []string{"mod", "tidy"},
-		WorkingDirectory: workingDir,
-	})
-	_, err = goModShell.Run()
-	if err != nil {
-		t.Fatalf("RunGoModTidyFailed: %v", err)
-	}
-
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testProgramMain := `package main
 
-import (
-	tkPresentation "github.com/goinfinite/tk/src/presentation"
-)
+import tkPresentation "github.com/goinfinite/tk/src/presentation"
 
 func main() {
 	liaisonResponse := tkPresentation.NewLiaisonResponse(
-		"` + string(testCase.status) + `", "Test message", map[string]string{"test": "data"},
+		tkPresentation.LiaisonResponseStatus("` + string(testCase.status) + `"),
+		map[string]any{"test": "data"},
+		"` + testCase.readableMessage + `",
 	)
 	tkPresentation.LiaisonCliResponseRenderer(liaisonResponse)
 }`
@@ -443,6 +441,18 @@ func main() {
 			err = fileClerk.UpdateFileContent(testFile, testProgramMain, true)
 			if err != nil {
 				t.Fatalf("WriteTestProgramFailed: %v", err)
+			}
+
+			if !fileClerk.FileExists(workingDir + "/go.sum") {
+				goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
+					Command:          "go",
+					Args:             []string{"mod", "tidy"},
+					WorkingDirectory: workingDir,
+				})
+				_, err = goModShell.Run()
+				if err != nil {
+					t.Fatalf("RunGoModTidyFailed: %v", err)
+				}
 			}
 
 			goRunShell := tkInfra.NewShell(tkInfra.ShellSettings{
@@ -468,6 +478,13 @@ func main() {
 				t.Errorf(
 					"ExitCodeMismatch: expected '%d', got '%d'. StdOut: '%s' // StdErr: '%s'",
 					testCase.expectedExitCode, exitCode, stdOut, stdErr,
+				)
+			}
+
+			if !strings.Contains(stdOut, testCase.readableMessage) {
+				t.Errorf(
+					"MessageMismatch: expected '%s' to be in '%s'",
+					testCase.readableMessage, stdOut,
 				)
 			}
 		})

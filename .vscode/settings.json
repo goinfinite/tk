@@ -5,6 +5,7 @@
     "github",
     "godotenv",
     "goinfinite",
+    "gorm",
     "Grpcs",
     "Kibibyte",
     "Kibibytes",
@@ -14,6 +15,7 @@
     "Nogroup",
     "Ptrs",
     "samber",
+    "strcase",
     "Tebibyte",
     "Tebibytes",
     "zerolog"

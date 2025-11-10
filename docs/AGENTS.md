@@ -17,7 +17,7 @@
 - Avoid comments unless strictly necessary.
 - Method names SHOULD focus on the conceptual purpose rather than implementation details.
 - NEVER use 'else' statements unless it's the UI layer.
-- NEVER use single letter variable names. Use clear and descriptive names, but avoid long names.
+- NEVER use single letter variable names, not even in for loops. Use clear, descriptive, preferably two words minimal names, but carefully avoid overly verbose names. Only exception is "t" for test cases.
 - Variables names MUST convey the intention or purpose rather than describing their content, avoiding unnecessary synonyms.
 - Variable names SHOULD reflect the primary flow, not conditional outcomes.
 - Use purposeful named return values whenever the method returns multiple values.
@@ -26,8 +26,9 @@
 - Boolean variables SHOULD start with "Is", "Should", "Has" etc prefixes.
 - Use PascalCase format for the entire error message whenever possible.
 - Prefer "Fail", "Error", "Invalid" suffixes instead of "FailedTo", "Cannot", "UnableTo" prefixes.
-- Prefer "Read" prefix or "Factory" suffix instead of "Get" suffix (depending on context).
+- Prefer "Read" prefix or "Factory" suffix instead of "Get" suffix.
 - Prefer suffixes instead of prefixes for struct and method names to preserve alphabetical order context.
+- Use mechanism-describing nouns like Builder, Parser, or Factory as method name suffixes instead of action verbs prefixes.
 - Avoid redundant prefixes in struct field names when the context is already clear from the struct name or surrounding code.
 - Struct fields SHOULD be ordered by importance, followed by alphabetical order.
 - Struct required fields SHOULD be placed before optional (pointer) fields.
@@ -48,3 +49,4 @@
 - When methods are executed automatically via timers or watchdogs, error log messages SHOULD always include slog.String("method", "MethodName") to identify the source method, since these log entries appear without user context and administrators need to know where the error originated.
 - When reviewing Swagger/GoDoc documentation comments, check for consistent spacing and indentation in @Param, @Summary, @Description and other annotation lines.
 - Error constants SHOULD follow the naming convention of starting with "Err" prefix.
+- Read the "go.mod" file to understand the project dependencies and their versions.

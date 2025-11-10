@@ -68,3 +68,61 @@ func TestNewPassword(t *testing.T) {
 		}
 	})
 }
+
+func TestNewWeakPassword(t *testing.T) {
+	t.Run("StringInput", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     any
+			expectedOutput WeakPassword
+			expectError    bool
+		}{
+			{"Valid123", WeakPassword("Valid123"), false},
+			{"Abcd1", WeakPassword("Abcd1"), false},
+			{"Password123", WeakPassword("Password123"), false},
+			{"MyPass123", WeakPassword("MyPass123"), false},
+			{"12345", WeakPassword("12345"), false},                                   // Minimum length
+			{strings.Repeat("a", 128), WeakPassword(strings.Repeat("a", 128)), false}, // Maximum length
+			// Invalid: too short
+			{"Abc1", WeakPassword(""), true},
+			{"A1", WeakPassword(""), true},
+			{"123", WeakPassword(""), true},
+			// Invalid: too long
+			{strings.Repeat("a", 129), WeakPassword(""), true},
+			// Invalid: non-string
+			{123, WeakPassword(""), true},
+			{true, WeakPassword(""), true},
+			{[]string{"Valid123"}, WeakPassword(""), true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := NewWeakPassword(testCase.inputValue)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("StringMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     WeakPassword
+			expectedOutput string
+		}{
+			{WeakPassword("Valid123"), "Valid123"},
+			{WeakPassword("Password123"), "Password123"},
+			{WeakPassword("MyPass123"), "MyPass123"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.String()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+}

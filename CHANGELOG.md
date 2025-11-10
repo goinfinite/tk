@@ -1,6 +1,17 @@
 # Changelog
 
 ```log
+0.1.2 - 2025/11/07
+feat: add trail database service
+feat: add activity record entity, vos and models
+feat: add activity record use cases, repositories and implementations
+feat: add system resource identifier vo
+feat: add account id vo
+feat: add weak password
+fix!: set message as last field in responseWrappers
+fix!: add api prefix to request input reader
+fix: run mod tidy after first test sample on responseWrappers_test.go
+
 0.1.1 - 2025/11/06
 feat: add request input reader
 feat: add trusted ip reader

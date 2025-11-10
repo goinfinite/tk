@@ -21,8 +21,8 @@ type ApiResponseWrapper struct {
 
 func NewApiResponseWrapper(
 	status int,
-	readableMessage string,
 	body any,
+	readableMessage string,
 ) ApiResponseWrapper {
 	return ApiResponseWrapper{
 		Status:          status,
@@ -46,20 +46,27 @@ const (
 
 type LiaisonResponse struct {
 	Status          LiaisonResponseStatus `json:"status"`
-	ReadableMessage string                `json:"readableMessage"`
 	Body            any                   `json:"body"`
+	ReadableMessage string                `json:"readableMessage"`
 }
 
 func NewLiaisonResponse(
 	status LiaisonResponseStatus,
-	readableMessage string,
 	body any,
+	readableMessage string,
 ) LiaisonResponse {
 	return LiaisonResponse{
 		Status:          status,
-		ReadableMessage: readableMessage,
 		Body:            body,
+		ReadableMessage: readableMessage,
 	}
+}
+
+func NewLiaisonResponseNoMessage(
+	status LiaisonResponseStatus,
+	body any,
+) LiaisonResponse {
+	return NewLiaisonResponse(status, body, "")
 }
 
 func LiaisonApiResponseEmitter(
@@ -83,7 +90,7 @@ func LiaisonApiResponseEmitter(
 	}
 
 	return echoContext.JSON(httpStatus, NewApiResponseWrapper(
-		httpStatus, liaisonResponse.ReadableMessage, liaisonResponse.Body,
+		httpStatus, liaisonResponse.Body, liaisonResponse.ReadableMessage,
 	))
 }
 
