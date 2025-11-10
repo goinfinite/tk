@@ -57,8 +57,8 @@ func NewLiaisonResponse(
 ) LiaisonResponse {
 	return LiaisonResponse{
 		Status:          status,
-		ReadableMessage: readableMessage,
 		Body:            body,
+		ReadableMessage: readableMessage,
 	}
 }
 
