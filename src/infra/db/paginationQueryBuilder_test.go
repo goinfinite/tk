@@ -159,6 +159,7 @@ func TestPaginationQueryBuilder(t *testing.T) {
 }
 
 func setupTestDb(t *testing.T) *gorm.DB {
+	t.Helper()
 	dbSvc, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("OpenTestDbFailed: %v", err)

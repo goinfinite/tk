@@ -174,6 +174,7 @@ func createTempFile(
 	t *testing.T,
 	filename, content string,
 ) string {
+	t.Helper()
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, filename)
 
@@ -189,6 +190,7 @@ func assertMapsEqual(
 	t *testing.T,
 	actual, expected map[string]any,
 ) {
+	t.Helper()
 	if actual == nil && expected == nil {
 		return
 	}

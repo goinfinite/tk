@@ -383,6 +383,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 }
 
 func SetupTestTrailDatabaseService(t *testing.T) *tkInfraDb.TrailDatabaseService {
+	t.Helper()
 	tempDir := t.TempDir()
 	rawDatabaseFilePath := filepath.Join(tempDir, strings.ReplaceAll(t.Name(), "/", "_")+".db")
 	rawDatabaseFilePath, err := filepath.Abs(rawDatabaseFilePath)

@@ -301,6 +301,7 @@ func uint64Ptr(u uint64) *uint64 {
 }
 
 func assertStringPtrEqual(t *testing.T, actual, expected *string) {
+	t.Helper()
 	if (actual == nil && expected != nil) || (actual != nil && expected == nil) {
 		t.Errorf("StringPtrMismatch: actual=%v, expected=%v", actual, expected)
 		return
@@ -311,6 +312,7 @@ func assertStringPtrEqual(t *testing.T, actual, expected *string) {
 }
 
 func assertUint64PtrEqual(t *testing.T, actual, expected *uint64) {
+	t.Helper()
 	if (actual == nil && expected != nil) || (actual != nil && expected == nil) {
 		t.Errorf("Uint64PtrMismatch: actual=%v, expected=%v", actual, expected)
 		return
