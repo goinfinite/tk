@@ -50,6 +50,12 @@ type LiaisonResponse struct {
 	ReadableMessage string                `json:"readableMessage"`
 }
 
+// The NewLiaisonResponse function is used when the response body contains complex data
+// that requires a more informative message to be displayed to the user. The readable message
+// field should describe the outcome of the operation in a clear and understandable manner,
+// providing valuable information about the result of the request. This is particularly handy in
+// scenarios where the body field contains details about the created resource, such as in POST
+// requests.
 func NewLiaisonResponse(
 	status LiaisonResponseStatus,
 	body any,
@@ -62,6 +68,9 @@ func NewLiaisonResponse(
 	}
 }
 
+// The NewLiaisonResponseNoMessage function is used when the response body is the
+// message (string) that should be displayed to the user, so the readable message field
+// is not needed.
 func NewLiaisonResponseNoMessage(
 	status LiaisonResponseStatus,
 	body any,
