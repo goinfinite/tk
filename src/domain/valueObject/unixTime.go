@@ -20,19 +20,19 @@ func NewUnixTime(value any) (unixTime UnixTime, err error) {
 }
 
 func NewUnixTimeNow() UnixTime {
-	return UnixTime(time.Now().Unix())
+	return UnixTime(time.Now().UTC().Unix())
 }
 
 func NewUnixTimeBeforeNow(duration time.Duration) UnixTime {
-	return UnixTime(time.Now().Add(-duration).Unix())
+	return UnixTime(time.Now().Add(-duration).UTC().Unix())
 }
 
 func NewUnixTimeAfterNow(duration time.Duration) UnixTime {
-	return UnixTime(time.Now().Add(duration).Unix())
+	return UnixTime(time.Now().Add(duration).UTC().Unix())
 }
 
 func NewUnixTimeWithGoTime(goTime time.Time) UnixTime {
-	return UnixTime(goTime.Unix())
+	return UnixTime(goTime.UTC().Unix())
 }
 
 func (vo UnixTime) Int64() int64 {
@@ -68,11 +68,11 @@ func (vo UnixTime) ReadAsGoTime() time.Time {
 }
 
 func (vo UnixTime) IsPast() bool {
-	return vo.ReadAsGoTime().Before(time.Now())
+	return vo.ReadAsGoTime().Before(time.Now().UTC())
 }
 
 func (vo UnixTime) IsFuture() bool {
-	return vo.ReadAsGoTime().After(time.Now())
+	return vo.ReadAsGoTime().After(time.Now().UTC())
 }
 
 func (vo UnixTime) IsBetween(startDate, endDate UnixTime) bool {
