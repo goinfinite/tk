@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -41,7 +42,7 @@ func NewTrailDatabaseService(extraModelsPtrs []any) (*TrailDatabaseService, erro
 
 	ormSvc, err := gorm.Open(
 		sqlite.Open("file:"+databaseFilePath.String()+DatabaseStandardConnectionParams),
-		&gorm.Config{},
+		&gorm.Config{NowFunc: func() time.Time { return time.Now().UTC() }},
 	)
 	if err != nil {
 		return nil, errors.New(errTrailDatabaseConnectionError)

@@ -241,50 +241,93 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 		dbSvc := SetupTestTrailDatabaseService(t)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
-		recordCode5Vo, err := tkValueObject.NewActivityRecordCode("TIME_TEST")
+		recordCodeVo, err := tkValueObject.NewActivityRecordCode("TIME_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCode5VoFailed: %v", err)
+			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
-		createDto5 := tkDto.CreateActivityRecord{
+		createDto := tkDto.CreateActivityRecord{
 			RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
-			RecordCode:        recordCode5Vo,
+			RecordCode:        recordCodeVo,
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{},
 		}
 
-		testRecord, err := createTestActivityRecord(dbSvc, createDto5)
+		testRecord, err := createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord5Failed: %v", err)
+			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		time.Sleep(10 * time.Millisecond)
 
-		now := time.Now()
-		beforeTimeVo, err := tkValueObject.NewUnixTime(now.Unix())
-		if err != nil {
-			t.Fatalf("CreateBeforeTimeVoFailed: %v", err)
+		testCases := []struct {
+			name            string
+			timeFilterValue *tkValueObject.UnixTime
+			isBeforeFilter  bool
+		}{
+			{
+				name: "CreatedBeforeAt_Future",
+				timeFilterValue: func() *tkValueObject.UnixTime {
+					beforeTimeVoFuture := tkValueObject.NewUnixTimeAfterNow(1 * time.Minute)
+					return &beforeTimeVoFuture
+				}(),
+				isBeforeFilter: true,
+			},
+			{
+				name: "CreatedBeforeAt_DistantFuture",
+				timeFilterValue: func() *tkValueObject.UnixTime {
+					beforeTimeVoDistant := tkValueObject.NewUnixTimeAfterNow(1 * time.Hour)
+					return &beforeTimeVoDistant
+				}(),
+				isBeforeFilter: true,
+			},
+			{
+				name: "CreatedAfterAt_Recent",
+				timeFilterValue: func() *tkValueObject.UnixTime {
+					afterTimeVoRecent := tkValueObject.NewUnixTimeBeforeNow(1 * time.Minute)
+					return &afterTimeVoRecent
+				}(),
+				isBeforeFilter: false,
+			},
+			{
+				name: "CreatedAfterAt_Medium",
+				timeFilterValue: func() *tkValueObject.UnixTime {
+					afterTimeVoMedium := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
+					return &afterTimeVoMedium
+				}(),
+				isBeforeFilter: false,
+			},
+			{
+				name: "CreatedAfterAt_Old",
+				timeFilterValue: func() *tkValueObject.UnixTime {
+					afterTimeVoOld := tkValueObject.NewUnixTimeBeforeNow(24 * time.Hour)
+					return &afterTimeVoOld
+				}(),
+				isBeforeFilter: false,
+			},
 		}
 
-		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
-			Pagination:      tkDto.PaginationUnpaginated,
-			CreatedBeforeAt: &beforeTimeVo,
-		})
-		if err != nil {
-			t.Errorf("ReadWithCreatedBeforeAtFilterFailed: %v", err)
-		}
-		if len(responseDto.ActivityRecords) == 0 {
-			t.Errorf("ExpectedRecordsBeforeTime: got none")
-		}
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				requestDto := tkDto.ReadActivityRecordsRequest{
+					RecordLevel: &tkValueObject.ActivityRecordLevelInfo,
+					RecordCode:  &recordCodeVo,
+				}
 
-		recordExists := false
-		for _, record := range responseDto.ActivityRecords {
-			if record.RecordId.Uint64() == testRecord.RecordId.Uint64() {
-				recordExists = true
-				break
-			}
-		}
-		if !recordExists {
-			t.Errorf("TestRecordNotFoundInBeforeTimeFilter")
+				if testCase.isBeforeFilter {
+					requestDto.CreatedBeforeAt = testCase.timeFilterValue
+				}
+				if !testCase.isBeforeFilter {
+					requestDto.CreatedAfterAt = testCase.timeFilterValue
+				}
+
+				recordEntity, err := queryRepo.ReadFirst(requestDto)
+				if err != nil {
+					t.Errorf("ReadWith%sFilterFailed: %v", testCase.name, err)
+				}
+				if recordEntity.RecordId.Uint64() != testRecord.RecordId.Uint64() {
+					t.Errorf("TestRecordNotFoundIn%sFilter", testCase.name)
+				}
+			})
 		}
 	})
 

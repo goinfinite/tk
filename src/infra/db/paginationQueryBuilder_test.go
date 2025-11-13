@@ -3,6 +3,7 @@ package tkInfraDb
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
@@ -160,7 +161,9 @@ func TestPaginationQueryBuilder(t *testing.T) {
 
 func setupTestDb(t *testing.T) *gorm.DB {
 	t.Helper()
-	dbSvc, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	dbSvc, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{
+		NowFunc: func() time.Time { return time.Now().UTC() },
+	})
 	if err != nil {
 		t.Fatalf("OpenTestDbFailed: %v", err)
 	}

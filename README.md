@@ -21,31 +21,239 @@ go get github.com/goinfinite/tk
 Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks:
 
 - **Deserializer**: Deserialize JSON and YAML files into maps for configuration handling.
+
+  ```go
+  deserializedMap, deserializationErr := StringDeserializer(`{"name": "test", "value": 123}`, SerializationFormatJson)
+
+  deserializedMap, deserializationErr := StringDeserializer("name: test\nvalue: 123", SerializationFormatYaml)
+
+  deserializedMap, deserializationErr := FileDeserializer("config.json")
+  ```
+
 - **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, and symlink handling.
+
+  ```go
+  clerk := FileClerk{}
+
+  // ExistenceChecks
+  isFileExists := clerk.FileExists("example.txt")
+  isRegularFile := clerk.IsFile("example.txt")
+  isDirectoryExists := clerk.IsDir("example_dir")
+  isSymlink := clerk.IsSymlink("symlink.txt")
+  isSymlinkToTarget := clerk.IsSymlinkTo("symlink.txt", "target.txt")
+
+  // FileCreation
+  fileCreationErr := clerk.CreateFile("example.txt")
+
+  // FileContentOperations
+  maxContentSize := int64(1024)
+  fileContent, fileReadingErr := clerk.ReadFileContent("example.txt", &maxContentSize)
+  shouldOverwrite := true
+  fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
+  fileContentDeletionErr := clerk.DeleteFileContent("example.txt")
+  fileTruncationErr := clerk.TruncateFileContent("example.txt")
+
+  // FileManipulation
+  fileCopyErr := clerk.CopyFile("source.txt", "destination.txt")
+  fileMoveErr := clerk.MoveFile("old.txt", "new.txt")
+  fileRenameErr := clerk.RenameFile("old.txt", "new.txt")
+  fileDeletionErr := clerk.DeleteFile("example.txt")
+
+  // FileAdvancedOperations
+  fileOwnershipUpdateErr := clerk.UpdateFileOwnership("example.txt", 1000, 1000)
+  filePermissions := 0755
+  filePermissionsUpdateErr := clerk.UpdateFilePermissions("example.txt", &filePermissions)
+
+  // CompressionOperations
+  compressionFormat := "gzip"
+  compressedFilePath, compressionErr := clerk.CompressFile("example.txt", &compressionFormat)
+  decompressionTargetPath := "decompressed.txt"
+  shouldKeepSourceFile := false
+  decompressedFilePath, decompressionErr := clerk.DecompressFile(
+    "example.txt.tar", &decompressionTargetPath, &shouldKeepSourceFile,
+  )
+
+  // DirectoryOperations
+  directoryCreationErr := clerk.CreateDir("example_dir")
+  directoryCopyErr := clerk.CopyDir("source_dir", "dest_dir")
+  directoryMoveErr := clerk.MoveDir("old_dir", "new_dir")
+  directoryDeletionErr := clerk.DeleteDir("example_dir")
+  directoryCompressionFormat := "brotli"
+  directoryCompressionErr := clerk.CompressDir("example_dir", &directoryCompressionFormat)
+  directoryDecompressionTargetPath := "decompressed_dir"
+  shouldKeepSourceDir := true
+  directoryDecompressionErr := clerk.DecompressDir(
+    "example_dir.tar", &directoryDecompressionTargetPath, &shouldKeepSourceDir,
+  )
+
+  // SymlinkOperations
+  shouldOverwriteSymlink := false
+  symlinkCreationErr := clerk.CreateSymlink(
+    "target.txt", "symlink.txt", shouldOverwriteSymlink,
+  )
+  symlinkRemovalErr := clerk.RemoveSymlink("symlink.txt")
+  ```
+
 - **Shell**: Execute system commands with configurable user, timeout, environment variables, and output redirection to files.
+
+  ```go
+  shell := NewShell(ShellSettings{
+      Command: "echo",
+      Args:    []string{"hello world"},
+  })
+  commandOutput, executionErr := shell.Run()
+  fmt.Println(commandOutput)
+  ```
+
 - **Synthesizer**: Generate secure passwords with charset guarantees, random usernames/emails, and self-signed TLS certificates.
+
+  ```go
+  synthesizer := &Synthesizer{}
+
+  securePassword := synthesizer.PasswordFactory(12, true)
+
+  randomUsername := synthesizer.UsernameFactory()
+
+  randomEmail := synthesizer.MailAddressFactory(nil)
+
+  commonName, _ := tkValueObject.NewFqdn("goinfinite.net")
+  aliasName, _ := tkValueObject.NewFqdn("goinfinite.com.br")
+  altNames := []tkValueObject.Fqdn{aliasName}
+  certificatePair, certGenerationErr := synthesizer.SelfSignedCertificatePairFactory(&commonName, altNames)
+
+  certPem, keyPem, certPemGenerationErr := synthesizer.SelfSignedCertificatePairPemFactory(&commonName, altNames)
+  ```
+
 - **ServerIpAddress**: Retrieve the server's private and public IP addresses.
+
+  ```go
+  privateIpAddress, privateIpReadingErr := ReadServerPrivateIpAddress()
+
+  publicIpAddress, publicIpReadingErr := ReadServerPublicIpAddress()
+  ```
+
 - **TrustedIpsReader**: Parse a comma-separated list of trusted IP addresses from the `TRUSTED_IPS` environment variable.
+
+  ```go
+  trustedIpAddresses, trustedIpsReadingErr := TrustedIpsReader()
+  ```
+
 - **ReadThrough**: Read-through utilities for TLS certificate pairs from `CERTIFICATE_PAIR_CERT_PATH` and `CERTIFICATE_PAIR_KEY_PATH` env vars, generating self-signed certificates in `PKI_DIR` if not provided.
+
+  ```go
+  readThrough := &ReadThrough{}
+
+  certificateFilePath, keyFilePath, certPairReadingErr := readThrough.CertPairFilePathsReader()
+  ```
+
 - **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
 - **PaginationQueryBuilder**: Build paginated database queries with support for page number, items per page, last seen ID, sorting, and total count.
+
+  ```go
+  databaseQuery := db.Model(&YourModel{})
+
+  requestPagination := tkDto.Pagination{
+      PageNumber:   0,
+      ItemsPerPage: 10,
+  }
+
+  paginatedQuery, responsePagination, paginationBuildingErr := PaginationQueryBuilder(databaseQuery, requestPagination)
+
+  modelRecords := []YourModel{}
+  queryExecutionErr := paginatedQuery.Find(&modelRecords).Error
+  ```
+
 - **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable.
+
+  ```go
+  os.Setenv("TRAIL_DATABASE_FILE_PATH", "/path/to/trail.db")
+
+  trailDatabaseService, serviceInitializationErr := NewTrailDatabaseService([]any{&YourAdditionalModel{}})
+
+  activityRecords := []ActivityRecord{}
+  trailDatabaseService.Handler.Model(&ActivityRecord{}).Find(&activityRecords)
+  ```
 
 ### Presentation Middlewares
 
 For web applications built with Echo:
 
 - **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` env var to mask sensitive information. It can be used with CLI applications as well.
+
+  ```go
+  // ForApiInitialization
+  echoInstance.Use(ApiPanicHandler)
+
+  // ForCliInitialization
+  defer CliPanicHandler()
+  ```
+
 - **RequiredParamsInspector**: Normalizes parameters from HTTP requests into a `map[string]any` regardless of the request type (JSON, form data, multipart files, path or query params).
+
+  ```go
+  paramsReceived := map[string]any{"name": "John", "age": 30}
+  paramsRequired := []string{"name", "email"}
+  requiredParamsValidationErr := RequiredParamsInspector(paramsReceived, paramsRequired)
+  ```
+
 - **ApiRequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data.
+
+  ```go
+  inputReader := ApiRequestInputReader{}
+  requestData, requestParsingErr := inputReader.Reader(echoContext)
+  ```
 
 ### Presentation Helpers
 
 - **EnvsInspector**: Inspect and validate environment variables from .env files loaded via `ENV_FILE_PATH` env var, supporting required and auto-fillable variables.
+
+  ```go
+  optionalEnvFilePath := "/path/to/.env"
+  requiredEnvVarNames := []string{"TRAIL_DATABASE_FILE_PATH", "SESSION_TOKEN_SECRET"}
+  autoFillableEnvVars := []string{"SESSION_TOKEN_SECRET"}
+  envsInspector := NewEnvsInspector(optionalEnvFilePath, requiredEnvVarNames, autoFillableEnvVars)
+  envsValidationErr := envsInspector.Inspect()
+  ```
+
 - **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests.
+
+  ```go
+  defaultPagination := tkDto.Pagination{PageNumber: 0, ItemsPerPage: 10}
+  untrustedInput := map[string]any{"pageNumber": 1, "itemsPerPage": 20}
+  parsedPagination, paginationParsingErr := PaginationParser(defaultPagination, untrustedInput)
+  ```
+
 - **StringSliceVoParser**: Convert comma-separated, semicolon-separated, or array strings into value object slices.
+
+  ```go
+  rawInput := "tag1,tag2;tag3"
+  parsedTags := StringSliceValueObjectParser(rawInput, tkValueObject.NewTag)
+  ```
+
 - **TimeParamsParser**: Parse date ranges, timestamps, and relative times from request parameters.
+
+  ```go
+  timeParamNames := []string{"createdAt", "updatedAt"}
+  untrustedInput := map[string]any{"createdAt": 1609459200}
+  parsedTimeParams := TimeParamsParser(timeParamNames, untrustedInput)
+  fmt.Println(parsedTimeParams["createdAt"])
+  ```
+
 - **ResponseWrapper**: A wrapper struct for liaison responses and when needed, used to emit API and CLI responses.
+
+  ```go
+  apiResponse := NewApiResponseWrapper(201, accountEntity, "AccountCreatedSuccessfully")
+
+  liaisonResponse := NewLiaisonResponse(
+    LiaisonResponseStatusCreated, accountEntity, "AccountCreatedSuccessfully",
+  )
+
+  liaisonResponseNoMessage := NewLiaisonResponseNoMessage(LiaisonResponseStatusSuccess, err.Error())
+
+  liaisonApiEmissionErr := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
+
+  LiaisonCliResponseRenderer(liaisonResponse)
+  ```
 
 ### Value Objects
 
@@ -54,6 +262,15 @@ The library offers a diverse range of value objects (VO) to represent domain ent
 ### Value Object Utilities
 
 - **InterfaceTo**: Safely convert interface{} to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
+
+  ```go
+  boolValue, boolConversionErr := tkVoUtil.InterfaceToBool("true")
+  stringValue, stringConversionErr := tkVoUtil.InterfaceToString(42)
+  intValue, intConversionErr := tkVoUtil.InterfaceToInt("123")
+  int64Value, int64ConversionErr := tkVoUtil.InterfaceToInt64(3.14159)
+  uint32Value, uint32ConversionErr := tkVoUtil.InterfaceToUint32("4294967295")
+  float32Value, float32ConversionErr := tkVoUtil.InterfaceToFloat32("-987.654")
+  ```
 
 ### DTOs
 
@@ -77,8 +294,48 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 ##### Use Cases
 
 - **CreateActivityRecord**: Persists an activity record as a non-blocking side effect, logging errors without failing the primary operation.
+
+  ```go
+  recordCode, _ := tkValueObject.NewActivityRecordCode("CreateSessionToken")
+  affectedResources := []tkValueObject.SystemResourceIdentifier{
+      tkValueObject.NewSystemResourceIdentifier("sri://0:account/123"),
+  }
+  operatorAccountId, _ := tkValueObject.NewAccountId(123)
+  operatorIpAddress, _ := tkValueObject.NewIpAddress("1.1.1.1")
+
+  createDto := tkDto.CreateActivityRecord{
+      RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+      RecordCode:        recordCode,
+      AffectedResources: affectedResources,
+      RecordDetails:     map[string]any{"sessionId": "abc123"},
+      OperatorAccountId: &operatorAccountId,
+      OperatorIpAddress: &operatorIpAddress,
+  }
+
+  tkUseCase.CreateActivityRecord(activityRecordCmdRepo, createDto)
+  ```
+
 - **DeleteActivityRecord**: Deletes an activity record by ID.
+
+  ```go
+  recordId, _ := tkValueObject.NewActivityRecordId(123)
+  deleteDto := tkDto.DeleteActivityRecord{RecordId: &recordId}
+  deleteErr := tkUseCase.DeleteActivityRecord(activityRecordCmdRepo, deleteDto)
+  ```
+
 - **ReadActivityRecords**: Retrieves activity records with pagination and filtering options.
+
+  ```go
+  requestDto := tkDto.ReadActivityRecordsRequest{
+      Pagination: tkDto.Pagination{
+          PageNumber:   0,
+          ItemsPerPage: 20,
+      },
+  }
+
+  responseDto, readErr := tkUseCase.ReadActivityRecords(activityRecordQueryRepo, requestDto)
+  activityRecords := responseDto.ActivityRecords
+  ```
 
 ##### DTOs
 
@@ -90,3 +347,31 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 
 - **ActivityRecordCmdRepo**: Interface for command operations (create, delete) on activity records.
 - **ActivityRecordQueryRepo**: Interface for query operations (read) on activity records.
+
+#### Usage Examples
+
+- **Counting Failed Login Attempts**: Query activity records to count failed login attempts for security monitoring.
+
+  ```go
+  func readFailedLoginAttemptsCount(
+      activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
+      createDto dto.CreateSessionToken,
+  ) (attemptsCount uint, err error) {
+      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
+          CreateSessionTokenFailedLoginAttemptsInterval,
+      )
+      readResponseDto, err := tkUseCase.ReadActivityRecords(
+          activityRecordQueryRepo, tkDto.ReadActivityRecordsRequest{
+              Pagination:        tkUseCase.ActivityRecordsDefaultPagination,
+              RecordLevel:       &tkValueObject.ActivityRecordLevelSecurity,
+              RecordCode:        &CreateSessionTokenActivityRecordCodeFailed,
+              OperatorIpAddress: &createDto.OperatorIpAddress,
+              CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
+          })
+      if err != nil {
+          return attemptsCount, err
+      }
+
+      return uint(len(readResponseDto.ActivityRecords)), nil
+  }
+  ```

@@ -8,39 +8,34 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
+	tkInfra "github.com/goinfinite/tk/src/infra"
 	"github.com/labstack/echo/v4"
 )
 
 const (
-	panicHandlerMaxStackTraceSize    int    = 1 << 16
-	panicHandlerMaxErrorLength       int    = 150
-	panicHandlerLogsDir              string = "logs"
-	panicHandlerLogFileName          string = "panic.log"
-	PanicHandlerTrustedIpsEnvVarName string = "TRUSTED_IPS"
+	panicHandlerMaxStackTraceSize int    = 1 << 16
+	panicHandlerMaxErrorLength    int    = 150
+	panicHandlerLogsDir           string = "logs"
+	panicHandlerLogFileName       string = "panic.log"
 )
 
 var panicHandlerDomainLayerPathRegex = regexp.MustCompile(`domain/(valueObject|entity|useCase)`)
 
 type PanicReport struct {
-	RecoverErr         error
-	StackTrace         string
-	RequestUri         string
-	RequesterIpAddress string
+	RecoverErr        error
+	StackTrace        string
+	RequestUri        string
+	OperatorIpAddress string
 }
 
-func readPanicReport() *PanicReport {
-	var recoverErr error
-	recoverFunc := recover()
-	if recoverFunc == nil {
-		return nil
-	}
-
-	recoverErr, isError := recoverFunc.(error)
+func panicReportFactory(recoveredValue any) *PanicReport {
+	recoverErr, isError := recoveredValue.(error)
 	if !isError {
-		recoverErr = fmt.Errorf("%v", recoverFunc)
+		recoverErr = fmt.Errorf("%v", recoveredValue)
 	}
 
 	traceBuffer := make([]byte, panicHandlerMaxStackTraceSize)
@@ -62,30 +57,23 @@ func readPanicReport() *PanicReport {
 	}
 }
 
-func isRequesterTrustworthy(echoContext echo.Context) bool {
-	rawTrustedIps := os.Getenv(PanicHandlerTrustedIpsEnvVarName)
-	if rawTrustedIps == "" {
+func isOperatorTrustworthy(echoContext echo.Context) bool {
+	trustedIpAddresses, err := tkInfra.TrustedIpsReader()
+	if err != nil {
 		return false
 	}
 
-	rawRequesterIpAddress := echoContext.RealIP()
-	if rawRequesterIpAddress == "" {
+	rawOperatorIpAddress := echoContext.RealIP()
+	if rawOperatorIpAddress == "" {
 		return false
 	}
 
-	requesterIpAddress, ipErr := tkValueObject.NewIpAddress(rawRequesterIpAddress)
+	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawOperatorIpAddress)
 	if ipErr != nil {
 		return false
 	}
-	requesterIpAddressStr := requesterIpAddress.String()
 
-	for staffIp := range strings.SplitSeq(rawTrustedIps, ",") {
-		if strings.TrimSpace(staffIp) == requesterIpAddressStr {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(trustedIpAddresses, operatorIpAddress)
 }
 
 func logPanic(panicReportPtr *PanicReport) {
@@ -105,20 +93,26 @@ func logPanic(panicReportPtr *PanicReport) {
 	defer logFile.Close()
 
 	slogger := slog.New(slog.NewTextHandler(logFile, nil))
+	errorStr := "UnknownError"
+	if panicReportPtr.RecoverErr != nil {
+		errorStr = panicReportPtr.RecoverErr.Error()
+	}
 	slogger.Error(
 		"PanicRecovered",
-		slog.String("error", panicReportPtr.RecoverErr.Error()),
+		slog.String("error", errorStr),
 		slog.String("stackTrace", panicReportPtr.StackTrace),
 		slog.String("requestUri", panicReportPtr.RequestUri),
-		slog.String("requesterIpAddress", panicReportPtr.RequesterIpAddress),
+		slog.String("operatorIpAddress", panicReportPtr.OperatorIpAddress),
 	)
 }
 
 func apiHandlePanic(echoContext echo.Context) {
-	panicReportPtr := readPanicReport()
-	if panicReportPtr == nil {
+	recoveredValue := recover()
+	if recoveredValue == nil {
 		return
 	}
+
+	panicReportPtr := panicReportFactory(recoveredValue)
 
 	stackTraceStr := panicReportPtr.StackTrace
 
@@ -152,10 +146,10 @@ func apiHandlePanic(echoContext echo.Context) {
 			"exceptionCode":  fullRecoverErrStr,
 			"exceptionTrace": stackTraceStr,
 		},
-		"humanReadableMessage": "SomethingWentWrong",
+		"readableMessage": "SomethingWentWrong",
 	}
 
-	if !isRequesterTrustworthy(echoContext) {
+	if !isOperatorTrustworthy(echoContext) {
 		jsonResponse["body"] = map[string]any{
 			"exceptionCode": shortRecoverErrStr,
 		}
@@ -164,9 +158,9 @@ func apiHandlePanic(echoContext echo.Context) {
 	echoContext.JSON(statusCode, jsonResponse)
 
 	panicReportPtr.RequestUri = echoContext.Request().RequestURI
-	requesterIpAddress, ipErr := tkValueObject.NewIpAddress(echoContext.RealIP())
+	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(echoContext.RealIP())
 	if ipErr == nil {
-		panicReportPtr.RequesterIpAddress = requesterIpAddress.String()
+		panicReportPtr.OperatorIpAddress = operatorIpAddress.String()
 	}
 
 	logPanic(panicReportPtr)
@@ -181,10 +175,12 @@ func ApiPanicHandler(subsequentHandler echo.HandlerFunc) echo.HandlerFunc {
 
 // @attention CliPanicHandler MUST be used as a defer statement.
 func CliPanicHandler() {
-	panicReport := readPanicReport()
-	if panicReport == nil {
+	recoveredValue := recover()
+	if recoveredValue == nil {
 		return
 	}
+
+	panicReport := panicReportFactory(recoveredValue)
 	logPanic(panicReport)
 
 	fmt.Println("FatalError. Please check the 'logs/panic.log' file for more details.")

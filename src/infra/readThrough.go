@@ -53,12 +53,6 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 		return certPath, keyPath, nil
 	}
 
-	synthesizer := Synthesizer{}
-	selfSignedCertPem, selfSignedKeyPem, err := synthesizer.SelfSignedCertificatePairPemFactory(nil, nil)
-	if err != nil {
-		return certPath, keyPath, err
-	}
-
 	fileClerk := FileClerk{}
 	rawPkiDir := "pki"
 	if os.Getenv(ReadThroughPkiDirEnvVarName) != "" {
@@ -87,10 +81,7 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	if err != nil {
 		return certPath, keyPath, errors.New("SelfSignedCertPathInvalid")
 	}
-	err = fileClerk.UpdateFileContent(certPath.String(), selfSignedCertPem, true)
-	if err != nil {
-		return certPath, keyPath, errors.New("SelfSignedCertContentUpdateFailed")
-	}
+	certPathStr := certPath.String()
 
 	rawKeyPath, err = filepath.Abs(pkiDirStr + "/key.pem")
 	if err != nil {
@@ -100,7 +91,23 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	if err != nil {
 		return certPath, keyPath, errors.New("SelfSignedKeyPathInvalid")
 	}
-	err = fileClerk.UpdateFileContent(keyPath.String(), selfSignedKeyPem, true)
+	keyPathStr := keyPath.String()
+
+	if fileClerk.FileExists(certPathStr) && fileClerk.FileExists(keyPathStr) {
+		return certPath, keyPath, nil
+	}
+
+	synthesizer := Synthesizer{}
+	selfSignedCertPem, selfSignedKeyPem, err := synthesizer.SelfSignedCertificatePairPemFactory(nil, nil)
+	if err != nil {
+		return certPath, keyPath, err
+	}
+
+	err = fileClerk.UpdateFileContent(certPathStr, selfSignedCertPem, true)
+	if err != nil {
+		return certPath, keyPath, errors.New("SelfSignedCertContentUpdateFailed")
+	}
+	err = fileClerk.UpdateFileContent(keyPathStr, selfSignedKeyPem, true)
 	if err != nil {
 		return certPath, keyPath, errors.New("SelfSignedKeyContentUpdateFailed")
 	}
