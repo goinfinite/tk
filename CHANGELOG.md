@@ -1,6 +1,15 @@
 # Changelog
 
 ```log
+0.1.4 - 2025/11/13
+test: add CreatedAfterAt tests for activity record query repo
+test: add panic handler middleware
+fix: prevent regen of existent cert pair
+fix: force gorm to use UTC
+fix: use UTC on UnixTime vo alt constructors
+fix: move recover() to defer func in panic handlers
+docs: add examples for all components
+
 0.1.3 - 2025/11/10
 fix: fix pagination query builder order statement declaration bug
 fix: missing gofmt run on a few VO unit tests
