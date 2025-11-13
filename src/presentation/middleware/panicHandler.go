@@ -32,16 +32,10 @@ type PanicReport struct {
 	OperatorIpAddress string
 }
 
-func readPanicReport() *PanicReport {
-	var recoverErr error
-	recoverFunc := recover()
-	if recoverFunc == nil {
-		return nil
-	}
-
-	recoverErr, isError := recoverFunc.(error)
+func panicReportFactory(recoveredValue any) *PanicReport {
+	recoverErr, isError := recoveredValue.(error)
 	if !isError {
-		recoverErr = fmt.Errorf("%v", recoverFunc)
+		recoverErr = fmt.Errorf("%v", recoveredValue)
 	}
 
 	traceBuffer := make([]byte, panicHandlerMaxStackTraceSize)
@@ -99,9 +93,13 @@ func logPanic(panicReportPtr *PanicReport) {
 	defer logFile.Close()
 
 	slogger := slog.New(slog.NewTextHandler(logFile, nil))
+	errorStr := "UnknownError"
+	if panicReportPtr.RecoverErr != nil {
+		errorStr = panicReportPtr.RecoverErr.Error()
+	}
 	slogger.Error(
 		"PanicRecovered",
-		slog.String("error", panicReportPtr.RecoverErr.Error()),
+		slog.String("error", errorStr),
 		slog.String("stackTrace", panicReportPtr.StackTrace),
 		slog.String("requestUri", panicReportPtr.RequestUri),
 		slog.String("operatorIpAddress", panicReportPtr.OperatorIpAddress),
@@ -109,10 +107,12 @@ func logPanic(panicReportPtr *PanicReport) {
 }
 
 func apiHandlePanic(echoContext echo.Context) {
-	panicReportPtr := readPanicReport()
-	if panicReportPtr == nil {
+	recoveredValue := recover()
+	if recoveredValue == nil {
 		return
 	}
+
+	panicReportPtr := panicReportFactory(recoveredValue)
 
 	stackTraceStr := panicReportPtr.StackTrace
 
@@ -175,10 +175,12 @@ func ApiPanicHandler(subsequentHandler echo.HandlerFunc) echo.HandlerFunc {
 
 // @attention CliPanicHandler MUST be used as a defer statement.
 func CliPanicHandler() {
-	panicReport := readPanicReport()
-	if panicReport == nil {
+	recoveredValue := recover()
+	if recoveredValue == nil {
 		return
 	}
+
+	panicReport := panicReportFactory(recoveredValue)
 	logPanic(panicReport)
 
 	fmt.Println("FatalError. Please check the 'logs/panic.log' file for more details.")
