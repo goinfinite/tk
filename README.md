@@ -117,7 +117,8 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   randomEmail := synthesizer.MailAddressFactory(nil)
 
   commonName, _ := tkValueObject.NewFqdn("goinfinite.net")
-  altNames := []tkValueObject.Fqdn{commonName}
+  aliasName, _ := tkValueObject.NewFqdn("goinfinite.com.br")
+  altNames := []tkValueObject.Fqdn{aliasName}
   certificatePair, certGenerationErr := synthesizer.SelfSignedCertificatePairFactory(&commonName, altNames)
 
   certPem, keyPem, certPemGenerationErr := synthesizer.SelfSignedCertificatePairPemFactory(&commonName, altNames)
@@ -262,6 +263,15 @@ The library offers a diverse range of value objects (VO) to represent domain ent
 
 - **InterfaceTo**: Safely convert interface{} to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
 
+  ```go
+  boolValue, boolConversionErr := tkVoUtil.InterfaceToBool("true")
+  stringValue, stringConversionErr := tkVoUtil.InterfaceToString(42)
+  intValue, intConversionErr := tkVoUtil.InterfaceToInt("123")
+  int64Value, int64ConversionErr := tkVoUtil.InterfaceToInt64(3.14159)
+  uint32Value, uint32ConversionErr := tkVoUtil.InterfaceToUint32("4294967295")
+  float32Value, float32ConversionErr := tkVoUtil.InterfaceToFloat32("-987.654")
+  ```
+
 ### DTOs
 
 - **Pagination**: General pagination DTO with page number, items per page, last seen ID, sort by, and sort direction.
@@ -284,8 +294,48 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 ##### Use Cases
 
 - **CreateActivityRecord**: Persists an activity record as a non-blocking side effect, logging errors without failing the primary operation.
+
+  ```go
+  recordCode, _ := tkValueObject.NewActivityRecordCode("CreateSessionToken")
+  affectedResources := []tkValueObject.SystemResourceIdentifier{
+      tkValueObject.NewSystemResourceIdentifier("sri://0:account/123"),
+  }
+  operatorAccountId, _ := tkValueObject.NewAccountId(123)
+  operatorIpAddress, _ := tkValueObject.NewIpAddress("1.1.1.1")
+
+  createDto := tkDto.CreateActivityRecord{
+      RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+      RecordCode:        recordCode,
+      AffectedResources: affectedResources,
+      RecordDetails:     map[string]any{"sessionId": "abc123"},
+      OperatorAccountId: &operatorAccountId,
+      OperatorIpAddress: &operatorIpAddress,
+  }
+
+  tkUseCase.CreateActivityRecord(activityRecordCmdRepo, createDto)
+  ```
+
 - **DeleteActivityRecord**: Deletes an activity record by ID.
+
+  ```go
+  recordId, _ := tkValueObject.NewActivityRecordId(123)
+  deleteDto := tkDto.DeleteActivityRecord{RecordId: &recordId}
+  deleteErr := tkUseCase.DeleteActivityRecord(activityRecordCmdRepo, deleteDto)
+  ```
+
 - **ReadActivityRecords**: Retrieves activity records with pagination and filtering options.
+
+  ```go
+  requestDto := tkDto.ReadActivityRecordsRequest{
+      Pagination: tkDto.Pagination{
+          PageNumber:   0,
+          ItemsPerPage: 20,
+      },
+  }
+
+  responseDto, readErr := tkUseCase.ReadActivityRecords(activityRecordQueryRepo, requestDto)
+  activityRecords := responseDto.ActivityRecords
+  ```
 
 ##### DTOs
 
@@ -297,3 +347,31 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 
 - **ActivityRecordCmdRepo**: Interface for command operations (create, delete) on activity records.
 - **ActivityRecordQueryRepo**: Interface for query operations (read) on activity records.
+
+#### Usage Examples
+
+- **Counting Failed Login Attempts**: Query activity records to count failed login attempts for security monitoring.
+
+  ```go
+  func readFailedLoginAttemptsCount(
+      activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
+      createDto dto.CreateSessionToken,
+  ) (attemptsCount uint, err error) {
+      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
+          CreateSessionTokenFailedLoginAttemptsInterval,
+      )
+      readResponseDto, err := tkUseCase.ReadActivityRecords(
+          activityRecordQueryRepo, tkDto.ReadActivityRecordsRequest{
+              Pagination:        tkUseCase.ActivityRecordsDefaultPagination,
+              RecordLevel:       &tkValueObject.ActivityRecordLevelSecurity,
+              RecordCode:        &CreateSessionTokenActivityRecordCodeFailed,
+              OperatorIpAddress: &createDto.OperatorIpAddress,
+              CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
+          })
+      if err != nil {
+          return attemptsCount, err
+      }
+
+      return uint(len(readResponseDto.ActivityRecords)), nil
+  }
+  ```
