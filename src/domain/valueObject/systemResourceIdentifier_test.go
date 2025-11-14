@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewSystemResourceIdentifier(t *testing.T) {
-	t.Run("ValidSystemResourceIdentifier", func(t *testing.T) {
+func TestSystemResourceIdentifier(t *testing.T) {
+	t.Run("NewSystemResourceIdentifier/Valid", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -29,15 +29,15 @@ func TestNewSystemResourceIdentifier(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceIdentifier(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				t.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				t.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("InvalidSystemResourceIdentifier", func(t *testing.T) {
+	t.Run("NewSystemResourceIdentifier/Invalid", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -52,10 +52,176 @@ func TestNewSystemResourceIdentifier(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceIdentifier(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				t.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				t.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("NewSystemResourceIdentifierMustCreate/Valid", func(t *testing.T) {
+		validSri := "sri://1:account/120"
+		sri := NewSystemResourceIdentifierMustCreate(validSri)
+		if sri.String() != validSri {
+			t.Errorf("UnexpectedSriValue: expected %s, got %s", validSri, sri.String())
+		}
+	})
+
+	t.Run("NewSystemResourceIdentifierMustCreate/Panic", func(t *testing.T) {
+		invalidSri := "invalid"
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("MissingExpectedPanicForInvalidSri")
+			}
+		}()
+		NewSystemResourceIdentifierMustCreate(invalidSri)
+	})
+
+	t.Run("String/Valid", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputSri    string
+			expectedStr string
+		}{
+			{"sri://1:account/120", "sri://1:account/120"},
+			{"sri://10:database/myDb", "sri://10:database/myDb"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
+			actualStr := sri.String()
+			if actualStr != testCase.expectedStr {
+				t.Errorf(
+					"UnexpectedStringValueForSri: expected %s, got %s",
+					testCase.expectedStr, actualStr,
+				)
+			}
+		}
+	})
+
+	t.Run("ReadAccountId/Valid", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputSri        string
+			expectedAccount string
+		}{
+			{"sri://1:account/120", "1"},
+			{"sri://10:database/myDb", "10"},
+			{"sri://1000:ssl/*", "1000"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
+			accountId, err := sri.ReadAccountId()
+			if err != nil {
+				t.Errorf("UnexpectedErrorReadingAccountIdForSri")
+			}
+			if accountId.String() != testCase.expectedAccount {
+				t.Errorf(
+					"UnexpectedAccountIdForSri: expected %s, got %s",
+					testCase.expectedAccount, accountId.String(),
+				)
+			}
+		}
+	})
+
+	t.Run("ReadAccountId/Invalid", func(t *testing.T) {
+		invalidSri := "invalid"
+		sri := SystemResourceIdentifier(invalidSri)
+		_, err := sri.ReadAccountId()
+		if err == nil {
+			t.Errorf("MissingExpectedErrorForInvalidSri")
+		}
+	})
+
+	t.Run("ReadResourceType/Valid", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputSri             string
+			expectedResourceType string
+		}{
+			{"sri://1:account/120", "account"},
+			{"sri://10:database/myDb", "database"},
+			{"sri://1000:ssl/*", "ssl"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
+			resourceType, err := sri.ReadResourceType()
+			if err != nil {
+				t.Errorf("UnexpectedErrorReadingResourceTypeForSri")
+			}
+			if resourceType != testCase.expectedResourceType {
+				t.Errorf(
+					"UnexpectedResourceTypeForSri: expected %s, got %s",
+					testCase.expectedResourceType, resourceType,
+				)
+			}
+		}
+	})
+
+	t.Run("ReadResourceType/Invalid", func(t *testing.T) {
+		invalidSri := "invalid"
+		sri := SystemResourceIdentifier(invalidSri)
+		_, err := sri.ReadResourceType()
+		if err == nil {
+			t.Errorf("MissingExpectedErrorForInvalidSri")
+		}
+	})
+
+	t.Run("ReadResourceId/Valid", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputSri           string
+			expectedResourceId string
+		}{
+			{"sri://1:account/120", "120"},
+			{"sri://10:database/myDb", "myDb"},
+			{"sri://1000:ssl/*", "*"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
+			resourceId, err := sri.ReadResourceId()
+			if err != nil {
+				t.Errorf("UnexpectedErrorReadingResourceIdForSri")
+			}
+			if resourceId != testCase.expectedResourceId {
+				t.Errorf(
+					"UnexpectedResourceIdForSri: expected %s, got %s",
+					testCase.expectedResourceId, resourceId,
+				)
+			}
+		}
+	})
+
+	t.Run("ReadResourceId/Invalid", func(t *testing.T) {
+		invalidSri := "invalid"
+		sri := SystemResourceIdentifier(invalidSri)
+		_, err := sri.ReadResourceId()
+		if err == nil {
+			t.Errorf("MissingExpectedErrorForInvalidSri")
+		}
+	})
+
+	t.Run("NewAccountSri/Valid", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputAccountId string
+			expectedSri    string
+		}{
+			{"1", "sri://0:account/1"},
+			{"123", "sri://0:account/123"},
+			{"1000", "sri://0:account/1000"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			accountId, err := NewAccountId(testCase.inputAccountId)
+			if err != nil {
+				t.Errorf("UnexpectedErrorCreatingAccountIdForInput")
+			}
+			sri := NewAccountSri(accountId)
+			if sri.String() != testCase.expectedSri {
+				t.Errorf(
+					"UnexpectedAccountSriForAccountId: expected %s, got %s",
+					testCase.expectedSri, sri.String(),
+				)
 			}
 		}
 	})
