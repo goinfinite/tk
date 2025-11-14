@@ -23,9 +23,13 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
 - **Deserializer**: Deserialize JSON and YAML files into maps for configuration handling.
 
   ```go
-  deserializedMap, deserializationErr := StringDeserializer(`{"name": "test", "value": 123}`, SerializationFormatJson)
+  deserializedMap, deserializationErr := StringDeserializer(
+    `{"name": "test", "value": 123}`, SerializationFormatJson,
+  )
 
-  deserializedMap, deserializationErr := StringDeserializer("name: test\nvalue: 123", SerializationFormatYaml)
+  deserializedMap, deserializationErr := StringDeserializer(
+    "name: test\nvalue: 123", SerializationFormatYaml,
+  )
 
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
@@ -66,7 +70,9 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
 
   // CompressionOperations
   compressionFormat := "gzip"
-  compressedFilePath, compressionErr := clerk.CompressFile("example.txt", &compressionFormat)
+  compressedFilePath, compressionErr := clerk.CompressFile(
+    "example.txt", &compressionFormat,
+  )
   decompressionTargetPath := "decompressed.txt"
   shouldKeepSourceFile := false
   decompressedFilePath, decompressionErr := clerk.DecompressFile(
@@ -79,7 +85,9 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   directoryMoveErr := clerk.MoveDir("old_dir", "new_dir")
   directoryDeletionErr := clerk.DeleteDir("example_dir")
   directoryCompressionFormat := "brotli"
-  directoryCompressionErr := clerk.CompressDir("example_dir", &directoryCompressionFormat)
+  directoryCompressionErr := clerk.CompressDir(
+    "example_dir", &directoryCompressionFormat,
+  )
   directoryDecompressionTargetPath := "decompressed_dir"
   shouldKeepSourceDir := true
   directoryDecompressionErr := clerk.DecompressDir(
@@ -119,9 +127,13 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   commonName, _ := tkValueObject.NewFqdn("goinfinite.net")
   aliasName, _ := tkValueObject.NewFqdn("goinfinite.com.br")
   altNames := []tkValueObject.Fqdn{aliasName}
-  certificatePair, certGenerationErr := synthesizer.SelfSignedCertificatePairFactory(&commonName, altNames)
+  certPair, certGenErr := synthesizer.SelfSignedCertificatePairFactory(
+    &commonName, altNames,
+  )
 
-  certPem, keyPem, certPemGenerationErr := synthesizer.SelfSignedCertificatePairPemFactory(&commonName, altNames)
+  certPem, keyPem, certPemGenErr := synthesizer.SelfSignedCertificatePairPemFactory(
+    &commonName, altNames,
+  )
   ```
 
 - **ServerIpAddress**: Retrieve the server's private and public IP addresses.
@@ -143,7 +155,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   ```go
   readThrough := &ReadThrough{}
 
-  certificateFilePath, keyFilePath, certPairReadingErr := readThrough.CertPairFilePathsReader()
+  certFilePath, keyFilePath, certPairReadingErr := readThrough.CertPairFilePathsReader()
   ```
 
 - **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
@@ -157,7 +169,9 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
       ItemsPerPage: 10,
   }
 
-  paginatedQuery, responsePagination, paginationBuildingErr := PaginationQueryBuilder(databaseQuery, requestPagination)
+  paginatedQuery, responsePagination, paginationBuildingErr := PaginationQueryBuilder(
+    databaseQuery, requestPagination,
+  )
 
   modelRecords := []YourModel{}
   queryExecutionErr := paginatedQuery.Find(&modelRecords).Error
@@ -168,7 +182,9 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   ```go
   os.Setenv("TRAIL_DATABASE_FILE_PATH", "/path/to/trail.db")
 
-  trailDatabaseService, serviceInitializationErr := NewTrailDatabaseService([]any{&YourAdditionalModel{}})
+  trailDatabaseService, serviceInitializationErr := NewTrailDatabaseService(
+    []any{&YourAdditionalModel{}},
+  )
 
   activityRecords := []ActivityRecord{}
   trailDatabaseService.Handler.Model(&ActivityRecord{}).Find(&activityRecords)
@@ -211,7 +227,9 @@ For web applications built with Echo:
   optionalEnvFilePath := "/path/to/.env"
   requiredEnvVarNames := []string{"TRAIL_DATABASE_FILE_PATH", "SESSION_TOKEN_SECRET"}
   autoFillableEnvVars := []string{"SESSION_TOKEN_SECRET"}
-  envsInspector := NewEnvsInspector(optionalEnvFilePath, requiredEnvVarNames, autoFillableEnvVars)
+  envsInspector := NewEnvsInspector(
+    optionalEnvFilePath, requiredEnvVarNames, autoFillableEnvVars,
+  )
   envsValidationErr := envsInspector.Inspect()
   ```
 
@@ -220,7 +238,9 @@ For web applications built with Echo:
   ```go
   defaultPagination := tkDto.Pagination{PageNumber: 0, ItemsPerPage: 10}
   untrustedInput := map[string]any{"pageNumber": 1, "itemsPerPage": 20}
-  parsedPagination, paginationParsingErr := PaginationParser(defaultPagination, untrustedInput)
+  parsedPagination, paginationParsingErr := PaginationParser(
+    defaultPagination, untrustedInput,
+  )
   ```
 
 - **StringSliceVoParser**: Convert comma-separated, semicolon-separated, or array strings into value object slices.
@@ -248,7 +268,9 @@ For web applications built with Echo:
     LiaisonResponseStatusCreated, accountEntity, "AccountCreatedSuccessfully",
   )
 
-  liaisonResponseNoMessage := NewLiaisonResponseNoMessage(LiaisonResponseStatusSuccess, err.Error())
+  liaisonResponseNoMessage := NewLiaisonResponseNoMessage(
+    LiaisonResponseStatusSuccess, err.Error(),
+  )
 
   liaisonApiEmissionErr := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
 
@@ -267,9 +289,17 @@ The library offers a diverse range of value objects (VO) to represent domain ent
   boolValue, boolConversionErr := tkVoUtil.InterfaceToBool("true")
   stringValue, stringConversionErr := tkVoUtil.InterfaceToString(42)
   intValue, intConversionErr := tkVoUtil.InterfaceToInt("123")
+  int8Value, int8ConversionErr := tkVoUtil.InterfaceToInt8("127")
+  int16Value, int16ConversionErr := tkVoUtil.InterfaceToInt16("32767")
+  int32Value, int32ConversionErr := tkVoUtil.InterfaceToInt32("2147483647")
   int64Value, int64ConversionErr := tkVoUtil.InterfaceToInt64(3.14159)
+  uintValue, uintConversionErr := tkVoUtil.InterfaceToUint("4294967295")
+  uint8Value, uint8ConversionErr := tkVoUtil.InterfaceToUint8("255")
+  uint16Value, uint16ConversionErr := tkVoUtil.InterfaceToUint16("65535")
   uint32Value, uint32ConversionErr := tkVoUtil.InterfaceToUint32("4294967295")
+  uint64Value, uint64ConversionErr := tkVoUtil.InterfaceToUint64("18446744073709551615")
   float32Value, float32ConversionErr := tkVoUtil.InterfaceToFloat32("-987.654")
+  float64Value, float64ConversionErr := tkVoUtil.InterfaceToFloat64("-123.456")
   ```
 
 ### DTOs
@@ -333,7 +363,9 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
       },
   }
 
-  responseDto, readErr := tkUseCase.ReadActivityRecords(activityRecordQueryRepo, requestDto)
+  responseDto, readErr := tkUseCase.ReadActivityRecords(
+    activityRecordQueryRepo, requestDto,
+  )
   activityRecords := responseDto.ActivityRecords
   ```
 
