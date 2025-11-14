@@ -47,10 +47,11 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 			t.Fatalf("CreateResourceVoFailed: %v", err)
 		}
 
-		operatorAccountIdVo, err := tkValueObject.NewAccountId(123)
+		accountId, err := tkValueObject.NewAccountId(123)
 		if err != nil {
-			t.Fatalf("CreateOperatorAccountIdVoFailed: %v", err)
+			t.Fatalf("CreateAccountIdVoFailed: %v", err)
 		}
+		operatorSri := tkValueObject.NewSriAccount(accountId)
 
 		operatorIpAddressVo, err := tkValueObject.NewIpAddress("192.168.1.1")
 		if err != nil {
@@ -62,7 +63,7 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 			RecordCode:        recordCodeVo,
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri},
 			RecordDetails:     map[string]any{"key": "value"},
-			OperatorAccountId: &operatorAccountIdVo,
+			OperatorSri:       &operatorSri,
 			OperatorIpAddress: &operatorIpAddressVo,
 		}
 

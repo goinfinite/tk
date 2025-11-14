@@ -13,7 +13,7 @@ type ActivityRecord struct {
 	RecordCode        string `gorm:"not null"`
 	AffectedResources []ActivityRecordAffectedResource
 	RecordDetails     *string
-	OperatorAccountId *uint64
+	OperatorSri       *string
 	OperatorIpAddress *string
 	CreatedAt         time.Time `gorm:"not null"`
 }
@@ -26,16 +26,14 @@ func NewActivityRecord(
 	recordId uint64,
 	recordLevel, recordCode string,
 	affectedResources []ActivityRecordAffectedResource,
-	recordDetails *string,
-	operatorAccountId *uint64,
-	operatorIpAddress *string,
+	recordDetails, operatorSri, operatorIpAddress *string,
 ) ActivityRecord {
 	model := ActivityRecord{
 		RecordLevel:       recordLevel,
 		RecordCode:        recordCode,
 		AffectedResources: affectedResources,
 		RecordDetails:     recordDetails,
-		OperatorAccountId: operatorAccountId,
+		OperatorSri:       operatorSri,
 		OperatorIpAddress: operatorIpAddress,
 	}
 
@@ -76,13 +74,13 @@ func (model ActivityRecord) ToEntity() (recordEntity tkEntity.ActivityRecord, er
 		recordDetails = *model.RecordDetails
 	}
 
-	var operatorAccountIdPtr *tkValueObject.AccountId
-	if model.OperatorAccountId != nil {
-		operatorAccountId, err := tkValueObject.NewAccountId(*model.OperatorAccountId)
+	var operatorSriPtr *tkValueObject.SystemResourceIdentifier
+	if model.OperatorSri != nil {
+		operatorSri, err := tkValueObject.NewSystemResourceIdentifier(*model.OperatorSri)
 		if err != nil {
 			return recordEntity, err
 		}
-		operatorAccountIdPtr = &operatorAccountId
+		operatorSriPtr = &operatorSri
 	}
 
 	var operatorIpAddressPtr *tkValueObject.IpAddress
@@ -96,7 +94,7 @@ func (model ActivityRecord) ToEntity() (recordEntity tkEntity.ActivityRecord, er
 
 	return tkEntity.NewActivityRecord(
 		recordId, recordLevel, recordCode, affectedResources, recordDetails,
-		operatorAccountIdPtr, operatorIpAddressPtr,
+		operatorSriPtr, operatorIpAddressPtr,
 		tkValueObject.NewUnixTimeWithGoTime(model.CreatedAt),
 	), nil
 }

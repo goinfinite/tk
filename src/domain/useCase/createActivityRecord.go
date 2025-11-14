@@ -18,7 +18,7 @@ func CreateActivityRecord(
 		slog.Error(
 			"CreateActivityRecordInfraError",
 			slog.String("err", err.Error()),
-			slog.Any("createDto", createDto),
+			slog.String("recordCode", createDto.RecordCode.String()),
 		)
 	}
 }

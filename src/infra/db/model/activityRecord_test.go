@@ -16,7 +16,7 @@ func TestNewActivityRecord(t *testing.T) {
 			recordCode        string
 			affectedResources []ActivityRecordAffectedResource
 			recordDetails     *string
-			operatorAccountId *uint64
+			operatorSri       *string
 			operatorIpAddress *string
 			expectedId        uint64
 		}{
@@ -25,9 +25,6 @@ func TestNewActivityRecord(t *testing.T) {
 				recordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 				recordCode:        "TEST_CODE",
 				affectedResources: []ActivityRecordAffectedResource{},
-				recordDetails:     nil,
-				operatorAccountId: nil,
-				operatorIpAddress: nil,
 				expectedId:        0,
 			},
 			{
@@ -38,7 +35,7 @@ func TestNewActivityRecord(t *testing.T) {
 					{SystemResourceIdentifier: "test-resource"},
 				},
 				recordDetails:     stringPtr("test details"),
-				operatorAccountId: uint64Ptr(123),
+				operatorSri:       stringPtr("sri://1:account/123"),
 				operatorIpAddress: stringPtr("192.168.1.1"),
 				expectedId:        0,
 			},
@@ -48,7 +45,7 @@ func TestNewActivityRecord(t *testing.T) {
 			model := NewActivityRecord(
 				testCase.recordId, testCase.recordLevel, testCase.recordCode,
 				testCase.affectedResources, testCase.recordDetails,
-				testCase.operatorAccountId, testCase.operatorIpAddress,
+				testCase.operatorSri, testCase.operatorIpAddress,
 			)
 
 			if model.ID != testCase.expectedId {
@@ -64,7 +61,7 @@ func TestNewActivityRecord(t *testing.T) {
 				t.Errorf("AffectedResourcesNotSetCorrectly: expected %d, got %d", len(testCase.affectedResources), len(model.AffectedResources))
 			}
 			assertStringPtrEqual(t, model.RecordDetails, testCase.recordDetails)
-			assertUint64PtrEqual(t, model.OperatorAccountId, testCase.operatorAccountId)
+			assertStringPtrEqual(t, model.OperatorSri, testCase.operatorSri)
 			assertStringPtrEqual(t, model.OperatorIpAddress, testCase.operatorIpAddress)
 		}
 	})
@@ -76,7 +73,7 @@ func TestNewActivityRecord(t *testing.T) {
 			recordCode        string
 			affectedResources []ActivityRecordAffectedResource
 			recordDetails     *string
-			operatorAccountId *uint64
+			operatorSri       *string
 			operatorIpAddress *string
 			expectedId        uint64
 		}{
@@ -89,7 +86,7 @@ func TestNewActivityRecord(t *testing.T) {
 					{SystemResourceIdentifier: "resource-2"},
 				},
 				recordDetails:     stringPtr("update details"),
-				operatorAccountId: uint64Ptr(999),
+				operatorSri:       stringPtr("sri://1:account/999"),
 				operatorIpAddress: stringPtr("10.0.0.1"),
 				expectedId:        42,
 			},
@@ -99,7 +96,7 @@ func TestNewActivityRecord(t *testing.T) {
 			model := NewActivityRecord(
 				testCase.recordId, testCase.recordLevel, testCase.recordCode,
 				testCase.affectedResources, testCase.recordDetails,
-				testCase.operatorAccountId, testCase.operatorIpAddress,
+				testCase.operatorSri, testCase.operatorIpAddress,
 			)
 
 			if model.ID != testCase.expectedId {
@@ -115,7 +112,7 @@ func TestNewActivityRecord(t *testing.T) {
 				t.Errorf("AffectedResourcesNotSetCorrectly: expected %d, got %d", len(testCase.affectedResources), len(model.AffectedResources))
 			}
 			assertStringPtrEqual(t, model.RecordDetails, testCase.recordDetails)
-			assertUint64PtrEqual(t, model.OperatorAccountId, testCase.operatorAccountId)
+			assertStringPtrEqual(t, model.OperatorSri, testCase.operatorSri)
 			assertStringPtrEqual(t, model.OperatorIpAddress, testCase.operatorIpAddress)
 		}
 	})
@@ -131,8 +128,8 @@ func TestToEntity(t *testing.T) {
 				{SystemResourceIdentifier: "sri://1:account/120"},
 				{SystemResourceIdentifier: "sri://10:virtualHost/local.os"},
 			},
-			RecordDetails:     stringPtr("User logged in successfully"),
-			OperatorAccountId: uint64Ptr(123),
+			RecordDetails:     stringPtr("UserLoggedSuccessfully"),
+			OperatorSri:       stringPtr("sri://1:account/123"),
 			OperatorIpAddress: stringPtr("192.168.1.100"),
 			CreatedAt:         time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC),
 		}
@@ -161,11 +158,11 @@ func TestToEntity(t *testing.T) {
 		if entity.AffectedResources[1].String() != "sri://10:virtualHost/local.os" {
 			t.Errorf("SecondAffectedResourceMismatch: expected sri://10:virtualHost/local.os, got %s", entity.AffectedResources[1].String())
 		}
-		if entity.RecordDetails != "User logged in successfully" {
-			t.Errorf("RecordDetailsMismatch: expected 'User logged in successfully', got %v", entity.RecordDetails)
+		if entity.RecordDetails != "UserLoggedSuccessfully" {
+			t.Errorf("RecordDetailsMismatch: expected 'UserLoggedSuccessfully', got %v", entity.RecordDetails)
 		}
-		if entity.OperatorAccountId == nil || entity.OperatorAccountId.Uint64() != 123 {
-			t.Errorf("OperatorAccountIdMismatch: expected 123, got %v", entity.OperatorAccountId)
+		if entity.OperatorSri == nil || entity.OperatorSri.String() != "sri://1:account/123" {
+			t.Errorf("OperatorSriMismatch: expected sri://1:account/123, got %v", entity.OperatorSri)
 		}
 		if entity.OperatorIpAddress == nil || entity.OperatorIpAddress.String() != "192.168.1.100" {
 			t.Errorf("OperatorIpAddressMismatch: expected 192.168.1.100, got %v", entity.OperatorIpAddress)
@@ -181,9 +178,6 @@ func TestToEntity(t *testing.T) {
 			RecordLevel:       tkValueObject.ActivityRecordLevelError.String(),
 			RecordCode:        "LoginFailed",
 			AffectedResources: []ActivityRecordAffectedResource{},
-			RecordDetails:     nil,
-			OperatorAccountId: nil,
-			OperatorIpAddress: nil,
 			CreatedAt:         time.Date(2023, 2, 20, 15, 45, 30, 0, time.UTC),
 		}
 
@@ -193,8 +187,8 @@ func TestToEntity(t *testing.T) {
 			return
 		}
 
-		if entity.OperatorAccountId != nil {
-			t.Errorf("OperatorAccountIdShouldBeNil")
+		if entity.OperatorSri != nil {
+			t.Errorf("OperatorSriShouldBeNil")
 		}
 		if entity.OperatorIpAddress != nil {
 			t.Errorf("OperatorIpAddressShouldBeNil")
@@ -210,9 +204,6 @@ func TestToEntity(t *testing.T) {
 			RecordLevel:       "InvalidRecordLevel",
 			RecordCode:        "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{},
-			RecordDetails:     nil,
-			OperatorAccountId: nil,
-			OperatorIpAddress: nil,
 			CreatedAt:         time.Now(),
 		}
 
@@ -220,7 +211,6 @@ func TestToEntity(t *testing.T) {
 		if err == nil {
 			t.Errorf("ToEntityShouldFailWithInvalidRecordLevel")
 		}
-		// The exact error message depends on the value object implementation
 		if !strings.Contains(err.Error(), "ActivityRecordLevel") {
 			t.Errorf("ErrorShouldContainActivityRecordLevel: got '%s'", err.Error())
 		}
@@ -232,9 +222,6 @@ func TestToEntity(t *testing.T) {
 			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:        "a",
 			AffectedResources: []ActivityRecordAffectedResource{},
-			RecordDetails:     nil,
-			OperatorAccountId: nil,
-			OperatorIpAddress: nil,
 			CreatedAt:         time.Now(),
 		}
 
@@ -255,10 +242,8 @@ func TestToEntity(t *testing.T) {
 			AffectedResources: []ActivityRecordAffectedResource{
 				{SystemResourceIdentifier: "invalid-sri"},
 			},
-			RecordDetails:     nil,
-			OperatorAccountId: nil,
-			OperatorIpAddress: nil,
-			CreatedAt:         time.Now(),
+			OperatorSri: nil,
+			CreatedAt:   time.Now(),
 		}
 
 		_, err := model.ToEntity()
@@ -276,8 +261,6 @@ func TestToEntity(t *testing.T) {
 			RecordLevel:       tkValueObject.ActivityRecordLevelInfo.String(),
 			RecordCode:        "LoginSuccessful",
 			AffectedResources: []ActivityRecordAffectedResource{},
-			RecordDetails:     nil,
-			OperatorAccountId: nil,
 			OperatorIpAddress: stringPtr("invalid-ip"),
 			CreatedAt:         time.Now(),
 		}
@@ -296,10 +279,6 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func uint64Ptr(u uint64) *uint64 {
-	return &u
-}
-
 func assertStringPtrEqual(t *testing.T, actual, expected *string) {
 	t.Helper()
 	if (actual == nil && expected != nil) || (actual != nil && expected == nil) {
@@ -308,16 +287,5 @@ func assertStringPtrEqual(t *testing.T, actual, expected *string) {
 	}
 	if actual != nil && expected != nil && *actual != *expected {
 		t.Errorf("StringPtrValueMismatch: actual=%s, expected=%s", *actual, *expected)
-	}
-}
-
-func assertUint64PtrEqual(t *testing.T, actual, expected *uint64) {
-	t.Helper()
-	if (actual == nil && expected != nil) || (actual != nil && expected == nil) {
-		t.Errorf("Uint64PtrMismatch: actual=%v, expected=%v", actual, expected)
-		return
-	}
-	if actual != nil && expected != nil && *actual != *expected {
-		t.Errorf("Uint64PtrValueMismatch: actual=%d, expected=%d", *actual, *expected)
 	}
 }

@@ -11,7 +11,7 @@ type ReadActivityRecordsRequest struct {
 	RecordLevel       *tkValueObject.ActivityRecordLevel       `json:"recordLevel"`
 	RecordCode        *tkValueObject.ActivityRecordCode        `json:"recordCode"`
 	AffectedResources []tkValueObject.SystemResourceIdentifier `json:"affectedResources"`
-	OperatorAccountId *tkValueObject.AccountId                 `json:"operatorAccountId"`
+	OperatorSri       *tkValueObject.SystemResourceIdentifier  `json:"operatorSri"`
 	OperatorIpAddress *tkValueObject.IpAddress                 `json:"operatorIpAddress"`
 	CreatedBeforeAt   *tkValueObject.UnixTime                  `json:"createdBeforeAt"`
 	CreatedAfterAt    *tkValueObject.UnixTime                  `json:"createdAfterAt"`

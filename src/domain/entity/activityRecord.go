@@ -10,7 +10,7 @@ type ActivityRecord struct {
 	RecordCode        tkValueObject.ActivityRecordCode         `json:"recordCode"`
 	AffectedResources []tkValueObject.SystemResourceIdentifier `json:"affectedResources"`
 	RecordDetails     any                                      `json:"recordDetails"`
-	OperatorAccountId *tkValueObject.AccountId                 `json:"operatorAccountId"`
+	OperatorSri       *tkValueObject.SystemResourceIdentifier  `json:"operatorSri"`
 	OperatorIpAddress *tkValueObject.IpAddress                 `json:"operatorIpAddress"`
 	CreatedAt         tkValueObject.UnixTime                   `json:"createdAt"`
 }
@@ -21,7 +21,7 @@ func NewActivityRecord(
 	recordCode tkValueObject.ActivityRecordCode,
 	affectedResources []tkValueObject.SystemResourceIdentifier,
 	recordDetails any,
-	operatorAccountId *tkValueObject.AccountId,
+	operatorSri *tkValueObject.SystemResourceIdentifier,
 	operatorIpAddress *tkValueObject.IpAddress,
 	createdAt tkValueObject.UnixTime,
 ) ActivityRecord {
@@ -31,7 +31,7 @@ func NewActivityRecord(
 		RecordCode:        recordCode,
 		AffectedResources: affectedResources,
 		RecordDetails:     recordDetails,
-		OperatorAccountId: operatorAccountId,
+		OperatorSri:       operatorSri,
 		OperatorIpAddress: operatorIpAddress,
 		CreatedAt:         createdAt,
 	}

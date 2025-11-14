@@ -59,7 +59,35 @@ func (vo SystemResourceIdentifier) String() string {
 	return string(vo)
 }
 
-func NewAccountSri(accountId AccountId) SystemResourceIdentifier {
+func (vo SystemResourceIdentifier) readComponents() []string {
+	return systemResourceIdentifierRegex.FindStringSubmatch(vo.String())
+}
+
+func (vo SystemResourceIdentifier) ReadAccountId() (accountId AccountId, err error) {
+	sriComponents := vo.readComponents()
+	if len(sriComponents) < 2 {
+		return accountId, errors.New("SystemResourceIdentifierHasNoAccountId")
+	}
+	return NewAccountId(sriComponents[1])
+}
+
+func (vo SystemResourceIdentifier) ReadResourceType() (resourceType string, err error) {
+	sriComponents := vo.readComponents()
+	if len(sriComponents) < 3 {
+		return resourceType, errors.New("SystemResourceIdentifierHasNoResourceType")
+	}
+	return sriComponents[2], nil
+}
+
+func (vo SystemResourceIdentifier) ReadResourceId() (resourceId string, err error) {
+	sriComponents := vo.readComponents()
+	if len(sriComponents) < 4 {
+		return resourceId, errors.New("SystemResourceIdentifierHasNoResourceId")
+	}
+	return sriComponents[3], nil
+}
+
+func NewSriAccount(accountId AccountId) SystemResourceIdentifier {
 	return NewSystemResourceIdentifierMustCreate(
 		"sri://0:account/" + accountId.String(),
 	)

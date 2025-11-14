@@ -7,6 +7,6 @@ type CreateActivityRecord struct {
 	RecordCode        tkValueObject.ActivityRecordCode         `json:"recordCode"`
 	AffectedResources []tkValueObject.SystemResourceIdentifier `json:"affectedResources"`
 	RecordDetails     any                                      `json:"recordDetails"`
-	OperatorAccountId *tkValueObject.AccountId                 `json:"operatorAccountId"`
+	OperatorSri       *tkValueObject.SystemResourceIdentifier  `json:"operatorSri"`
 	OperatorIpAddress *tkValueObject.IpAddress                 `json:"operatorIpAddress"`
 }

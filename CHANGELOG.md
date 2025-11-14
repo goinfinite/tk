@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.1.5 - 2025/11/14
+feat: add component reader to sri vo
+fix!: replace accountId with sri on activity record feat
+docs: improve line breaks on code snippets
+
 0.1.4 - 2025/11/13
 test: add CreatedAfterAt tests for activity record query repo
 test: add panic handler middleware
