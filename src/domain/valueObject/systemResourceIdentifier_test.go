@@ -201,7 +201,7 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		}
 	})
 
-	t.Run("NewAccountSri/Valid", func(t *testing.T) {
+	t.Run("NewSriAccount/Valid", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputAccountId string
 			expectedSri    string
@@ -216,10 +216,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			if err != nil {
 				t.Errorf("UnexpectedErrorCreatingAccountIdForInput")
 			}
-			sri := NewAccountSri(accountId)
+			sri := NewSriAccount(accountId)
 			if sri.String() != testCase.expectedSri {
 				t.Errorf(
-					"UnexpectedAccountSriForAccountId: expected %s, got %s",
+					"UnexpectedSriAccountForAccountId: expected %s, got %s",
 					testCase.expectedSri, sri.String(),
 				)
 			}

@@ -87,7 +87,7 @@ func (vo SystemResourceIdentifier) ReadResourceId() (resourceId string, err erro
 	return sriComponents[3], nil
 }
 
-func NewAccountSri(accountId AccountId) SystemResourceIdentifier {
+func NewSriAccount(accountId AccountId) SystemResourceIdentifier {
 	return NewSystemResourceIdentifierMustCreate(
 		"sri://0:account/" + accountId.String(),
 	)
