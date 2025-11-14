@@ -40,9 +40,9 @@ func (repo *ActivityRecordQueryRepo) Read(
 		recordModel.RecordCode = recordCodeStr
 	}
 
-	if requestDto.OperatorAccountId != nil {
-		operatorAccountId := requestDto.OperatorAccountId.Uint64()
-		recordModel.OperatorAccountId = &operatorAccountId
+	if requestDto.OperatorSri != nil {
+		operatorSriStr := requestDto.OperatorSri.String()
+		recordModel.OperatorSri = &operatorSriStr
 	}
 
 	if requestDto.OperatorIpAddress != nil {

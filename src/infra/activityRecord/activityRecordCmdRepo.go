@@ -41,10 +41,10 @@ func (repo *ActivityRecordCmdRepo) Create(createDto tkDto.CreateActivityRecord) 
 		recordDetails = &recordDetailsStr
 	}
 
-	var operatorAccountIdPtr *uint64
-	if createDto.OperatorAccountId != nil {
-		operatorAccountId := createDto.OperatorAccountId.Uint64()
-		operatorAccountIdPtr = &operatorAccountId
+	var operatorSriPtr *string
+	if createDto.OperatorSri != nil {
+		operatorSri := createDto.OperatorSri.String()
+		operatorSriPtr = &operatorSri
 	}
 
 	var operatorIpAddressPtr *string
@@ -55,7 +55,7 @@ func (repo *ActivityRecordCmdRepo) Create(createDto tkDto.CreateActivityRecord) 
 
 	activityRecordModel := tkInfraDbModel.NewActivityRecord(
 		0, createDto.RecordLevel.String(), createDto.RecordCode.String(),
-		affectedResources, recordDetails, operatorAccountIdPtr, operatorIpAddressPtr,
+		affectedResources, recordDetails, operatorSriPtr, operatorIpAddressPtr,
 	)
 
 	return repo.trailDbSvc.Handler.Create(&activityRecordModel).Error
@@ -68,7 +68,7 @@ func (repo *ActivityRecordCmdRepo) Delete(deleteDto tkDto.DeleteActivityRecord) 
 		RecordLevel:       deleteDto.RecordLevel,
 		RecordCode:        deleteDto.RecordCode,
 		AffectedResources: deleteDto.AffectedResources,
-		OperatorAccountId: deleteDto.OperatorAccountId,
+		OperatorSri:       deleteDto.OperatorSri,
 		OperatorIpAddress: deleteDto.OperatorIpAddress,
 		CreatedBeforeAt:   deleteDto.CreatedBeforeAt,
 		CreatedAfterAt:    deleteDto.CreatedAfterAt,

@@ -326,19 +326,19 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 - **CreateActivityRecord**: Persists an activity record as a non-blocking side effect, logging errors without failing the primary operation.
 
   ```go
-  recordCode, _ := tkValueObject.NewActivityRecordCode("CreateSessionToken")
+  recordCode, _ := tkValueObject.NewActivityRecordCode("CreateAccount")
   affectedResources := []tkValueObject.SystemResourceIdentifier{
-      tkValueObject.NewSystemResourceIdentifier("sri://0:account/123"),
+      tkValueObject.NewSriAccount(2),
   }
-  operatorAccountId, _ := tkValueObject.NewAccountId(123)
+  operatorSri := tkValueObject.NewSriAccount(1)
   operatorIpAddress, _ := tkValueObject.NewIpAddress("1.1.1.1")
 
   createDto := tkDto.CreateActivityRecord{
-      RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+      RecordLevel:       tkValueObject.ActivityRecordLevelSecurity,
       RecordCode:        recordCode,
       AffectedResources: affectedResources,
-      RecordDetails:     map[string]any{"sessionId": "abc123"},
-      OperatorAccountId: &operatorAccountId,
+      RecordDetails:     map[string]any{"username": "abc123"},
+      OperatorSri:       &operatorSri,
       OperatorIpAddress: &operatorIpAddress,
   }
 
