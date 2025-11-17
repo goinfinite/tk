@@ -173,10 +173,12 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 	// process the request uniformly. To prevent repeating the same logic in every
 	// controller and to ensure the untrusted user doesn't succeed in injecting a
 	// fake operator context, we populate/overwrite these values here.
+	requestBody["operatorSri"] = nil
 	if operatorSri, assertOk := echoContext.Get("operatorSri").(tkValueObject.SystemResourceIdentifier); assertOk {
 		requestBody["operatorSri"] = operatorSri
 	}
 
+	requestBody["operatorIpAddress"] = nil
 	if operatorIpAddress, assertOk := echoContext.Get("operatorIpAddress").(tkValueObject.IpAddress); assertOk {
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}
