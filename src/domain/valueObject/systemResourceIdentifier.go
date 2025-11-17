@@ -10,7 +10,8 @@ import (
 
 var systemResourceIdentifierRegex = regexp.MustCompile(`^sri://(?P<accountId>\d{1,64}):(?P<resourceType>[a-zA-Z][\w-]{0,255})\/(?P<resourceId>([a-zA-Z0-9][\w\.\-]{0,512}|\*))$`)
 
-// SystemResourceIdentifier is a string that represents a system resource identifier.
+// SystemResourceIdentifier is a string that represents the complete identifier
+// of a system resource.
 //
 // It has the following format: sri://<accountId>:<resourceType>/<resourceId>
 //
@@ -71,20 +72,20 @@ func (vo SystemResourceIdentifier) ReadAccountId() (accountId AccountId, err err
 	return NewAccountId(sriComponents[1])
 }
 
-func (vo SystemResourceIdentifier) ReadResourceType() (resourceType string, err error) {
+func (vo SystemResourceIdentifier) ReadResourceType() (resourceType SystemResourceType, err error) {
 	sriComponents := vo.readComponents()
 	if len(sriComponents) < 3 {
 		return resourceType, errors.New("SystemResourceIdentifierHasNoResourceType")
 	}
-	return sriComponents[2], nil
+	return NewSystemResourceType(sriComponents[2])
 }
 
-func (vo SystemResourceIdentifier) ReadResourceId() (resourceId string, err error) {
+func (vo SystemResourceIdentifier) ReadResourceId() (resourceId SystemResourceId, err error) {
 	sriComponents := vo.readComponents()
 	if len(sriComponents) < 4 {
 		return resourceId, errors.New("SystemResourceIdentifierHasNoResourceId")
 	}
-	return sriComponents[3], nil
+	return NewSystemResourceId(sriComponents[3])
 }
 
 func NewSriAccount(accountId AccountId) SystemResourceIdentifier {

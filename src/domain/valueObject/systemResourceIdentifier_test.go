@@ -149,10 +149,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			if err != nil {
 				t.Errorf("UnexpectedErrorReadingResourceTypeForSri")
 			}
-			if resourceType != testCase.expectedResourceType {
+			if resourceType.String() != testCase.expectedResourceType {
 				t.Errorf(
 					"UnexpectedResourceTypeForSri: expected %s, got %s",
-					testCase.expectedResourceType, resourceType,
+					testCase.expectedResourceType, resourceType.String(),
 				)
 			}
 		}
@@ -183,10 +183,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			if err != nil {
 				t.Errorf("UnexpectedErrorReadingResourceIdForSri")
 			}
-			if resourceId != testCase.expectedResourceId {
+			if resourceId.String() != testCase.expectedResourceId {
 				t.Errorf(
 					"UnexpectedResourceIdForSri: expected %s, got %s",
-					testCase.expectedResourceId, resourceId,
+					testCase.expectedResourceId, resourceId.String(),
 				)
 			}
 		}
