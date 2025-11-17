@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/labstack/echo/v4"
 )
 
@@ -105,21 +106,18 @@ func (ApiRequestInputReader) MultipartFilesProcessor(
 //   - Other/missing Content-Type: Returns "InvalidContentType" error.
 //
 // Query parameters:
-//
-//	Query parameters are merged into the result map. When a query parameter has multiple
-//	values (e.g., ?tags=tag1&tags=tag2), only the FIRST value is captured. This is a design
-//	decision to optimize for the common single-value case (~99% of use cases).
-//
-//	For the rare cases where multiple values are needed, use a delimiter at the controller
-//	level. For example: ?tags=tag1;tag2 and split on ";" in your controller logic.
+//   - Query parameters are merged into the result map. When a query parameter has multiple
+//     values (e.g., ?tags=tag1&tags=tag2), only the FIRST value is captured. This is a design
+//     decision to optimize for the common single-value case (~99% of use cases).
+//   - For the rare cases where multiple values are needed, use a delimiter at the controller
+//     level. For example: ?tags=tag1;tag2 and split on ";" in your controller logic.
 //
 // Route Path parameters:
-//
-//	All Echo route path parameters (e.g., :id, :name) are merged into the result map.
+//   - All Echo route path parameters (e.g., :id, :name) are merged into the result map.
 //
 // Operator context (if present in Echo context):
-//   - operatorAccountId: Extracted from context key and included in the result map.
-//   - operatorIpAddress: Always populated using the real client IP address via RealIP().
+//   - operatorSri: Extracted from context key and included in the result map.
+//   - operatorIpAddress: If missing, populated using the RealIP() method.
 //
 // Returns:
 //   - A map[string]any containing all extracted request data, or
@@ -169,10 +167,28 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 		requestBody[routeParamName] = echoContext.Param(routeParamName)
 	}
 
-	if echoContext.Get("operatorAccountId") != nil {
-		requestBody["operatorAccountId"] = echoContext.Get("operatorAccountId")
+	// The `operatorSri` and `operatorIpAddress` fields in the request body are
+	// typically extracted from an authentication middleware and passed by the
+	// controller in the request body if the API relies on a liaison layer to
+	// process the request uniformly. To prevent repeating the same logic in every
+	// controller and to ensure the untrusted user doesn't succeed in injecting a
+	// fake operator context, we populate/overwrite these values here.
+	requestBody["operatorSri"] = nil
+	if operatorSri, assertOk := echoContext.Get("operatorSri").(tkValueObject.SystemResourceIdentifier); assertOk {
+		requestBody["operatorSri"] = operatorSri
 	}
-	requestBody["operatorIpAddress"] = echoContext.RealIP()
+
+	requestBody["operatorIpAddress"] = nil
+	if operatorIpAddress, assertOk := echoContext.Get("operatorIpAddress").(tkValueObject.IpAddress); assertOk {
+		requestBody["operatorIpAddress"] = operatorIpAddress
+	}
+	if requestBody["operatorIpAddress"] == nil {
+		operatorIpAddress, err := tkValueObject.NewIpAddress(echoContext.RealIP())
+		if err != nil {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidOperatorIpAddress")
+		}
+		requestBody["operatorIpAddress"] = operatorIpAddress
+	}
 
 	return requestBody, nil
 }
