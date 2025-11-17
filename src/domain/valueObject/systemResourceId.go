@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var resourceIdRegex = regexp.MustCompile(`^([a-zA-Z0-9][\w\.\-]{0,512}|\*)$`)
+var resourceIdRegex = regexp.MustCompile(`^([a-zA-Z0-9][\w\.\-]{0,511}|\*)$`)
 
 type SystemResourceId string
 

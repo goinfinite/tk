@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var systemResourceIdentifierRegex = regexp.MustCompile(`^sri://(?P<accountId>\d{1,64}):(?P<resourceType>[a-zA-Z][\w-]{0,255})\/(?P<resourceId>([a-zA-Z0-9][\w\.\-]{0,512}|\*))$`)
+var systemResourceIdentifierRegex = regexp.MustCompile(`^sri://(?P<accountId>\d{1,64}):(?P<resourceType>[a-zA-Z][\w-]{0,255})\/(?P<resourceId>([a-zA-Z0-9][\w\.\-]{0,511}|\*))$`)
 
 // SystemResourceIdentifier is a string that represents the complete identifier
 // of a system resource.
