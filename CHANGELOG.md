@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.1.6 - 2025/11/17
+feat: add system resource type and id vo
+feat: add more liaison response statuses
+fix!: replace accountId with sri on request input reader
+
 0.1.5 - 2025/11/14
 feat: add component reader to sri vo
 fix!: replace accountId with sri on activity record feat
