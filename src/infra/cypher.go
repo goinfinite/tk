@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"io"
 )
 
 const CypherNewSecretKeyLength = 32
@@ -17,7 +16,7 @@ type Cypher struct {
 
 // NewCypherSecretKey generates a cryptographically secure random 32-byte secret key,
 // encodes it in base64 for safe storage and transmission, and returns it as a string.
-// This key is suitable for AES-256 encryption and should be kept confidential.
+// This key is suitable for AES-GCM encryption and should be kept confidential.
 func NewCypherSecretKey() (string, error) {
 	secretKeyBytes := make([]byte, CypherNewSecretKeyLength)
 	if _, err := rand.Read(secretKeyBytes); err != nil {
@@ -41,29 +40,30 @@ func (cypher *Cypher) Encrypt(plainText string) (encryptedText string, err error
 
 	aesBlock, err := aes.NewCipher(decodedKey)
 	if err != nil {
-		return encryptedText, errors.New("CipherCreationError: " + err.Error())
+		return encryptedText, errors.New("AesCipherCreationError: " + err.Error())
+	}
+
+	gcmCipher, err := cipher.NewGCM(aesBlock)
+	if err != nil {
+		return encryptedText, errors.New("GcmCipherCreationError: " + err.Error())
+	}
+
+	nonceBytes := make([]byte, gcmCipher.NonceSize())
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return encryptedText, errors.New("NonceGenerationError: " + err.Error())
 	}
 
 	inputBytes := []byte(plainText)
-	outputBytes := make([]byte, aes.BlockSize+len(inputBytes))
-	ivBuffer := outputBytes[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, ivBuffer); err != nil {
-		return encryptedText, errors.New("IvGenerationError: " + err.Error())
-	}
+	cipherTextWithAuthTag := gcmCipher.Seal(nil, nonceBytes, inputBytes, nil)
+	authCipherTextWithNonce := append(nonceBytes, cipherTextWithAuthTag...)
 
-	ctrStream := cipher.NewCTR(aesBlock, ivBuffer)
-	ctrStream.XORKeyStream(outputBytes[aes.BlockSize:], inputBytes)
-
-	return base64.StdEncoding.EncodeToString(outputBytes), nil
+	return base64.StdEncoding.EncodeToString(authCipherTextWithNonce), nil
 }
 
 func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error) {
 	inputBytes, err := base64.StdEncoding.DecodeString(encryptedText)
 	if err != nil {
 		return plainText, errors.New("EncryptedTextDecodeError: " + err.Error())
-	}
-	if len(inputBytes) < aes.BlockSize {
-		return plainText, errors.New("EncryptedTextTooShort")
 	}
 
 	decodedKey, err := base64.RawURLEncoding.DecodeString(cypher.encodedSecretKey)
@@ -73,14 +73,26 @@ func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error
 
 	aesBlock, err := aes.NewCipher(decodedKey)
 	if err != nil {
-		return plainText, errors.New("CipherCreationError: " + err.Error())
+		return plainText, errors.New("AesCipherCreationError: " + err.Error())
 	}
 
-	outputBytes := make([]byte, len(inputBytes)-aes.BlockSize)
-	ivBuffer := inputBytes[:aes.BlockSize]
+	gcmCipher, err := cipher.NewGCM(aesBlock)
+	if err != nil {
+		return plainText, errors.New("GcmCipherCreationError: " + err.Error())
+	}
 
-	ctrStream := cipher.NewCTR(aesBlock, ivBuffer)
-	ctrStream.XORKeyStream(outputBytes, inputBytes[aes.BlockSize:])
+	nonceSize := gcmCipher.NonceSize()
+	if len(inputBytes) < nonceSize {
+		return plainText, errors.New("EncryptedTextTooShort")
+	}
 
-	return string(outputBytes), nil
+	noncePart := inputBytes[:nonceSize]
+	authCipherTextWithoutNonce := inputBytes[nonceSize:]
+
+	plainTextBytes, err := gcmCipher.Open(nil, noncePart, authCipherTextWithoutNonce, nil)
+	if err != nil {
+		return plainText, errors.New("DecryptionError: " + err.Error())
+	}
+
+	return string(plainTextBytes), nil
 }

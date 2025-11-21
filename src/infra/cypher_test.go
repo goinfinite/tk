@@ -47,7 +47,7 @@ func TestCypher(t *testing.T) {
 			{"LongText", strings.Repeat("a", 1000), "", false, ""},
 			{"InvalidSecretKey", "test", "encrypt", true, "SecretKeyDecodeError"},
 			{"InvalidEncryptedText", "invalid base64", "decrypt", true, "EncryptedTextDecodeError"},
-			{"EncryptedTextTooShort", "dGVzdA==", "decrypt", true, "EncryptedTextTooShort"},
+			{"EncryptedTextTooShort", "AA==", "decrypt", true, "EncryptedTextTooShort"}, // InputLengthLessThanNonceSize
 		}
 
 		for _, testCase := range testCases {
@@ -73,7 +73,10 @@ func TestCypher(t *testing.T) {
 						t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.name)
 					}
 					if testCase.expectError && err != nil && !strings.Contains(err.Error(), testCase.errorContains) {
-						t.Errorf("ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]", err.Error(), testCase.errorContains, testCase.name)
+						t.Errorf(
+							"ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]",
+							err.Error(), testCase.errorContains, testCase.name,
+						)
 					}
 
 					return

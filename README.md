@@ -158,7 +158,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   certFilePath, keyFilePath, certPairReadingErr := readThrough.CertPairFilePathsReader()
   ```
 
-- **Cypher**: Encrypt and decrypt strings using AES with CTR mode and base64 encoding.
+- **Cypher**: Encrypt and decrypt strings using AES-GCM for authenticated encryption with base64 encoding.
 
   ```go
   encodedSecretKey, keyGenerationErr := NewCypherSecretKey()
