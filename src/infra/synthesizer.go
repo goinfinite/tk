@@ -24,8 +24,7 @@ const (
 	CharsetSymbols          string = "!@#$%^&*()_+"
 )
 
-type Synthesizer struct {
-}
+type Synthesizer struct{}
 
 func (synth *Synthesizer) CharsetPresenceGuarantor(
 	originalString []byte,

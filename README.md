@@ -158,6 +158,18 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   certFilePath, keyFilePath, certPairReadingErr := readThrough.CertPairFilePathsReader()
   ```
 
+- **Cypher**: Encrypt and decrypt strings using AES-GCM for authenticated encryption with base64 encoding.
+
+  ```go
+  encodedSecretKey, keyGenerationErr := NewCypherSecretKey()
+
+  cypher, cypherCreationErr := NewCypher(encodedSecretKey)
+
+  encryptedText, encryptionErr := cypher.Encrypt("plain text")
+
+  decryptedText, decryptionErr := cypher.Decrypt(encryptedText)
+  ```
+
 - **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
 - **PaginationQueryBuilder**: Build paginated database queries with support for page number, items per page, last seen ID, sorting, and total count.
 

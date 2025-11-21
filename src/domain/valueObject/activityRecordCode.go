@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var activityRecordRegex = regexp.MustCompile(`^[a-zA-Z]\w{2,127}$`)
+var activityRecordCodeRegex = regexp.MustCompile(`^[a-zA-Z]\w{2,127}$`)
 
 type ActivityRecordCode string
 
@@ -17,7 +17,7 @@ func NewActivityRecordCode(value any) (recordCode ActivityRecordCode, err error)
 		return recordCode, errors.New("ActivityRecordCodeMustBeString")
 	}
 
-	if !activityRecordRegex.MatchString(stringValue) {
+	if !activityRecordCodeRegex.MatchString(stringValue) {
 		return recordCode, errors.New("InvalidActivityRecordCode")
 	}
 
