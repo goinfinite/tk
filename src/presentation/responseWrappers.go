@@ -40,6 +40,9 @@ const (
 	LiaisonResponseStatusUserError    LiaisonResponseStatus = "userError"
 	LiaisonResponseStatusUnauthorized LiaisonResponseStatus = "unauthorized"
 	LiaisonResponseStatusForbidden    LiaisonResponseStatus = "forbidden"
+	LiaisonResponseStatusNotFound     LiaisonResponseStatus = "notFound"
+	LiaisonResponseStatusTimeout      LiaisonResponseStatus = "timeout"
+	LiaisonResponseStatusRateLimited  LiaisonResponseStatus = "rateLimited"
 	LiaisonResponseStatusInfraError   LiaisonResponseStatus = "infraError"
 	LiaisonResponseStatusUnknownError LiaisonResponseStatus = "unknownError"
 )
@@ -94,6 +97,12 @@ func LiaisonApiResponseEmitter(
 		httpStatus = http.StatusUnauthorized
 	case LiaisonResponseStatusForbidden:
 		httpStatus = http.StatusForbidden
+	case LiaisonResponseStatusNotFound:
+		httpStatus = http.StatusNotFound
+	case LiaisonResponseStatusTimeout:
+		httpStatus = http.StatusRequestTimeout
+	case LiaisonResponseStatusRateLimited:
+		httpStatus = http.StatusTooManyRequests
 	case LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError:
 		httpStatus = http.StatusInternalServerError
 	}
@@ -108,7 +117,9 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	switch liaisonResponse.Status {
 	case LiaisonResponseStatusMultiStatus, LiaisonResponseStatusUserError,
 		LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError,
-		LiaisonResponseStatusUnauthorized, LiaisonResponseStatusForbidden:
+		LiaisonResponseStatusUnauthorized, LiaisonResponseStatusForbidden,
+		LiaisonResponseStatusNotFound, LiaisonResponseStatusTimeout,
+		LiaisonResponseStatusRateLimited:
 		exitCode = 1
 	default:
 		exitCode = 0
