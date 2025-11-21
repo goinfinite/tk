@@ -47,7 +47,8 @@ func TestCypher(t *testing.T) {
 			{"LongText", strings.Repeat("a", 1000), "", false, ""},
 			{"InvalidSecretKey", "test", "encrypt", true, "SecretKeyDecodeError"},
 			{"InvalidEncryptedText", "invalid base64", "decrypt", true, "EncryptedTextDecodeError"},
-			{"EncryptedTextTooShort", "AA==", "decrypt", true, "EncryptedTextTooShort"}, // InputLengthLessThanNonceSize
+			{"EncryptedTextTooShort", "AA==", "decrypt", true, "EncryptedTextTooShort"},                           // InputLengthLessThanNonceSize
+			{"EncryptedTextTooShortForAuthTag", "YWJjZGVmZ2hpamtsbQ==", "decrypt", true, "EncryptedTextTooShort"}, // InputLengthBetweenNonceSizeAndMinSize
 		}
 
 		for _, testCase := range testCases {

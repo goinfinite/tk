@@ -20,7 +20,7 @@ type Cypher struct {
 func NewCypherSecretKey() (string, error) {
 	secretKeyBytes := make([]byte, CypherNewSecretKeyLength)
 	if _, err := rand.Read(secretKeyBytes); err != nil {
-		return "", err
+		return "", errors.New("SecretKeyGenerationError: " + err.Error())
 	}
 	return base64.RawURLEncoding.EncodeToString(secretKeyBytes), nil
 }
@@ -82,7 +82,8 @@ func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error
 	}
 
 	nonceSize := gcmCipher.NonceSize()
-	if len(inputBytes) < nonceSize {
+	minInputSize := nonceSize + gcmCipher.Overhead()
+	if len(inputBytes) < minInputSize {
 		return plainText, errors.New("EncryptedTextTooShort")
 	}
 
