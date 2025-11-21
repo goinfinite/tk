@@ -102,8 +102,8 @@ func TestEnvsInspectorInspect(t *testing.T) {
 			t.Errorf("EnvVarNotAppendedToFile: DB_PASSWORD not found in file")
 		}
 
-		if len(dbPassword) != 32 {
-			t.Errorf("AutoFilledPasswordWrongLength: expected 32, got %d", len(dbPassword))
+		if len(dbPassword) < 32 {
+			t.Errorf("AutoFilledPasswordWrongLength: expected >= 32, got %d", len(dbPassword))
 		}
 	})
 
