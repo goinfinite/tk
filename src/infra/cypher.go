@@ -11,7 +11,7 @@ import (
 const CypherNewSecretKeyLength = 32
 
 type Cypher struct {
-	encodedSecretKey string
+	decodedSecretKeyBytes []byte
 }
 
 // NewCypherSecretKey generates a cryptographically secure random 32-byte secret key,
@@ -26,19 +26,23 @@ func NewCypherSecretKey() (string, error) {
 }
 
 // NewCypher creates a new Cypher instance with the provided base64-encoded secret key.
-// The key must be a valid base64 string that decodes to 16, 24, or 32 bytes for AES encryption.
-// Use NewCypherSecretKey to generate a suitable key if needed.
-func NewCypher(encodedSecretKey string) *Cypher {
-	return &Cypher{encodedSecretKey: encodedSecretKey}
+// The key must be a valid base64 string that decodes to exactly 16, 24, or 32 bytes
+// for AES encryption. Use NewCypherSecretKey to generate a suitable key if needed.
+// Returns an error if the key is invalid, providing fail-fast validation.
+func NewCypher(encodedSecretKey string) (*Cypher, error) {
+	decodedKeyBytes, err := base64.RawURLEncoding.DecodeString(encodedSecretKey)
+	if err != nil {
+		return nil, errors.New("SecretKeyDecodeError: " + err.Error())
+	}
+	keyLen := len(decodedKeyBytes)
+	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+		return nil, errors.New("InvalidSecretKeyLength")
+	}
+	return &Cypher{decodedSecretKeyBytes: decodedKeyBytes}, nil
 }
 
 func (cypher *Cypher) Encrypt(plainText string) (encryptedText string, err error) {
-	decodedKey, err := base64.RawURLEncoding.DecodeString(cypher.encodedSecretKey)
-	if err != nil {
-		return encryptedText, errors.New("SecretKeyDecodeError: " + err.Error())
-	}
-
-	aesBlock, err := aes.NewCipher(decodedKey)
+	aesBlock, err := aes.NewCipher(cypher.decodedSecretKeyBytes)
 	if err != nil {
 		return encryptedText, errors.New("AesCipherCreationError: " + err.Error())
 	}
@@ -66,12 +70,7 @@ func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error
 		return plainText, errors.New("EncryptedTextDecodeError: " + err.Error())
 	}
 
-	decodedKey, err := base64.RawURLEncoding.DecodeString(cypher.encodedSecretKey)
-	if err != nil {
-		return plainText, errors.New("SecretKeyDecodeError: " + err.Error())
-	}
-
-	aesBlock, err := aes.NewCipher(decodedKey)
+	aesBlock, err := aes.NewCipher(cypher.decodedSecretKeyBytes)
 	if err != nil {
 		return plainText, errors.New("AesCipherCreationError: " + err.Error())
 	}

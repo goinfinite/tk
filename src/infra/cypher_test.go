@@ -34,6 +34,11 @@ func TestCypher(t *testing.T) {
 	})
 
 	t.Run("Cypher", func(t *testing.T) {
+		cypher, err := NewCypher(encodedSecretKey)
+		if err != nil {
+			t.Fatalf("CreateCypherInstanceFailed: %v", err)
+		}
+
 		testCases := []struct {
 			name          string
 			input         string
@@ -45,7 +50,7 @@ func TestCypher(t *testing.T) {
 			{"EmptyText", "", "", false, ""},
 			{"SpecialChars", "test@123!#$%", "", false, ""},
 			{"LongText", strings.Repeat("a", 1000), "", false, ""},
-			{"InvalidSecretKey", "test", "encrypt", true, "SecretKeyDecodeError"},
+			{"InvalidSecretKey", "invalid!", "encrypt", true, "SecretKeyDecodeError"},
 			{"InvalidEncryptedText", "invalid base64", "decrypt", true, "EncryptedTextDecodeError"},
 			{"EncryptedTextTooShort", "AA==", "decrypt", true, "EncryptedTextTooShort"},                           // InputLengthLessThanNonceSize
 			{"EncryptedTextTooShortForAuthTag", "YWJjZGVmZ2hpamtsbQ==", "decrypt", true, "EncryptedTextTooShort"}, // InputLengthBetweenNonceSizeAndMinSize
@@ -53,18 +58,18 @@ func TestCypher(t *testing.T) {
 
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
-				invalidEncodedSecretKey := "invalid base64 key"
-				cypher := NewCypher(encodedSecretKey)
-				if testCase.name == "InvalidSecretKey" {
-					cypher = NewCypher(invalidEncodedSecretKey)
-				}
 				if testCase.expectError {
 					var err error
-					if testCase.operationType == "encrypt" {
+					switch testCase.operationType {
+					case "encrypt":
 						_, err = cypher.Encrypt(testCase.input)
-					}
-					if testCase.operationType == "decrypt" {
+						if testCase.name == "InvalidSecretKey" {
+							_, err = NewCypher(testCase.input)
+						}
+					case "decrypt":
 						_, err = cypher.Decrypt(testCase.input)
+					default:
+						t.Errorf("InvalidOperationType: %s", testCase.operationType)
 					}
 
 					if testCase.expectError && err == nil {

@@ -163,7 +163,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   ```go
   encodedSecretKey, keyGenerationErr := NewCypherSecretKey()
 
-  cypher := NewCypher(encodedSecretKey)
+  cypher, cypherCreationErr := NewCypher(encodedSecretKey)
 
   encryptedText, encryptionErr := cypher.Encrypt("plain text")
 
