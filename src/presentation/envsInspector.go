@@ -54,18 +54,18 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	if !fileClerk.FileExists(envFilePathStr) {
 		err = fileClerk.CreateFile(envFilePathStr)
 		if err != nil {
-			return errors.New("EnvsInspectorEnvCreateFileError")
+			return errors.New("EnvsInspectorCreateEnvFileError: " + err.Error())
 		}
 	}
 	envFileWritePermissions := int(0600)
 	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileWritePermissions)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvUpdateFileWritePermissionsError")
+		return errors.New("EnvsInspectorUpdateEnvFileWritePermissionsError: " + err.Error())
 	}
 
 	err = godotenv.Load(envFilePathStr)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvLoadError: " + err.Error())
+		return errors.New("EnvsInspectorLoadEnvFileError: " + err.Error())
 	}
 
 	missingRequiredEnvVars := []string{}
@@ -79,6 +79,12 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 			missingRequiredEnvVars = append(missingRequiredEnvVars, envVarName)
 			continue
 		}
+	}
+
+	for _, envVarName := range envsInspector.autoFillableEnvVars {
+		if os.Getenv(envVarName) != "" {
+			continue
+		}
 
 		cryptographicallySecureSecretKey, err := tkInfra.NewCypherSecretKey()
 		if err != nil {
@@ -88,7 +94,7 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		envVarStr := envVarName + "=" + cryptographicallySecureSecretKey + "\n"
 		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
 		if err != nil {
-			return errors.New("EnvsInspectorEnvWriteFileError")
+			return errors.New("EnvsInspectorWriteEnvFileError: " + err.Error())
 		}
 
 		os.Setenv(envVarName, cryptographicallySecureSecretKey)
@@ -97,7 +103,7 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	envFileReadOnlyPermissions := int(0400)
 	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileReadOnlyPermissions)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvUpdateFileReadOnlyPermissionsError")
+		return errors.New("EnvsInspectorUpdateEnvFileReadOnlyPermissionsError: " + err.Error())
 	}
 
 	if len(missingRequiredEnvVars) > 0 {
