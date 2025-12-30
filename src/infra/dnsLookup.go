@@ -28,8 +28,8 @@ func NewDnsLookup(
 	}
 
 	return &DnsLookup{
-		primaryResolver:   "8.8.8.8",
-		secondaryResolver: "185.228.168.168",
+		primaryResolver:   tkValueObject.IpAddress("8.8.8.8"),
+		secondaryResolver: tkValueObject.IpAddress("185.228.168.168"),
 		queryTimeoutSec:   5,
 		dialTimeoutMs:     200,
 		hostname:          hostname,
