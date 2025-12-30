@@ -29,28 +29,35 @@ func ReadServerPrivateIpAddress() (ipAddress tkValueObject.IpAddress, err error)
 }
 
 func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) {
-	rawIpAddress, err := NewShell(ShellSettings{
-		Command: "dig", Args: []string{"+short", "TXT", "o-o.myaddr.l.google.com", "@ns1.google.com"},
-	}).Run()
-	if err != nil || rawIpAddress == "" {
-		rawIpAddress, err = NewShell(ShellSettings{
-			Command: "dig", Args: []string{"+short", "-c", "CH", "-t", "TXT", "whoami.cloudflare", "@1.1.1.1"},
-		}).Run()
-		if err != nil {
-			return ipAddress, err
-		}
-	}
-
-	rawIpAddress = strings.Trim(rawIpAddress, `"`)
-	rawIpAddress = strings.TrimSpace(rawIpAddress)
-	if rawIpAddress == "" {
-		return ipAddress, errors.New("PublicIpAddressNotFound")
-	}
-
-	ipAddress, err = tkValueObject.NewIpAddress(rawIpAddress)
+	primaryResolverHostname, err := tkValueObject.NewUnixHostname("whoami.ds.akahelp.net")
 	if err != nil {
 		return ipAddress, err
 	}
+	primaryResolver := NewDnsLookup(primaryResolverHostname, &tkValueObject.DnsRecordTypeTXT)
+	primaryResolverResults, primaryResolverError := primaryResolver.Execute()
+	if primaryResolverError == nil && len(primaryResolverResults) > 0 {
+		// ExpectedFormat: "ip1.2.3.4"
+		for _, rawRecord := range primaryResolverResults {
+			if !strings.Contains(rawRecord, "ip") {
+				continue
+			}
 
-	return ipAddress, nil
+			rawRecord = strings.ReplaceAll(rawRecord, "ip", "")
+			ipAddress, err = tkValueObject.NewIpAddress(rawRecord)
+			if err == nil {
+				return ipAddress, nil
+			}
+		}
+	}
+
+	secondaryResolver := NewShell(ShellSettings{
+		Command: "curl",
+		Args:    []string{"-sL", "https://goinfinite.net/ip"},
+	})
+	secondaryResolverResults, secondaryResolverError := secondaryResolver.Run()
+	if secondaryResolverError == nil && len(secondaryResolverResults) > 0 {
+		return tkValueObject.NewIpAddress(secondaryResolverResults)
+	}
+
+	return ipAddress, errors.New("PublicIpAddressNotFound")
 }
