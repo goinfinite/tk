@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.1.8 - 2025/12/30
+feat: add pure go dns lookup
+feat: add user agent and dns record type value objects
+refactor: replace dig with DnsLookup and curl fallback (serverIpAddress)
+
 0.1.7 - 2025/11/21
 feat: add cypher infra helper
 fix: add missing suffix on record code regex
