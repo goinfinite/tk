@@ -42,7 +42,7 @@ func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) 
 				continue
 			}
 
-			rawRecord = strings.ReplaceAll(rawRecord, "ip", "")
+			rawRecord = strings.TrimPrefix(rawRecord, "ip")
 			ipAddress, err = tkValueObject.NewIpAddress(rawRecord)
 			if err == nil {
 				return ipAddress, nil
@@ -51,8 +51,9 @@ func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) 
 	}
 
 	secondaryResolver := NewShell(ShellSettings{
-		Command: "curl",
-		Args:    []string{"-sL", "https://goinfinite.net/ip"},
+		Command:              "curl",
+		Args:                 []string{"-sL", "https://goinfinite.net/ip"},
+		ExecutionTimeoutSecs: 3,
 	})
 	secondaryResolverResults, secondaryResolverError := secondaryResolver.Run()
 	if secondaryResolverError == nil && len(secondaryResolverResults) > 0 {
