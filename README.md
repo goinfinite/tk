@@ -144,6 +144,15 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   publicIpAddress, publicIpReadingErr := ReadServerPublicIpAddress()
   ```
 
+- **DnsLookup**: Perform DNS queries for various record types using custom resolvers with fallback support.
+
+  ```go
+  hostname, _ := tkValueObject.NewUnixHostname("example.com")
+  dnsLookup := NewDnsLookup(hostname, &tkValueObject.DnsRecordTypeA)
+
+  dnsRecords, lookupErr := dnsLookup.Execute()
+  ```
+
 - **TrustedIpsReader**: Parse a comma-separated list of trusted IP addresses from the `TRUSTED_IPS` environment variable.
 
   ```go
