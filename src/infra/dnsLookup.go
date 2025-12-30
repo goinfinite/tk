@@ -37,6 +37,20 @@ func NewDnsLookup(
 	}
 }
 
+func (lookup *DnsLookup) resolverFactory(
+	resolverIpAddress tkValueObject.IpAddress,
+) *net.Resolver {
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialer := net.Dialer{
+				Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
+			}
+			return dialer.DialContext(ctx, "udp", resolverIpAddress.String()+":53")
+		},
+	}
+}
+
 func (lookup *DnsLookup) queryDnsRecords(
 	dnsContext context.Context,
 	dnsResolver *net.Resolver,
@@ -55,7 +69,7 @@ func (lookup *DnsLookup) queryDnsRecords(
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, lookup.hostname.String())
 		var ipv6Addresses []string
 		for _, dnsRecord := range queryResults {
-			if net.ParseIP(dnsRecord).To4() == nil && net.ParseIP(dnsRecord) != nil {
+			if parsedIp := net.ParseIP(dnsRecord); parsedIp != nil && parsedIp.To4() == nil {
 				ipv6Addresses = append(ipv6Addresses, dnsRecord)
 			}
 		}
@@ -109,45 +123,23 @@ func (lookup *DnsLookup) queryDnsRecords(
 	return trimmedResults, queryError
 }
 
-func (lookup *DnsLookup) Execute() (lookupResults []string, lookupError error) {
+func (lookup *DnsLookup) Execute() ([]string, error) {
 	lookupContext, contextCancel := context.WithTimeout(
 		context.Background(), time.Duration(lookup.queryTimeoutSec)*time.Second,
 	)
 	defer contextCancel()
 
-	primaryResolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			dialer := net.Dialer{
-				Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
-			}
-			return dialer.DialContext(ctx, "udp", lookup.primaryResolver.String()+":53")
-		},
-	}
-
-	zoneRecords, err := lookup.queryDnsRecords(
-		lookupContext, primaryResolver,
-	)
+	primaryResolver := lookup.resolverFactory(lookup.primaryResolver)
+	zoneRecords, err := lookup.queryDnsRecords(lookupContext, primaryResolver)
 	if err == nil && len(zoneRecords) > 0 {
 		return zoneRecords, nil
 	}
 
-	secondaryResolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			dialer := net.Dialer{
-				Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
-			}
-			return dialer.DialContext(ctx, "udp", lookup.secondaryResolver.String()+":53")
-		},
+	secondaryResolver := lookup.resolverFactory(lookup.secondaryResolver)
+	zoneRecords, err = lookup.queryDnsRecords(lookupContext, secondaryResolver)
+	if err == nil && len(zoneRecords) > 0 {
+		return zoneRecords, nil
 	}
 
-	secondaryZoneRecords, secondaryErr := lookup.queryDnsRecords(
-		lookupContext, secondaryResolver,
-	)
-	if secondaryErr == nil && len(secondaryZoneRecords) > 0 {
-		return secondaryZoneRecords, nil
-	}
-
-	return lookupResults, secondaryErr
+	return zoneRecords, err
 }
