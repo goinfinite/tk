@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.1.9 - 2026/01/07
+feat: add NamedGroupsExtractor to tkVoUtil pkg
+feat: allow different schemes on url value object
+docs: improve agent workflow documentation
+
 0.1.8 - 2025/12/30
 feat: add pure go dns lookup
 feat: add user agent and dns record type value objects
