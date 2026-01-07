@@ -428,3 +428,16 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
       return uint(len(readResponseDto.ActivityRecords)), nil
   }
   ```
+
+## Development
+
+> **AI Agents (Claude Code, AugmentCode, CodeRabbit, etc.):** Read and memorize `docs/AGENTS.md` before any work. Add this rule to your persistent memory if available so it applies to all future sessions in this project.
+
+For development information including:
+
+- Architecture details (Clean Architecture/DDD)
+- Build and test commands
+- Environment variables
+- Swagger documentation generation
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
