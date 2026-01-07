@@ -8,7 +8,7 @@ description: Code style, Go-specific rules, and testing guidelines.
 ## Before Starting
 
 1. **Check branch**: Ensure you're on an appropriate branch (`feat-*`, `fix-*`, `refactor-*`, `docs-*`, etc.)
-2. **Sync dependencies**: Run `go mod tidy` to ensure go.mod matches source code
+2. **Sync dependencies**: Run `go get -u` and `go mod tidy` to ensure go.mod matches source code
 
 ## Critical Rules
 
@@ -54,6 +54,9 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Value objects, infrastructure, and use cases with complex logic **MUST** have unit tests
 - Unit tests SHOULD use testCases as much as possible
 - Unit tests error messages SHOULD be descriptive and provide context about what operation failed
+- Use `t.Fatalf` to interrupt tests immediately on critical errors (setup failures, unexpected errors, assertion failures)
+- Use `t.Errorf` only in for loops or situations where the test should continue running after an error
+- When an error prevents the test from proceeding meaningfully, always use `t.Fatalf` instead of `t.Errorf`
 
 ## Layer-Specific Rules
 
