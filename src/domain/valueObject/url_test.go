@@ -68,6 +68,7 @@ func TestNewUrl(t *testing.T) {
 			{[]string{"http://example.com"}, Url(""), true},
 			{"http://localhost:65536", Url(""), true},
 			{"http://localhost:-1", Url(""), true},
+			{"http://localhost:999999", Url(""), true},
 			// cSpell:enable
 		}
 
