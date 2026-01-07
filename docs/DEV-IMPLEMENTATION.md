@@ -31,7 +31,7 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Variable names MUST convey the intention or purpose rather than describing their content
 - Variable names SHOULD reflect the primary flow, not conditional outcomes
 - Use purposeful named return values whenever the method returns multiple values
-- Boolean variables SHOULD start with "Is", "Should", "Has" etc prefixes
+- Boolean variables SHOULD start with "Is", "Should", "Has" etc. prefixes
 - Prefer "Fail", "Error", "Invalid" suffixes instead of "FailedTo", "Cannot", "UnableTo" prefixes
 - Prefer "Read" prefix or "Factory" suffix instead of generic "Get" suffix
 - Prefer suffixes instead of prefixes for struct and method names to preserve alphabetical order context
@@ -45,7 +45,7 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Prefer slog.Error or slog.Debug instead of log.Printf depending on the gravity of the log
 - `slog.Any` MUST NOT be used with `slog.Error` (user-facing logs); allowed only with `slog.Debug`
 - When using struct constructors (New), use multiple arguments per line
-- Sequential method parameters of the same type SHOULD be combined together on the same line
+- Sequential method parameters of the same type SHOULD be grouped on the same line
 - Auxiliary methods SHOULD be ordered according to their appearance/call order in the main method
 - Avoid unnecessary line breaks, especially in simple struct initializations that fit on a single line
 

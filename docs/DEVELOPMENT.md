@@ -18,7 +18,7 @@ When working on this project, read the appropriate documentation for your curren
 
 The codebase follows Clean Architecture (Domain-Driven Design):
 
-```
+```txt
 src/
 ├── domain/          # Business logic (entities, use cases, DTOs, value objects, repository interfaces)
 ├── infra/           # Infrastructure implementations (database, external APIs, repositories)

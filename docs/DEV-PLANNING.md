@@ -18,7 +18,7 @@ Before writing any code, go through this mental checklist:
 ### 1. Understand Current State ("Before")
 
 - What exists today? How does it work?
-- What are the limitations or problems with the current approach?
+- Which limitations or problems exist with the current approach?
 - What code/files will be affected?
 - Read relevant `.context.md` files for business rules
 
