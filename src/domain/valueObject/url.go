@@ -3,6 +3,7 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
+	"strconv"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -24,6 +25,17 @@ func NewUrl(value any) (url Url, err error) {
 	namedGroupsValuesMap := tkVoUtil.NamedGroupsExtractor(urlRegex, stringValue)
 	if namedGroupsValuesMap["scheme"] == "" {
 		stringValue = "https://" + stringValue
+	}
+
+	if namedGroupsValuesMap["port"] != "" {
+		networkPort, err := strconv.Atoi(namedGroupsValuesMap["port"])
+		if err != nil {
+			return url, errors.New("InvalidNetworkPort")
+		}
+
+		if networkPort < 0 || networkPort > 65535 {
+			return url, errors.New("InvalidNetworkPort")
+		}
 	}
 
 	return Url(stringValue), nil

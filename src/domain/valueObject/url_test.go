@@ -53,6 +53,8 @@ func TestNewUrl(t *testing.T) {
 			{"INSERT INTO users (name, email) VALUES ('admin', 'admin@example.com');", Url(""), true},
 			{"sudo rm -r /", Url(""), true},
 			{[]string{"http://example.com"}, Url(""), true},
+			{"http://localhost:65536", Url(""), true},
+			{"http://localhost:-1", Url(""), true},
 			// cSpell:enable
 		}
 
