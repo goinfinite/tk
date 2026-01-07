@@ -24,9 +24,8 @@ Before writing any code, go through this mental checklist:
 
 ### 2. Define Target State ("After")
 
-- What will be possible after this implementation?
-- What behavior changes will users/developers see?
-- What new capabilities will exist?
+- What behavior and capability changes will users/developers see?
+- What will become possible?
 - Write this explicitly: "After completion, users will be able to..."
 
 ### 3. Identify the Delta
@@ -91,7 +90,7 @@ When a plan is too large:
 
 ## Plan Storage
 
-Completed plans are archived in `docs/history/` with naming convention:
+Completed plans are archived in `docs/history/` (create if it doesn't exist) with naming convention:
 
 ```
 docs/history/X-Y-Z-phase-N-short-description.md
@@ -143,6 +142,7 @@ Each PR increments the project version (semver):
 Update these files:
 
 - `src/infra/envs/envs.go`: Update project version constant
+- `src/presentation/api/api.go`: Update project version on swagger info
 - `CHANGELOG.md`: Add entry describing what changed in this version
 
 ## General Planning Rules
