@@ -4,11 +4,12 @@ import (
 	"errors"
 	"regexp"
 	"strconv"
+	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var urlRegex = regexp.MustCompile(`^(?P<scheme>(https?|wss?|grpcs?|tcp|udp|ftp|mailto|file|data|irc):\/\/)?(?P<hostname>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9][a-z0-9-]{0,61}[a-z0-9])*)(:(?P<port>\d{1,6}))?(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?$`)
+var urlRegex = regexp.MustCompile(`^(?:(?:mailto:)?(?P<mailUsername>[a-z0-9._%+-]+)@(?P<mailHostname>[a-z0-9.-]+\.[a-z]{2,})|(?:tel:)?(?P<phone>\+?\d{1,12}-?\d{0,12})|(?:(?P<scheme>(?:https?|wss?|grpcs?|tcp|udp|ftp|ftps|file|data|irc|imap|nntp|pop3|smtp|telnet):\/\/)?(?:(?P<userAuthUsername>[a-z0-9._~%!$&'()*+,;=-]+)(?::(?P<userAuthPassword>[a-z0-9._~%!$&'()*+,;=:-]+))?@)?(?P<hostname>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9][a-z0-9-]{0,61}[a-z0-9])*)(?::(?P<networkPort>\d{1,6}))?(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?))$`)
 
 type Url string
 
@@ -24,11 +25,21 @@ func NewUrl(value any) (url Url, err error) {
 
 	namedGroupsValuesMap := tkVoUtil.NamedGroupsExtractor(urlRegex, stringValue)
 	if namedGroupsValuesMap["scheme"] == "" {
-		stringValue = "https://" + stringValue
+		if namedGroupsValuesMap["hostname"] != "" {
+			stringValue = "https://" + stringValue
+		}
+
+		if namedGroupsValuesMap["phone"] != "" && !strings.HasPrefix(stringValue, "tel:") {
+			stringValue = "tel:" + stringValue
+		}
+
+		if namedGroupsValuesMap["mailUsername"] != "" && !strings.HasPrefix(stringValue, "mailto:") {
+			stringValue = "mailto:" + stringValue
+		}
 	}
 
-	if namedGroupsValuesMap["port"] != "" {
-		networkPort, err := strconv.Atoi(namedGroupsValuesMap["port"])
+	if namedGroupsValuesMap["networkPort"] != "" {
+		networkPort, err := strconv.Atoi(namedGroupsValuesMap["networkPort"])
 		if err != nil {
 			return url, errors.New("InvalidNetworkPort")
 		}
