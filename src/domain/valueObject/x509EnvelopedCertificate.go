@@ -2,9 +2,13 @@ package tkValueObject
 
 import (
 	"errors"
-	"strings"
+	"regexp"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
+)
+
+var x509EnvelopedCertificateRegex = regexp.MustCompile(
+	`^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$`,
 )
 
 type X509EnvelopedCertificate string
@@ -17,12 +21,8 @@ func NewX509EnvelopedCertificate(
 		return envelopedCert, errors.New("X509EnvelopedCertificateMustBeString")
 	}
 
-	if !strings.Contains(stringValue, "-----BEGIN CERTIFICATE-----") {
-		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateNoBeginMarker")
-	}
-
-	if !strings.Contains(stringValue, "-----END CERTIFICATE-----") {
-		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateNoEndMarker")
+	if !x509EnvelopedCertificateRegex.MatchString(stringValue) {
+		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateFormat")
 	}
 
 	if len(stringValue) < 100 {

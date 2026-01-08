@@ -35,6 +35,26 @@ CgKCAQEAyWm
 				X509EnvelopedCertificate(""),
 				true,
 			},
+			{
+				"malicious payload" + validCert,
+				X509EnvelopedCertificate(""),
+				true,
+			},
+			{
+				validCert + "malicious payload",
+				X509EnvelopedCertificate(""),
+				true,
+			},
+			{
+				"<script>alert('xss')</script>\n" + validCert,
+				X509EnvelopedCertificate(""),
+				true,
+			},
+			{
+				validCert + "\n; rm -rf /",
+				X509EnvelopedCertificate(""),
+				true,
+			},
 			{123, X509EnvelopedCertificate(""), true},
 			{nil, X509EnvelopedCertificate(""), true},
 		}
