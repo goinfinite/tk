@@ -124,10 +124,10 @@ func NewX509CertificateFromEnvelopedCertificate(
 	}
 
 	var subjectCommonNamePtr *tkValueObject.X509SubjectName
-	subjectCommonNameStr := stdlibCert.Subject.CommonName
-	if subjectCommonNameStr != "" {
+	rawSubjectCommonName := stdlibCert.Subject.CommonName
+	if rawSubjectCommonName != "" {
 		subjectCommonName, err := tkValueObject.NewX509SubjectName(
-			subjectCommonNameStr,
+			rawSubjectCommonName,
 		)
 		if err != nil {
 			return x509CertEntity, err
@@ -139,6 +139,10 @@ func NewX509CertificateFromEnvelopedCertificate(
 	for _, dnsName := range stdlibCert.DNSNames {
 		subjectAltName, err := tkValueObject.NewX509SubjectName(dnsName)
 		if err != nil {
+			slog.Debug(
+				"SkipInvalidSubjectAltName",
+				slog.String("dnsName", dnsName),
+			)
 			continue
 		}
 		subjectAltNames = append(subjectAltNames, subjectAltName)
@@ -151,10 +155,10 @@ func NewX509CertificateFromEnvelopedCertificate(
 	}
 
 	var issuerCommonNamePtr *tkValueObject.X509SubjectName
-	issuerCommonNameStr := stdlibCert.Issuer.CommonName
-	if issuerCommonNameStr != "" {
+	rawIssuerCommonName := stdlibCert.Issuer.CommonName
+	if rawIssuerCommonName != "" {
 		issuerCommonName, err := tkValueObject.NewX509SubjectName(
-			issuerCommonNameStr,
+			rawIssuerCommonName,
 		)
 		if err != nil {
 			return x509CertEntity, err
