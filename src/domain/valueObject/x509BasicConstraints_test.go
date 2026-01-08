@@ -32,43 +32,30 @@ func TestNewX509BasicConstraints(t *testing.T) {
 			if testCase.expectError && err == nil {
 				t.Errorf(
 					"MissingExpectedError: [isAuthority=%v, maxPath=%v]",
-					testCase.isAuthority,
-					testCase.maxPathLength,
+					testCase.isAuthority, testCase.maxPathLength,
 				)
 			}
 
 			if !testCase.expectError && err != nil {
 				t.Fatalf(
 					"UnexpectedError: '%s' [isAuthority=%v, maxPath=%v]",
-					err.Error(),
-					testCase.isAuthority,
-					testCase.maxPathLength,
+					err.Error(), testCase.isAuthority, testCase.maxPathLength,
 				)
 			}
 
 			if !testCase.expectError {
 				if actualOutput.IsAuthority != testCase.isAuthority {
-					t.Errorf(
-						"UnexpectedIsAuthority: '%v' vs '%v'",
-						actualOutput.IsAuthority,
-						testCase.isAuthority,
-					)
+					t.Errorf("UnexpectedIsAuthority: '%v' vs '%v'", actualOutput.IsAuthority, testCase.isAuthority)
 				}
 
 				if testCase.maxPathLength == nil &&
 					actualOutput.MaxPathLength != nil {
-					t.Errorf(
-						"UnexpectedMaxPathLength: expected nil, got %v",
-						*actualOutput.MaxPathLength,
-					)
+					t.Errorf("UnexpectedMaxPathLength: expected nil, got %v", *actualOutput.MaxPathLength)
 				}
 
 				if testCase.maxPathLength != nil &&
 					actualOutput.MaxPathLength == nil {
-					t.Errorf(
-						"UnexpectedMaxPathLength: expected %v, got nil",
-						*testCase.maxPathLength,
-					)
+					t.Errorf("UnexpectedMaxPathLength: expected %v, got nil", *testCase.maxPathLength)
 				}
 
 				if testCase.maxPathLength != nil &&
@@ -76,8 +63,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 					*actualOutput.MaxPathLength != *testCase.maxPathLength {
 					t.Errorf(
 						"UnexpectedMaxPathLength: '%v' vs '%v'",
-						*actualOutput.MaxPathLength,
-						*testCase.maxPathLength,
+						*actualOutput.MaxPathLength, *testCase.maxPathLength,
 					)
 				}
 			}

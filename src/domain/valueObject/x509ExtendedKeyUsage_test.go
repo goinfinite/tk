@@ -30,27 +30,18 @@ func TestNewX509ExtendedKeyUsage(t *testing.T) {
 			actualOutput, err := NewX509ExtendedKeyUsage(testCase.inputValue)
 
 			if testCase.expectError && err == nil {
-				t.Errorf(
-					"MissingExpectedError: [%v]",
-					testCase.inputValue,
-				)
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf(
-					"UnexpectedError: '%s' [%v]",
-					err.Error(),
-					testCase.inputValue,
-				)
+				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
 				t.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
-					actualOutput,
-					testCase.expectedOutput,
-					testCase.inputValue,
+					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
 			}
 		}
@@ -70,11 +61,7 @@ func TestNewX509ExtendedKeyUsage(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
-					"UnexpectedOutputValue: '%v' vs '%v'",
-					actualOutput,
-					testCase.expectedOutput,
-				)
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
 			}
 		}
 	})

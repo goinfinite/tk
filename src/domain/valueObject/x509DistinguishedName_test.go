@@ -92,11 +92,7 @@ func TestNewX509DistinguishedName(t *testing.T) {
 			actualOutput := testCase.dn.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
-					"UnexpectedOutputValue: '%v' vs '%v'",
-					actualOutput,
-					testCase.expectedOutput,
-				)
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
 			}
 		}
 	})
