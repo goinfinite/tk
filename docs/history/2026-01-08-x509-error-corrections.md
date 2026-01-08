@@ -265,18 +265,21 @@
 ### Issues Found:
 
 1. **Variable Naming - Unvalidated Data Without "raw" Prefix**
+
    - **Error**: `organizationalUnitStr` used for unvalidated data from pkix.Name
    - **Rule Violated**: Unvalidated values have the "raw" prefix; "Str" suffix only for .String() method results
    - **Fix**: `organizationalUnitStr` → `rawOrganizationalUnit`
    - **Lesson**: "raw" prefix signals unvalidated data; "Str" suffix signals already-validated value object .String() result
 
 2. **Missing slog.Debug in x509DistinguishedName.go Loop**
+
    - **Error**: Silently skipping invalid organizational units with `continue` (line 54)
    - **Rule Violated**: Always log when skipping/ignoring items in loops
    - **Fix**: Added `slog.Debug("SkipInvalidOrganizationalUnit", slog.String("value", rawOrganizationalUnit))`
    - **Lesson**: EVERY `continue` after an error needs slog.Debug
 
 3. **Generic Variable Name in x509EnvelopedCertificate.go**
+
    - **Error**: `cert` variable in named return value (line 14)
    - **Rule Violated**: Variable names must be descriptive, not generic
    - **Fix**: `cert` → `envelopedCert`
@@ -291,11 +294,13 @@
 ### Comprehensive Review Findings (After User Stopped Initial Review):
 
 5. **Missing slog.Debug in x509KeyUsage.go Loop**
+
    - **Location**: Line 64
    - **Error**: Silent `continue` after error in key usage loop
    - **Fix**: Added `slog.Debug("SkipInvalidKeyUsage", slog.String("name", keyUsageName))`
 
 6. **Missing slog.Debug in x509Certificate.go Entity File**
+
    - **Location**: Line 142
    - **Error**: Silent `continue` in subjectAltNames loop when NewX509SubjectName fails
    - **Fix**: Added `slog.Debug("SkipInvalidSubjectAltName", slog.String("dnsName", dnsName))`
@@ -304,7 +309,7 @@
    - **Location 1**: Line 127 - `subjectCommonNameStr := stdlibCert.Subject.CommonName`
    - **Location 2**: Line 154 - `issuerCommonNameStr := stdlibCert.Issuer.CommonName`
    - **Error**: Using "Str" suffix for raw unvalidated data from stdlib
-   - **Fix**: 
+   - **Fix**:
      - `subjectCommonNameStr` → `rawSubjectCommonName`
      - `issuerCommonNameStr` → `rawIssuerCommonName`
    - **Lesson**: "Str" suffix ONLY for `.String()` results from validated value objects
@@ -332,3 +337,275 @@
 - **7 violations** across 4 files
 - Missing slog.Debug: 4 instances
 - Variable naming: 3 instances
+
+## Fifth Correction Session
+
+### Issues Found:
+
+1. **Missing Accent Normalization for User Input**
+
+   - **Error**: X509Locality, X509Organization, X509OrganizationalUnit, X509StateOrProvince would reject valid inputs like "São Paulo" or "Montréal"
+   - **Rule Violated**: Validation should normalize common input variations to improve UX
+   - **Fix**:
+     - Created `util/stringNormalizer.go` with `StripAccents()` function using golang.org/x/text
+     - Applied normalization to 4 value objects before validation
+     - Added test cases for accented characters (São Paulo → Sao Paulo, München → Munchen)
+   - **Implementation**:
+     ```go
+     func StripAccents(input string) (string, error) {
+         transformer := transform.Chain(
+             norm.NFD,
+             runes.Remove(runes.In(unicode.Mn)),
+             norm.NFC,
+         )
+         result, _, err := transform.String(transformer, input)
+         if err != nil {
+             return input, err
+         }
+         return strings.TrimSpace(result), nil
+     }
+     ```
+   - **Lesson**: User input validation should be lenient and normalize common variations (accents, case, whitespace) rather than rejecting them
+
+2. **Weak x509PolicyName Validation**
+
+   - **Error**: No regex validation allowed dangerous characters like `<>` that could be used for injection attacks
+   - **Rule Violated**: Security-sensitive fields need strict character whitelisting
+   - **Fix**: Added regex `^[a-zA-Z0-9 .\-_()]{1,128}$` to allow only safe characters
+   - **Previous Code**:
+     ```go
+     if len(stringValue) < 1 || len(stringValue) > 128 {
+         return name, errors.New("InvalidX509PolicyNameLength")
+     }
+     ```
+   - **Fixed Code**:
+
+     ```go
+     var x509PolicyNameRegex = regexp.MustCompile(`^[a-zA-Z0-9 .\-_()]{1,128}$`)
+
+     if !x509PolicyNameRegex.MatchString(stringValue) {
+         return name, errors.New("InvalidX509PolicyName")
+     }
+     ```
+
+   - **Lesson**: Length validation alone is insufficient for security-sensitive fields; whitelist allowed characters
+
+3. **Weak x509SubjectName Wildcard Validation**
+
+   - **Error**: Wildcard validation only counted wildcards but didn't validate format, allowing `******something`, `*something.com`, etc.
+   - **Rule Violated**: Wildcard certificates must follow strict format: only `*.domain.com` pattern
+   - **Fix**:
+     - Created separate regex for wildcard pattern: `^\*\.[a-zA-Z0-9.\-_]+$`
+     - Added format validation: wildcard must be at start followed by dot and domain
+     - Split validation into wildcard vs non-wildcard branches
+   - **Previous Code**:
+     ```go
+     hasWildcard := strings.Contains(stringValue, "*")
+     if hasWildcard {
+         wildcardCount := strings.Count(stringValue, "*")
+         if wildcardCount > 1 {
+             return name, errors.New("InvalidX509SubjectNameMultipleWildcards")
+         }
+     }
+     // No format validation!
+     ```
+   - **Fixed Code**:
+
+     ```go
+     hasWildcard := strings.Contains(stringValue, "*")
+     if hasWildcard {
+         wildcardCount := strings.Count(stringValue, "*")
+         if wildcardCount > 1 {
+             return name, errors.New("InvalidX509SubjectNameMultipleWildcards")
+         }
+
+         if !x509WildcardSubjectNameRegex.MatchString(stringValue) {
+             return name, errors.New("InvalidX509SubjectNameWildcardFormat")
+         }
+     } else {
+         if !x509SubjectNameRegex.MatchString(stringValue) {
+             return name, errors.New("InvalidX509SubjectName")
+         }
+     }
+     ```
+
+   - **Lesson**: Count validation alone is insufficient; format validation must enforce the expected pattern
+
+4. **Unnecessary Line Breaks in Test Error Declarations**
+
+   - **Error**: 90+ instances of multi-line t.Errorf/t.Fatalf calls across all 23 X509 test files
+   - **Rule Violated**: Only break lines in function calls when exceeding 85 character limit
+   - **Examples Fixed**:
+
+     ```go
+     // Before:
+     t.Errorf(
+         "MissingExpectedError: [%v]",
+         testCase.inputValue,
+     )
+
+     // After:
+     t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+     ```
+
+   - **Pattern**: Nearly every test file had 3-4 instances in:
+     - "MissingExpectedError" checks (lines 52-55, 59-62)
+     - "UnexpectedError" checks (lines 66-70)
+     - "UnexpectedOutputValue" checks (lines 75-78, 95-98, 102-105)
+   - **Files Affected**: All 23 x509\*\_test.go files
+   - **Fix**: User manually consolidated all instances to single lines
+   - **Lesson**: Test error declarations should follow same formatting rules as production code; line breaks only for 85 char limit
+
+5. **Forgot to Document Error Corrections (Again!)**
+   - **Error**: Completed all fixes but didn't document the fifth correction session
+   - **Rule Violated**: "Always document error correction sessions immediately after implementation"
+   - **Fix**: User had to remind me to document this session
+   - **Lesson**: Documentation is NOT optional - it must be done immediately after corrections, not as an afterthought
+
+## Common Patterns in Fifth Session
+
+1. **Security Hardening**: Validation improvements focused on preventing injection attacks and wildcard abuse
+2. **User Experience**: Accent normalization improves UX by accepting common input variations
+3. **Code Consistency**: Test files should follow same formatting rules as production code
+4. **Documentation Discipline**: Still struggling to remember documentation step
+
+## Updated Improvements List
+
+1. Add rule about normalizing user input (accents, whitespace, case) before validation
+2. Add rule about character whitelisting for security-sensitive fields
+3. Add rule about wildcard validation requiring both count and format checks
+4. Reinforce rule about test code following same formatting standards as production code
+5. **Make documentation step more prominent** - need systematic reminder to document corrections
+
+## Total Violations Fixed Across All Sessions
+
+- **Session 1**: 8 violations (naming, organization, documentation)
+- **Session 2**: 7 violations (naming, implementation completeness, documentation)
+- **Session 3**: 9 violations (initialization, naming, logging, formatting, efficiency)
+- **Session 4**: 7 violations (naming semantics, missing logging)
+- **Session 5**: 5 violations (security validation, UX normalization, test formatting, documentation)
+
+**Grand Total**: 36 violations across 5 correction sessions
+
+## Critical Recurring Issues
+
+1. **Documentation Forgetting** (Sessions 2, 5): Keep forgetting to document corrections
+2. **Incomplete Reviews** (Sessions 3, 4): Claiming comprehensive review but missing obvious patterns
+3. **Missing slog.Debug** (Sessions 3, 4): Repeatedly missing debug logging in loops
+4. **Naming Conventions** (Sessions 1, 2, 3, 4): Most persistent category of errors
+
+## Key Technical Improvements
+
+1. **Unicode Normalization**: golang.org/x/text for NFD/NFC transformation
+2. **Security Validation**: Regex whitelisting for injection prevention
+3. **Wildcard Certificate Standards**: Strict `*.domain.com` format enforcement
+4. **String Building**: strings.Builder for efficient concatenation
+5. **Debug Visibility**: slog.Debug for all skipped items in loops
+
+## Sixth Correction Session
+
+### Issues Found:
+
+1. **Missing Test Coverage for Allowed Characters in Regex**
+
+   - **Error**: x509SignatureValue regex allows `\r\n` characters but no test cases verified this
+   - **Rule Violated**: "Test coverage must include all validation rules and edge cases"
+   - **Fix**: Added 3 test cases for newline handling:
+     - Trailing `\n` (stripped by InterfaceToString)
+     - Trailing `\r\n` (stripped by InterfaceToString)
+     - Middle `\n` (preserved as it's not trailing whitespace)
+   - **Discovery**: InterfaceToString calls strings.TrimSpace, so trailing whitespace is removed but internal newlines are preserved
+   - **Lesson**: When regex allows special characters, test cases must verify they work correctly, considering any normalization that happens during value object construction
+
+2. **Critical else Violation**
+
+   - **Error**: x509SubjectName.go used `else` block (line 41-45)
+   - **Rule Violated**: "NEVER use else - use early returns instead"
+   - **Fix**:
+     - Removed else block
+     - Added early return at end of wildcard validation branch
+     - Continued with non-wildcard validation after the if block
+   - **Previous Code**:
+     ```go
+     if hasWildcard {
+         // ... wildcard validation
+     } else {
+         if !x509SubjectNameRegex.MatchString(stringValue) {
+             return name, errors.New("InvalidX509SubjectName")
+         }
+     }
+     return X509SubjectName(stringValue), nil
+     ```
+   - **Fixed Code**:
+
+     ```go
+     if hasWildcard {
+         // ... wildcard validation
+
+         return X509SubjectName(stringValue), nil
+     }
+
+     if !x509SubjectNameRegex.MatchString(stringValue) {
+         return name, errors.New("InvalidX509SubjectName")
+     }
+
+     return X509SubjectName(stringValue), nil
+     ```
+
+   - **Lesson**: ALWAYS use early returns instead of else blocks - improves code flow and reduces nesting
+
+3. **Incomplete Test Coverage for StripAccents**
+
+   - **Error**: StripAccents utility was applied to 4 value objects (Locality, Organization, OrganizationalUnit, StateOrProvince) but only Locality had accent stripping test cases
+   - **Rule Violated**: "Any functionality must have corresponding test coverage"
+   - **Fix**: Added accent stripping test cases to all 3 missing files:
+     - **X509Organization_test.go**: Added "Société Française" → "Societe Francaise", "Müller GmbH" → "Muller GmbH", "Örnek Şirketi" → "Ornek Sirketi"
+     - **X509OrganizationalUnit_test.go**: Added "Département Informatique" → "Departement Informatique", "Fürschung" → "Furschung", "Ñoño Unit" → "Nono Unit"
+     - **X509StateOrProvince_test.go**: Added "São Paulo" → "Sao Paulo", "Québec" → "Quebec", "Åland" → "Aland"
+   - **Lesson**: When adding a utility function to multiple value objects, ALL of them need test coverage for that functionality, not just one
+
+4. **Forgot to Document Error Corrections (Third Time!)**
+   - **Error**: Completed all fixes from user feedback but didn't document the session
+   - **Rule Violated**: "Always document error correction sessions immediately after implementation"
+   - **Fix**: User had to remind me again to document this session
+   - **Pattern**: This is the THIRD occurrence (Sessions 2, 5, 6)
+   - **Lesson**: Documentation step needs to be FIRST PRIORITY after any correction work - this is becoming a critical recurring issue
+
+## Common Patterns in Sixth Session
+
+1. **Test Coverage Gaps**: Missing tests for regex-allowed characters and utility function usage
+2. **Control Flow Violations**: Using else instead of early returns
+3. **Incomplete Feature Testing**: Applying a utility to multiple files but only testing it in one
+4. **Documentation Discipline**: Still repeatedly forgetting to document corrections immediately
+
+## Updated Improvements List
+
+1. Add rule: "When regex allows special characters (like `\r\n`), test cases must verify they work correctly"
+2. Reinforce rule: "NEVER use else - ALWAYS use early returns instead" (make this more prominent)
+3. Add rule: "When adding a utility function to multiple value objects, ALL must have test coverage for that functionality"
+4. **CRITICAL**: Need systematic approach to remember documentation step (third violation!)
+
+## Total Violations Fixed Across All Sessions
+
+- **Session 1**: 8 violations (naming, organization, documentation)
+- **Session 2**: 7 violations (naming, implementation completeness, documentation)
+- **Session 3**: 9 violations (initialization, naming, logging, formatting, efficiency)
+- **Session 4**: 7 violations (naming semantics, missing logging)
+- **Session 5**: 5 violations (security validation, UX normalization, test formatting, documentation)
+- **Session 6**: 4 violations (test coverage, else usage, incomplete testing, documentation)
+
+**Grand Total**: 40 violations across 6 correction sessions
+
+## Critical Recurring Issues - Updated
+
+1. **Documentation Forgetting** (Sessions 2, 5, 6): THREE occurrences - this is a critical pattern
+2. **Incomplete Reviews** (Sessions 3, 4): Claiming comprehensive review but missing obvious patterns
+3. **Missing slog.Debug** (Sessions 3, 4): Repeatedly missing debug logging in loops
+4. **Naming Conventions** (Sessions 1, 2, 3, 4): Most persistent category of errors
+5. **Test Coverage Gaps** (Session 6): Not testing all aspects of implemented functionality
+
+## Most Critical Violations
+
+1. **else Usage**: This was marked as "CRITICAL" by user - absolutely forbidden, must use early returns
+2. **Documentation**: Three violations shows systematic failure to prioritize this step
+3. **Incomplete Test Coverage**: Adding functionality without complete test coverage across all affected files
