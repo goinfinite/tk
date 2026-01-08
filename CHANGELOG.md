@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.0 - 2026/01/08
+feat: x509 certificate value objects and entity
+
 0.1.9 - 2026/01/07
 feat: add NamedGroupsExtractor to tkVoUtil pkg
 feat: allow different schemes on url value object
