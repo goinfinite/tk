@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewX509OrganizationalUnit(t *testing.T) {
 	t.Run("ValidOrganizationalUnit", func(t *testing.T) {
@@ -63,6 +66,47 @@ func TestNewX509OrganizationalUnit(t *testing.T) {
 			{"Invalid@Unit", X509OrganizationalUnit(""), true},
 			{"123", X509OrganizationalUnit("123"), false},
 			{nil, X509OrganizationalUnit(""), true},
+			// Allowed punctuation characters
+			{"Dept.Engineering", X509OrganizationalUnit("Dept.Engineering"), false},
+			{"Group,Alpha", X509OrganizationalUnit("Group,Alpha"), false},
+			{"Sub-Unit", X509OrganizationalUnit("Sub-Unit"), false},
+			{"Team_Red", X509OrganizationalUnit("Team_Red"), false},
+			{"Division(East)", X509OrganizationalUnit("Division(East)"), false},
+			{"Sales&Marketing", X509OrganizationalUnit("Sales&Marketing"), false},
+			{"Parent/Child", X509OrganizationalUnit("Parent/Child"), false},
+			{"Director's Office", X509OrganizationalUnit("Director's Office"), false},
+			{"Men's Department", X509OrganizationalUnit("Men's Department"), false},
+			{"L'Equipe", X509OrganizationalUnit("L'Equipe"), false},
+			// Rejected characters
+			{"Unit@Domain", X509OrganizationalUnit(""), true},
+			{"Unit#1", X509OrganizationalUnit(""), true},
+			{"Unit$Corp", X509OrganizationalUnit(""), true},
+			{"Unit%Inc", X509OrganizationalUnit(""), true},
+			{"Unit*Star", X509OrganizationalUnit(""), true},
+			{"Unit+Plus", X509OrganizationalUnit(""), true},
+			{"Unit=Equal", X509OrganizationalUnit(""), true},
+			{"Unit[Bracket]", X509OrganizationalUnit(""), true},
+			{"Unit{Brace}", X509OrganizationalUnit(""), true},
+			{"Unit|Pipe", X509OrganizationalUnit(""), true},
+			{"Unit\\Backslash", X509OrganizationalUnit(""), true},
+			{"Unit:Colon", X509OrganizationalUnit(""), true},
+			{"Unit;Semicolon", X509OrganizationalUnit(""), true},
+			{"Unit\"Quote", X509OrganizationalUnit(""), true},
+			{"Unit<Less>", X509OrganizationalUnit(""), true},
+			{"Unit?Question", X509OrganizationalUnit(""), true},
+			{"Unit`Backtick", X509OrganizationalUnit(""), true},
+			{"Unit~Tilde", X509OrganizationalUnit(""), true},
+			{"Unit!Exclaim", X509OrganizationalUnit(""), true},
+			{
+				strings.Repeat("A", 255),
+				X509OrganizationalUnit(strings.Repeat("A", 255)),
+				false,
+			},
+			{
+				strings.Repeat("A", 256),
+				X509OrganizationalUnit(""),
+				true,
+			},
 		}
 
 		for _, testCase := range testCaseStructs {

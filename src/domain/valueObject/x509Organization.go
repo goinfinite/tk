@@ -8,9 +8,10 @@ import (
 )
 
 // x509OrgFieldRegex is shared validation pattern for Organization and OrganizationalUnit.
-// Both follow X.520 attribute type rules: alphanumeric plus common punctuation, 1-255 chars.
+// Allows: letters (a-z, A-Z), digits (0-9), space, and punctuation: . , - _ ( ) & / '
+// Length: 1-255 characters (project-specific policy, not strict X.520 compliance).
 var x509OrgFieldRegex = regexp.MustCompile(
-	`^[a-zA-Z0-9 .,\-_()&/]{1,255}$`,
+	`^[a-zA-Z0-9 .,\-_()&/']{1,255}$`,
 )
 
 type X509Organization string
