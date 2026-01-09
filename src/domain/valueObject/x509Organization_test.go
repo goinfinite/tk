@@ -102,4 +102,20 @@ func TestNewX509Organization(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("StringMethodReturnsNormalizedValue", func(t *testing.T) {
+		normalizedOrg, err := NewX509Organization("Société Française")
+		if err != nil {
+			t.Fatalf("UnexpectedError: %s", err.Error())
+		}
+
+		expectedNormalizedString := "Societe Francaise"
+		actualOutput := normalizedOrg.String()
+		if actualOutput != expectedNormalizedString {
+			t.Errorf(
+				"StringMethodShouldReturnNormalizedValue: got '%s', expected '%s'",
+				actualOutput, expectedNormalizedString,
+			)
+		}
+	})
 }
