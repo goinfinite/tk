@@ -71,7 +71,7 @@ func privateKeyPemGenerator(
 		return strings.TrimSpace(string(encryptOutput))
 
 	case PrivateKeyAlgorithmDSA:
-		dsaCmd := exec.Command("openssl", "dsaparam", "-genkey", "1024")
+		dsaCmd := exec.Command("openssl", "dsaparam", "-genkey", "2048")
 		dsaOutput, err := dsaCmd.Output()
 		if err != nil {
 			t.Skipf("OpenSslNotAvailable: %s", err.Error())
