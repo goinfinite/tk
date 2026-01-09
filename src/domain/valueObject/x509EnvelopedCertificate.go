@@ -3,6 +3,7 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
+	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -27,6 +28,12 @@ func NewX509EnvelopedCertificate(
 
 	if len(stringValue) < 100 {
 		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateTooShort")
+	}
+
+	beginCount := strings.Count(stringValue, "-----BEGIN CERTIFICATE-----")
+	endCount := strings.Count(stringValue, "-----END CERTIFICATE-----")
+	if beginCount != 1 || endCount != 1 {
+		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateMultiple")
 	}
 
 	return X509EnvelopedCertificate(stringValue), nil

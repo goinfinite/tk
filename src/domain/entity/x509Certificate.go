@@ -101,9 +101,13 @@ func NewX509CertificateFromEnvelopedCertificate(
 	envelopedCertificate tkValueObject.X509EnvelopedCertificate,
 ) (x509CertEntity X509Certificate, err error) {
 	envelopedCertificateBytes := envelopedCertificate.Bytes()
-	pemBlock, _ := pem.Decode(envelopedCertificateBytes)
+	pemBlock, remainingBytes := pem.Decode(envelopedCertificateBytes)
 	if pemBlock == nil {
 		return x509CertEntity, errors.New("DecodePEMFailed")
+	}
+
+	if len(remainingBytes) > 0 {
+		return x509CertEntity, errors.New("MultipleX509CertificatesNotAllowed")
 	}
 
 	stdlibCert, err := x509.ParseCertificate(pemBlock.Bytes)

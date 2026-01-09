@@ -75,6 +75,11 @@ func TestNewX509EnvelopedCertificate(t *testing.T) {
 				X509EnvelopedCertificate(""),
 				true,
 			},
+			{
+				validCert + "\n" + validCert, // Multiple certificates
+				X509EnvelopedCertificate(""),
+				true,
+			},
 			{123, X509EnvelopedCertificate(""), true},
 			{nil, X509EnvelopedCertificate(""), true},
 		}
