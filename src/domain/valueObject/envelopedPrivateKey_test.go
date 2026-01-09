@@ -1,56 +1,104 @@
 package tkValueObject
 
-import "testing"
+import (
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+func privateKeyPemGenerator(
+	t *testing.T, algorithm PrivateKeyAlgorithm,
+) string {
+	t.Helper()
+
+	switch algorithm {
+	case PrivateKeyAlgorithmRSA:
+		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
+		rsaKeyOutput, err := rsaKeyCmd.Output()
+		if err != nil {
+			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		}
+		return strings.TrimSpace(string(rsaKeyOutput))
+
+	case "PKCS8":
+		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
+		rsaKeyOutput, err := rsaKeyCmd.Output()
+		if err != nil {
+			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		}
+
+		pkcs8Cmd := exec.Command(
+			"openssl", "pkcs8", "-topk8", "-inform", "PEM", "-outform", "PEM",
+			"-nocrypt",
+		)
+		pkcs8Cmd.Stdin = strings.NewReader(string(rsaKeyOutput))
+		pkcs8Output, err := pkcs8Cmd.Output()
+		if err != nil {
+			t.Fatalf("PKCS8ConversionFailed: %s", err.Error())
+		}
+		return strings.TrimSpace(string(pkcs8Output))
+
+	case PrivateKeyAlgorithmECDSA:
+		ecKeyCmd := exec.Command("openssl", "ecparam", "-genkey", "-name", "prime256v1")
+		ecKeyOutput, err := ecKeyCmd.Output()
+		if err != nil {
+			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		}
+
+		ecKeyOutputStr := string(ecKeyOutput)
+		keyStart := strings.Index(ecKeyOutputStr, "-----BEGIN EC PRIVATE KEY-----")
+		if keyStart == -1 {
+			t.Fatalf("ECPrivateKeyNotFoundInOutput")
+		}
+		return strings.TrimSpace(ecKeyOutputStr[keyStart:])
+
+	case "Encrypted":
+		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
+		rsaKeyOutput, err := rsaKeyCmd.Output()
+		if err != nil {
+			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		}
+
+		encryptCmd := exec.Command(
+			"openssl", "pkcs8", "-topk8", "-inform", "PEM", "-outform", "PEM",
+			"-v2", "aes-256-cbc", "-passout", "pass:testpassword",
+		)
+		encryptCmd.Stdin = strings.NewReader(string(rsaKeyOutput))
+		encryptOutput, err := encryptCmd.Output()
+		if err != nil {
+			t.Fatalf("PrivateKeyEncryptionFailed: %s", err.Error())
+		}
+		return strings.TrimSpace(string(encryptOutput))
+
+	case PrivateKeyAlgorithmDSA:
+		dsaCmd := exec.Command("openssl", "dsaparam", "-genkey", "1024")
+		dsaOutput, err := dsaCmd.Output()
+		if err != nil {
+			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		}
+
+		dsaOutputStr := string(dsaOutput)
+		keyStart := strings.Index(dsaOutputStr, "-----BEGIN PRIVATE KEY-----")
+		if keyStart == -1 {
+			keyStart = strings.Index(dsaOutputStr, "-----BEGIN DSA PRIVATE KEY-----")
+		}
+		if keyStart == -1 {
+			t.Fatalf("DSAPrivateKeyNotFoundInOutput")
+		}
+		return strings.TrimSpace(dsaOutputStr[keyStart:])
+
+	default:
+		t.Fatalf("UnsupportedPrivateKeyAlgorithm: %s", algorithm)
+		return ""
+	}
+}
 
 func TestNewEnvelopedPrivateKey(t *testing.T) {
-	validPrivateKey := `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC5Wm1Z9ZJvLQ3
-LQ5Rk5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
------END PRIVATE KEY-----`
-
-	validRsaPrivateKey := `-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEAyWmAk8QJ9XJvLQ3LQ5Rk5J2k5J2k5J2k5J2k5J2k5J2k5J2k
-5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
------END RSA PRIVATE KEY-----`
-
-	validEcPrivateKey := `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIJKL0UG+mRkSvMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNVBAYTAkFVMRMw
-EQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0e
-SBMdGQwHhcNMTcwODE0MDk1NzU3WhcNMTgwODE0MDk1NzU3WjBFMQswCQYDVQQGEwJB
-VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQ
-dHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyWmAk8QJ9XJvLQ3
-LQ5Rk5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
------END EC PRIVATE KEY-----`
-
-	validEncryptedPrivateKey := `-----BEGIN ENCRYPTED PRIVATE KEY-----
-MIIFHDBOBgkqhkiG9w0BBQ0wQTApBgkqhkiG9w0BBQwwHAQIxJmAk8QJ9XJCAggA
-MAwGCCqGSIb3DQIJBQAwFAYIKoZIhvcNAwcECC5Wm1Z9ZJvLQ3LQ5Rk5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
-2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J2k5J
------END ENCRYPTED PRIVATE KEY-----`
+	validPrivateKey := privateKeyPemGenerator(t, "PKCS8")
+	validRsaPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmRSA)
+	validEcPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmECDSA)
+	validEncryptedPrivateKey := privateKeyPemGenerator(t, "Encrypted")
+	validDsaPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmDSA)
 
 	t.Run("ValidEnvelopedPrivateKey", func(t *testing.T) {
 		testCaseStructs := []struct {
@@ -76,6 +124,11 @@ MAwGCCqGSIb3DQIJBQAwFAYIKoZIhvcNAwcECC5Wm1Z9ZJvLQ3LQ5Rk5J2k5J2k5J
 			{
 				validEncryptedPrivateKey,
 				EnvelopedPrivateKey(validEncryptedPrivateKey),
+				false,
+			},
+			{
+				validDsaPrivateKey,
+				EnvelopedPrivateKey(validDsaPrivateKey),
 				false,
 			},
 			{"", EnvelopedPrivateKey(""), true},
@@ -196,6 +249,7 @@ MAwGCCqGSIb3DQIJBQAwFAYIKoZIhvcNAwcECC5Wm1Z9ZJvLQ3LQ5Rk5J2k5J2k5J
 			{EnvelopedPrivateKey(validRsaPrivateKey), validRsaPrivateKey},
 			{EnvelopedPrivateKey(validEcPrivateKey), validEcPrivateKey},
 			{EnvelopedPrivateKey(validEncryptedPrivateKey), validEncryptedPrivateKey},
+			{EnvelopedPrivateKey(validDsaPrivateKey), validDsaPrivateKey},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -207,6 +261,22 @@ MAwGCCqGSIb3DQIJBQAwFAYIKoZIhvcNAwcECC5Wm1Z9ZJvLQ3LQ5Rk5J2k5J2k5J
 					actualOutput, testCase.expectedOutput,
 				)
 			}
+		}
+	})
+
+	t.Run("ShortInputErrorMessage", func(t *testing.T) {
+		shortInput := "-----BEGIN PRIVATE KEY-----\nshort\n-----END PRIVATE KEY-----"
+		_, err := NewEnvelopedPrivateKey(shortInput)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: short input should fail")
+		}
+
+		expectedError := "InvalidEnvelopedPrivateKeyTooShort"
+		if err.Error() != expectedError {
+			t.Errorf(
+				"UnexpectedErrorMessage: got '%s', expected '%s'",
+				err.Error(), expectedError,
+			)
 		}
 	})
 }
