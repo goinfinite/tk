@@ -3,7 +3,6 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
-	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -18,8 +17,7 @@ func NewX509SerialNumber(value any) (serial X509SerialNumber, err error) {
 		return serial, errors.New("X509SerialNumberMustBeString")
 	}
 
-	stringValue = strings.ReplaceAll(stringValue, ":", "")
-	stringValue = strings.ReplaceAll(stringValue, " ", "")
+	stringValue = tkVoUtil.StripHexSeparators(stringValue)
 
 	if !x509SerialNumberRegex.MatchString(stringValue) {
 		return serial, errors.New("InvalidX509SerialNumber")

@@ -3,7 +3,6 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
-	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -18,8 +17,7 @@ func NewX509KeyIdentifier(value any) (id X509KeyIdentifier, err error) {
 		return id, errors.New("X509KeyIdentifierMustBeString")
 	}
 
-	stringValue = strings.ReplaceAll(stringValue, ":", "")
-	stringValue = strings.ReplaceAll(stringValue, " ", "")
+	stringValue = tkVoUtil.StripHexSeparators(stringValue)
 
 	if !x509KeyIdentifierRegex.MatchString(stringValue) {
 		return id, errors.New("InvalidX509KeyIdentifier")

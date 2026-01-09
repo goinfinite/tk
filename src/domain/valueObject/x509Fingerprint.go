@@ -3,7 +3,6 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
-	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -20,8 +19,7 @@ func NewX509Fingerprint(value any) (fp X509Fingerprint, err error) {
 		return fp, errors.New("X509FingerprintMustBeString")
 	}
 
-	stringValue = strings.ReplaceAll(stringValue, ":", "")
-	stringValue = strings.ReplaceAll(stringValue, " ", "")
+	stringValue = tkVoUtil.StripHexSeparators(stringValue)
 
 	if !x509FingerprintRegex.MatchString(stringValue) {
 		return fp, errors.New("InvalidX509Fingerprint")
