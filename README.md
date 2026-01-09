@@ -113,7 +113,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   fmt.Println(commandOutput)
   ```
 
-- **Synthesizer**: Generate secure passwords with charset guarantees, random usernames/emails, and self-signed TLS certificates.
+- **Synthesizer**: Generate secure passwords with charset guarantees, random usernames/emails, private keys, and TLS certificates (including CA certificates).
 
   ```go
   synthesizer := &Synthesizer{}
@@ -121,12 +121,22 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   securePassword := synthesizer.PasswordFactory(12, true)
 
   randomUsername := synthesizer.UsernameFactory()
-
   randomEmail := synthesizer.MailAddressFactory(nil)
+
+  rsaKeyPem, rsaErr := synthesizer.PrivateKeyPemFactory(PrivateKeySettings{
+    Algorithm: tkValueObject.PrivateKeyAlgorithmRSA,
+    BitSize:   2048,
+  })
+
+  ecdsaKeyPem, ecdsaErr := synthesizer.PrivateKeyPemFactory(PrivateKeySettings{
+    Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
+    BitSize:   256, // Supports 256, 384, 521
+  })
 
   commonName, _ := tkValueObject.NewFqdn("goinfinite.net")
   aliasName, _ := tkValueObject.NewFqdn("goinfinite.com.br")
   altNames := []tkValueObject.Fqdn{aliasName}
+
   certPair, certGenErr := synthesizer.SelfSignedCertificatePairFactory(
     &commonName, altNames,
   )
@@ -134,6 +144,17 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   certPem, keyPem, certPemGenErr := synthesizer.SelfSignedCertificatePairPemFactory(
     &commonName, altNames,
   )
+
+  certPem, keyPem, certErr := synthesizer.CertificatePemFactory(CertificateSettings{
+    CommonName: &commonName,
+    AltNames:   altNames,
+  })
+
+  maxPathLen := 2
+  caCertPem, caKeyPem, caErr := synthesizer.CACertificatePemFactory(CertificateSettings{
+    CommonName:       &commonName,
+    MaxPathLengthPtr: &maxPathLen,
+  })
   ```
 
 - **ServerIpAddress**: Retrieve the server's private and public IP addresses.
@@ -300,7 +321,7 @@ For web applications built with Echo:
 
 ### Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IPAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, and so on. These components are thoroughly tested, ensuring 100% coverage.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IPAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, and many more. These components are thoroughly tested, ensuring 100% coverage.
 
 ### Value Object Utilities
 
