@@ -12,7 +12,7 @@ Complete all TODOs in `src/domain/entity/x509Certificate.go` by creating 24 miss
 
 ## Current State
 
-- File: `/var/home/ntorga/infinite/projects/tk/src/domain/entity/x509Certificate.go`
+- File: `src/domain/entity/x509Certificate.go`
 - 24 X509-related types are referenced but not implemented
 - All value objects need to be created from scratch
 - No existing X509 value objects in the codebase
@@ -307,9 +307,9 @@ Complete all TODOs in `src/domain/entity/x509Certificate.go` by creating 24 miss
 
 ## File Locations
 
-- Value objects: `/var/home/ntorga/infinite/projects/tk/src/domain/valueObject/`
+- Value objects: `src/domain/valueObject/`
 - Tests: Same directory as implementation files
-- Entity: `/var/home/ntorga/infinite/projects/tk/src/domain/entity/x509Certificate.go`
+- Entity: `src/domain/entity/x509Certificate.go`
 
 ## Testing Strategy
 
@@ -336,10 +336,10 @@ Complete all TODOs in `src/domain/entity/x509Certificate.go` by creating 24 miss
 
 ## Critical Files
 
-- `/var/home/ntorga/infinite/projects/tk/src/domain/entity/x509Certificate.go` (entity with TODOs)
-- `/var/home/ntorga/infinite/projects/tk/src/domain/valueObject/*.go` (21+ new value objects)
-- `/var/home/ntorga/infinite/projects/tk/docs/DEV-IMPLEMENTATION.md` (coding standards)
-- `/var/home/ntorga/infinite/projects/tk/src/domain/valueObject/.context.md` (layer rules)
+- `src/domain/entity/x509Certificate.go` (entity with TODOs)
+- `src/domain/valueObject/*.go` (21+ new value objects)
+- `docs/DEV-IMPLEMENTATION.md` (coding standards)
+- `src/domain/valueObject/.context.md` (layer rules)
 
 ## Notes
 
