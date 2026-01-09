@@ -45,26 +45,30 @@ func NewX509KeyUsageSliceFromStdlib(
 	stdlibKeyUsage x509.KeyUsage,
 ) ([]X509KeyUsage, error) {
 	var keyUsageSlice []X509KeyUsage
-	keyUsageMap := map[x509.KeyUsage]string{
-		x509.KeyUsageDigitalSignature:  "digitalSignature",
-		x509.KeyUsageContentCommitment: "contentCommitment",
-		x509.KeyUsageKeyEncipherment:   "keyEncipherment",
-		x509.KeyUsageDataEncipherment:  "dataEncipherment",
-		x509.KeyUsageKeyAgreement:      "keyAgreement",
-		x509.KeyUsageCertSign:          "keyCertSign",
-		x509.KeyUsageCRLSign:           "cRLSign",
-		x509.KeyUsageEncipherOnly:      "encipherOnly",
-		x509.KeyUsageDecipherOnly:      "decipherOnly",
+
+	keyUsagePairs := []struct {
+		flag x509.KeyUsage
+		name string
+	}{
+		{x509.KeyUsageDigitalSignature, "digitalSignature"},
+		{x509.KeyUsageContentCommitment, "contentCommitment"},
+		{x509.KeyUsageKeyEncipherment, "keyEncipherment"},
+		{x509.KeyUsageDataEncipherment, "dataEncipherment"},
+		{x509.KeyUsageKeyAgreement, "keyAgreement"},
+		{x509.KeyUsageCertSign, "keyCertSign"},
+		{x509.KeyUsageCRLSign, "cRLSign"},
+		{x509.KeyUsageEncipherOnly, "encipherOnly"},
+		{x509.KeyUsageDecipherOnly, "decipherOnly"},
 	}
 
-	for keyUsageFlag, keyUsageName := range keyUsageMap {
-		flagIsSet := stdlibKeyUsage&keyUsageFlag != 0
+	for _, rawKeyUsagePair := range keyUsagePairs {
+		flagIsSet := stdlibKeyUsage&rawKeyUsagePair.flag != 0
 		if flagIsSet {
-			keyUsage, err := NewX509KeyUsage(keyUsageName)
+			keyUsage, err := NewX509KeyUsage(rawKeyUsagePair.name)
 			if err != nil {
 				slog.Debug(
 					"SkipInvalidKeyUsage",
-					slog.String("name", keyUsageName),
+					slog.String("name", rawKeyUsagePair.name),
 				)
 				continue
 			}
