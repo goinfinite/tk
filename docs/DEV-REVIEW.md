@@ -35,7 +35,7 @@ Before running external review tools, perform a manual self-review:
 #### Documentation
 
 - [ ] Implementation plan saved to `docs/history/` before work started
-- [ ] If there were error corrections, create error correction document in `docs/history/`
+- [ ] Create or update error correction document in `docs/history/` directory in the format `YYYY-MM-DD-error-correction.md` with a simple list of common agent errors that must be used to create or improve rules in `docs/DEV-IMPLEMENTATION.md` and `docs/DEV-REVIEW.md`.
 
 #### Build Verification
 
@@ -49,7 +49,7 @@ Before running external review tools, perform a manual self-review:
 After self-review passes, run CodeRabbit locally:
 
 ```bash
-coderabbit review --config docs/DEV-REVIEW.md --plain
+coderabbit review --config docs/DEV-REVIEW.md --prompt-only 2>&1
 ```
 
 ### 3. Issue Resolution Workflow
