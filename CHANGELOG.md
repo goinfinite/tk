@@ -2,17 +2,11 @@
 
 ```log
 0.2.0 - 2026/01/09
-feat: add PrivateKeyAlgorithm value object
+feat: x509 certificate value objects and entity
 feat: add PrivateKeyPemFactory to Synthesizer (supports RSA, ECDSA, DSA, Ed25519)
 feat: add CertificatePemFactory to Synthesizer
 feat: add CACertificatePemFactory to Synthesizer
-refactor: extract certificate template generation to certTemplateGenerator
-refactor: centralize key generation logic in privateKeyGenerator
-refactor: improve variable naming conventions (avoid single-word generic names)
-feat: x509 certificate value objects and entity
-security: remove all hardcoded private keys/certificates from test files
-test: unify x509PublicKeySize test structure with expectError pattern
-test: add dynamic key/certificate generation using openssl in VO tests
+fix: remove all hardcoded private keys/certificates from test files
 
 0.1.9 - 2026/01/07
 feat: add NamedGroupsExtractor to tkVoUtil pkg
