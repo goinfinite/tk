@@ -28,6 +28,10 @@ func NewEnvelopedPrivateKey(
 		return envelopedKey, errors.New("EnvelopedPrivateKeyMustBeString")
 	}
 
+	if len(stringValue) < 100 {
+		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyTooShort")
+	}
+
 	beginTagCount := strings.Count(stringValue, "-----BEGIN")
 	if beginTagCount != 1 {
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMultipleBeginTags")
@@ -40,10 +44,6 @@ func NewEnvelopedPrivateKey(
 
 	if !envelopedPrivateKeyRegex.MatchString(stringValue) {
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyFormat")
-	}
-
-	if len(stringValue) < 100 {
-		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyTooShort")
 	}
 
 	return EnvelopedPrivateKey(stringValue), nil
