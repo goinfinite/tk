@@ -10,6 +10,9 @@ refactor: extract certificate template generation to certTemplateGenerator
 refactor: centralize key generation logic in privateKeyGenerator
 refactor: improve variable naming conventions (avoid single-word generic names)
 feat: x509 certificate value objects and entity
+security: remove all hardcoded private keys/certificates from test files
+test: unify x509PublicKeySize test structure with expectError pattern
+test: add dynamic key/certificate generation using openssl in VO tests
 
 0.1.9 - 2026/01/07
 feat: add NamedGroupsExtractor to tkVoUtil pkg
