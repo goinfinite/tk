@@ -42,6 +42,10 @@ func NewX509DistinguishedNameFromPkixName(
 		organizationPtr = &organization
 	}
 
+	// OrganizationalUnit is multi-valued (slice), so we use lenient validation.
+	// If one OU is invalid, we skip it and continue parsing the rest.
+	// This differs from single-valued fields (Organization, Locality, etc.)
+	// which return errors immediately, as their failure affects the entire DN.
 	var organizationalUnits []X509OrganizationalUnit
 	for _, rawOrganizationalUnit := range pkixName.OrganizationalUnit {
 		organizationalUnit, err := NewX509OrganizationalUnit(
