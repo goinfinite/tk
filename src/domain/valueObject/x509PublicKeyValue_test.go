@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewX509PublicKeyValue(t *testing.T) {
 	validKey := `MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyWmVf7k3NpNvz1234567890
@@ -29,7 +32,7 @@ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/+/+/+/==`
 			{"", X509PublicKeyValue(""), true},
 			{"TooShort", X509PublicKeyValue(""), true},
 			{
-				"Invalid@Key!" + string(make([]byte, 100)),
+				"Invalid@Key!#$%^&*" + strings.Repeat("A", 90),
 				X509PublicKeyValue(""),
 				true,
 			},
