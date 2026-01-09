@@ -1,6 +1,12 @@
 package tkValueObject
 
-import "testing"
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
+	"testing"
+)
 
 func TestNewX509PublicKeySize(t *testing.T) {
 	t.Run("ValidPublicKeySize", func(t *testing.T) {
@@ -94,4 +100,50 @@ func TestNewX509PublicKeySize(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestNewX509PublicKeySizeFromStdlib(t *testing.T) {
+	rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("RSAKeyGenerationFailed: %s", err.Error())
+	}
+	rsaPublicKey := &rsaPrivateKey.PublicKey
+
+	ecdsaPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("ECDSAKeyGenerationFailed: %s", err.Error())
+	}
+	ecdsaPublicKey := &ecdsaPrivateKey.PublicKey
+
+	testCaseStructs := []struct {
+		inputValue     any
+		expectedOutput X509PublicKeySize
+		expectError    bool
+	}{
+		{rsaPublicKey, X509PublicKeySize(2048), false},
+		{ecdsaPublicKey, X509PublicKeySize(256), false},
+		{"not a valid public key", X509PublicKeySize(0), true},
+		{12345, X509PublicKeySize(0), true},
+		{nil, X509PublicKeySize(0), true},
+	}
+
+	for _, testCase := range testCaseStructs {
+		actualOutput, err := NewX509PublicKeySizeFromStdlib(testCase.inputValue)
+
+		if testCase.expectError && err == nil {
+			t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+		}
+
+		if !testCase.expectError && err != nil {
+			t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+		}
+
+		if !testCase.expectError &&
+			actualOutput != testCase.expectedOutput {
+			t.Errorf(
+				"UnexpectedOutputValue: '%v' vs '%v' [%v]",
+				actualOutput, testCase.expectedOutput, testCase.inputValue,
+			)
+		}
+	}
 }
