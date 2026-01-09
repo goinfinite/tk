@@ -133,7 +133,7 @@ func (synth *Synthesizer) privateKeyGenerator(
 
 	case tkValueObject.PrivateKeyAlgorithmDSA:
 		dsaParameters := new(dsa.Parameters)
-		generateErr := dsa.GenerateParameters(dsaParameters, cryptoRand.Reader, dsa.L1024N160)
+		generateErr := dsa.GenerateParameters(dsaParameters, cryptoRand.Reader, dsa.L2048N256)
 		if generateErr != nil {
 			return generatedKey, generateErr
 		}
@@ -230,8 +230,7 @@ func (synth *Synthesizer) certTemplateGenerator(
 	settings CertificateSettings,
 ) (template x509.Certificate, serialNumber *big.Int, err error) {
 	// The serial number is a positive integer that must be unique for every certificate issued
-	// by a given CA. This method generates a random 128 bit number, and shifts it to the left
-	// by 1 bit to ensure that it is positive.
+	// by a given CA. This method generates a random non-negative integer in the range [0, 2^128).
 	serialNumber, err = cryptoRand.Int(
 		cryptoRand.Reader,
 		new(big.Int).Lsh(big.NewInt(1), 128),
