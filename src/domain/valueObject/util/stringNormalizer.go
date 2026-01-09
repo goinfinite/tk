@@ -25,3 +25,11 @@ func StripAccents(input string) (string, error) {
 
 	return strings.TrimSpace(stringWithoutAccents), nil
 }
+
+// StripHexSeparators removes common separators (colons and spaces) from hex strings.
+// Used for normalizing X.509 fingerprints, serial numbers, and key identifiers.
+func StripHexSeparators(input string) string {
+	output := strings.ReplaceAll(input, ":", "")
+	output = strings.ReplaceAll(output, " ", "")
+	return output
+}
