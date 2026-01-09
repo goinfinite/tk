@@ -2,14 +2,11 @@ package tkValueObject
 
 import (
 	"errors"
-	"regexp"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var x509OrganizationalUnitRegex = regexp.MustCompile(
-	`^[a-zA-Z0-9 .,\-_()&/]{1,255}$`,
-)
+var x509OrganizationalUnitRegex = x509OrgFieldRegex
 
 type X509OrganizationalUnit string
 

@@ -7,9 +7,13 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var x509OrganizationRegex = regexp.MustCompile(
+// x509OrgFieldRegex is shared validation pattern for Organization and OrganizationalUnit.
+// Both follow X.520 attribute type rules: alphanumeric plus common punctuation, 1-255 chars.
+var x509OrgFieldRegex = regexp.MustCompile(
 	`^[a-zA-Z0-9 .,\-_()&/]{1,255}$`,
 )
+
+var x509OrganizationRegex = x509OrgFieldRegex
 
 type X509Organization string
 
