@@ -303,12 +303,26 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 
 		expectedAltNames := []string{"alt1.example.com", "alt2.example.com"}
 		if len(certPair.Leaf.DNSNames) != len(expectedAltNames) {
-			t.Errorf("UnexpectedAltNamesCount: %d vs %d", len(certPair.Leaf.DNSNames), len(expectedAltNames))
+			t.Errorf(
+				"UnexpectedAltNamesCount: %d vs %d",
+				len(certPair.Leaf.DNSNames), len(expectedAltNames),
+			)
 		}
 
-		for i, expected := range expectedAltNames {
-			if i >= len(certPair.Leaf.DNSNames) || certPair.Leaf.DNSNames[i] != expected {
-				t.Errorf("UnexpectedDNSName: '%s' vs '%s'", certPair.Leaf.DNSNames[i], expected)
+		for altNameIndex, expectedAltName := range expectedAltNames {
+			if altNameIndex >= len(certPair.Leaf.DNSNames) {
+				t.Errorf(
+					"MissingDNSNameAtIndex: %d (expected '%s')",
+					altNameIndex, expectedAltName,
+				)
+				continue
+			}
+
+			if certPair.Leaf.DNSNames[altNameIndex] != expectedAltName {
+				t.Errorf(
+					"UnexpectedDNSName: '%s' vs '%s'",
+					certPair.Leaf.DNSNames[altNameIndex], expectedAltName,
+				)
 			}
 		}
 	})
@@ -397,14 +411,31 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 				t.Errorf("CertParseFail: %v", err)
 			}
 			if parsedCert.Subject.CommonName != testCase.expectedCommonName {
-				t.Errorf("CommonNameMismatch: Expected '%s', Got '%s'", testCase.expectedCommonName, parsedCert.Subject.CommonName)
+				t.Errorf(
+					"CommonNameMismatch: Expected '%s', Got '%s'",
+					testCase.expectedCommonName, parsedCert.Subject.CommonName,
+				)
 			}
 			if len(parsedCert.DNSNames) != len(testCase.expectedAltNames) {
-				t.Errorf("AltNamesCountMismatch: Expected %d, Got %d", len(testCase.expectedAltNames), len(parsedCert.DNSNames))
+				t.Errorf(
+					"AltNamesCountMismatch: Expected %d, Got %d",
+					len(testCase.expectedAltNames), len(parsedCert.DNSNames),
+				)
 			}
 			for altNameIndex, expectedAltName := range testCase.expectedAltNames {
-				if altNameIndex >= len(parsedCert.DNSNames) || parsedCert.DNSNames[altNameIndex] != expectedAltName {
-					t.Errorf("AltNameMismatch: Expected '%s', Got '%s'", expectedAltName, parsedCert.DNSNames[altNameIndex])
+				if altNameIndex >= len(parsedCert.DNSNames) {
+					t.Errorf(
+						"AltNameMissing: Expected '%s' at index %d",
+						expectedAltName, altNameIndex,
+					)
+					continue
+				}
+
+				if parsedCert.DNSNames[altNameIndex] != expectedAltName {
+					t.Errorf(
+						"AltNameMismatch: Expected '%s', Got '%s'",
+						expectedAltName, parsedCert.DNSNames[altNameIndex],
+					)
 				}
 			}
 
