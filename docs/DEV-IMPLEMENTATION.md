@@ -95,32 +95,3 @@ description: Code style, Go-specific rules, and testing guidelines.
 ## Layer-Specific Rules
 
 Layer-specific rules are in the `.context.md` file of each directory. Always read them before editing.
-
-## After Completion
-
-Before marking work as complete, perform a final self-review:
-
-### Review All Rules Compliance
-
-- [ ] Re-read all sections above, especially **Naming Conventions** and **Code Formatting**
-- [ ] Verify all rules from this document are followed throughout the code
-- [ ] Check layer-specific `.context.md` rules are followed
-
-### Additional Checks Not Covered in Rules
-
-- [ ] No inline type conversions that should be value object methods
-- [ ] Variable names don't collide with package names in scope (e.g., `x509CertEntity` not `x509Cert` when using `x509` package)
-- [ ] No package-level auxiliary functions that should be value object constructors (locality of behavior)
-- [ ] Incomplete implementations have TODO comments or are fully implemented
-
-### Documentation
-
-- [ ] Implementation plan saved to docs/history/ before work started
-- [ ] If there were error corrections, create error correction document in docs/history/
-
-### Build Verification
-
-- [ ] Code compiles without errors
-- [ ] All tests pass
-- [ ] No linter warnings
-- [ ] `go mod tidy` completed successfully
