@@ -27,7 +27,7 @@ func NewX509PublicKeySize(value any) (size X509PublicKeySize, err error) {
 
 func NewX509PublicKeySizeFromStdlib(
 	stdlibPublicKey any,
-) (X509PublicKeySize, error) {
+) (size X509PublicKeySize, err error) {
 	switch typedPublicKey := stdlibPublicKey.(type) {
 	case *rsa.PublicKey:
 		rsaKeyBitLength := uint16(typedPublicKey.N.BitLen())
@@ -36,8 +36,7 @@ func NewX509PublicKeySizeFromStdlib(
 		ecdsaCurveBitSize := uint16(typedPublicKey.Curve.Params().BitSize)
 		return NewX509PublicKeySize(ecdsaCurveBitSize)
 	default:
-		defaultKeySize := uint16(2048)
-		return NewX509PublicKeySize(defaultKeySize)
+		return size, errors.New("UnsupportedPublicKeyType")
 	}
 }
 
