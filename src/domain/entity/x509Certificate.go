@@ -256,7 +256,8 @@ func NewX509CertificateFromEnvelopedCertificate(
 	if basicConstraintsAreValid {
 		var maxPathLengthPtr *int
 		certIsAuthority := stdlibCert.IsCA
-		caHasMaxPathLengthConstraint := stdlibCert.MaxPathLen >= 0
+		caHasMaxPathLengthConstraint := stdlibCert.MaxPathLen > 0 ||
+			(stdlibCert.MaxPathLen == 0 && stdlibCert.MaxPathLenZero)
 		if certIsAuthority && caHasMaxPathLengthConstraint {
 			maxPathLengthPtr = &stdlibCert.MaxPathLen
 		}
