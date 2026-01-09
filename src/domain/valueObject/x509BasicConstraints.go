@@ -10,6 +10,12 @@ type X509BasicConstraints struct {
 func NewX509BasicConstraints(
 	isAuthority bool, maxPathLength *int,
 ) (constraints X509BasicConstraints, err error) {
+	if !isAuthority && maxPathLength != nil {
+		return constraints, errors.New(
+			"InvalidX509BasicConstraintsMaxPathLengthForNonCA",
+		)
+	}
+
 	if maxPathLength != nil && *maxPathLength < 0 {
 		return constraints, errors.New("InvalidX509BasicConstraintsMaxPathLength")
 	}

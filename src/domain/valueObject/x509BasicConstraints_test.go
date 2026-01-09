@@ -19,7 +19,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 			{true, &maxPathZero, false},
 			{true, &maxPathOne, false},
 			{true, &maxPathFive, false},
-			{false, &maxPathZero, false},
+			{false, &maxPathZero, true}, // RFC 5280: MaxPathLength not allowed for non-CA
 			{true, &negativeMaxPath, true},
 			{false, &negativeMaxPath, true},
 		}
@@ -45,17 +45,26 @@ func TestNewX509BasicConstraints(t *testing.T) {
 
 			if !testCase.expectError {
 				if actualOutput.IsAuthority != testCase.isAuthority {
-					t.Errorf("UnexpectedIsAuthority: '%v' vs '%v'", actualOutput.IsAuthority, testCase.isAuthority)
+					t.Errorf(
+						"UnexpectedIsAuthority: '%v' vs '%v'",
+						actualOutput.IsAuthority, testCase.isAuthority,
+					)
 				}
 
 				if testCase.maxPathLength == nil &&
 					actualOutput.MaxPathLength != nil {
-					t.Errorf("UnexpectedMaxPathLength: expected nil, got %v", *actualOutput.MaxPathLength)
+					t.Errorf(
+						"UnexpectedMaxPathLength: expected nil, got %v",
+						*actualOutput.MaxPathLength,
+					)
 				}
 
 				if testCase.maxPathLength != nil &&
 					actualOutput.MaxPathLength == nil {
-					t.Errorf("UnexpectedMaxPathLength: expected %v, got nil", *testCase.maxPathLength)
+					t.Errorf(
+						"UnexpectedMaxPathLength: expected %v, got nil",
+						*testCase.maxPathLength,
+					)
 				}
 
 				if testCase.maxPathLength != nil &&
