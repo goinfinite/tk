@@ -303,12 +303,26 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 
 		expectedAltNames := []string{"alt1.example.com", "alt2.example.com"}
 		if len(certPair.Leaf.DNSNames) != len(expectedAltNames) {
-			t.Errorf("UnexpectedAltNamesCount: %d vs %d", len(certPair.Leaf.DNSNames), len(expectedAltNames))
+			t.Errorf(
+				"UnexpectedAltNamesCount: %d vs %d",
+				len(certPair.Leaf.DNSNames), len(expectedAltNames),
+			)
 		}
 
-		for i, expected := range expectedAltNames {
-			if i >= len(certPair.Leaf.DNSNames) || certPair.Leaf.DNSNames[i] != expected {
-				t.Errorf("UnexpectedDNSName: '%s' vs '%s'", certPair.Leaf.DNSNames[i], expected)
+		for altNameIndex, expectedAltName := range expectedAltNames {
+			if altNameIndex >= len(certPair.Leaf.DNSNames) {
+				t.Errorf(
+					"MissingDNSNameAtIndex: %d (expected '%s')",
+					altNameIndex, expectedAltName,
+				)
+				continue
+			}
+
+			if certPair.Leaf.DNSNames[altNameIndex] != expectedAltName {
+				t.Errorf(
+					"UnexpectedDNSName: '%s' vs '%s'",
+					certPair.Leaf.DNSNames[altNameIndex], expectedAltName,
+				)
 			}
 		}
 	})
@@ -397,14 +411,31 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 				t.Errorf("CertParseFail: %v", err)
 			}
 			if parsedCert.Subject.CommonName != testCase.expectedCommonName {
-				t.Errorf("CommonNameMismatch: Expected '%s', Got '%s'", testCase.expectedCommonName, parsedCert.Subject.CommonName)
+				t.Errorf(
+					"CommonNameMismatch: Expected '%s', Got '%s'",
+					testCase.expectedCommonName, parsedCert.Subject.CommonName,
+				)
 			}
 			if len(parsedCert.DNSNames) != len(testCase.expectedAltNames) {
-				t.Errorf("AltNamesCountMismatch: Expected %d, Got %d", len(testCase.expectedAltNames), len(parsedCert.DNSNames))
+				t.Errorf(
+					"AltNamesCountMismatch: Expected %d, Got %d",
+					len(testCase.expectedAltNames), len(parsedCert.DNSNames),
+				)
 			}
 			for altNameIndex, expectedAltName := range testCase.expectedAltNames {
-				if altNameIndex >= len(parsedCert.DNSNames) || parsedCert.DNSNames[altNameIndex] != expectedAltName {
-					t.Errorf("AltNameMismatch: Expected '%s', Got '%s'", expectedAltName, parsedCert.DNSNames[altNameIndex])
+				if altNameIndex >= len(parsedCert.DNSNames) {
+					t.Errorf(
+						"AltNameMissing: Expected '%s' at index %d",
+						expectedAltName, altNameIndex,
+					)
+					continue
+				}
+
+				if parsedCert.DNSNames[altNameIndex] != expectedAltName {
+					t.Errorf(
+						"AltNameMismatch: Expected '%s', Got '%s'",
+						expectedAltName, parsedCert.DNSNames[altNameIndex],
+					)
 				}
 			}
 
@@ -416,4 +447,406 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrivateKeyPemFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("RSAPrivateKey", func(t *testing.T) {
+		testCases := []struct {
+			bitSize         int
+			expectedBitSize int
+		}{
+			{0, 2048}, // default bit size
+			{2048, 2048},
+			{4096, 4096},
+		}
+
+		for _, testCase := range testCases {
+			keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+				Algorithm: tkValueObject.PrivateKeyAlgorithmRSA,
+				BitSize:   testCase.bitSize,
+			})
+			if err != nil {
+				t.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
+				continue
+			}
+
+			if !strings.HasPrefix(keyPem, "-----BEGIN RSA PRIVATE KEY-----") {
+				t.Errorf("InvalidRSAKeyHeader: %s", keyPem[:min(50, len(keyPem))])
+			}
+			if !strings.HasSuffix(keyPem, "-----END RSA PRIVATE KEY-----\n") {
+				t.Errorf("InvalidRSAKeyFooter")
+			}
+
+			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
+			if decodedPemBlock == nil || decodedPemBlock.Type != "RSA PRIVATE KEY" {
+				t.Errorf("DecodePEMFailed")
+				continue
+			}
+
+			parsedRsaKey, err := x509.ParsePKCS1PrivateKey(decodedPemBlock.Bytes)
+			if err != nil {
+				t.Fatalf(
+					"FailedToParseRSAKey: %v [bitSize: %d]",
+					err, testCase.bitSize,
+				)
+			}
+
+			actualBitSize := parsedRsaKey.N.BitLen()
+			if actualBitSize != testCase.expectedBitSize {
+				t.Errorf(
+					"UnexpectedBitSize: %d vs %d [requested: %d]",
+					actualBitSize, testCase.expectedBitSize, testCase.bitSize,
+				)
+			}
+		}
+	})
+
+	t.Run("ECDSAPrivateKey", func(t *testing.T) {
+		testCases := []struct {
+			bitSize       int
+			expectedCurve string
+		}{
+			{0, "P-256"}, // default curve
+			{256, "P-256"},
+			{384, "P-384"},
+			{521, "P-521"},
+		}
+
+		for _, testCase := range testCases {
+			keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+				Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
+				BitSize:   testCase.bitSize,
+			})
+			if err != nil {
+				t.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
+				continue
+			}
+
+			if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
+				t.Errorf("InvalidECKeyHeader")
+			}
+			if !strings.HasSuffix(keyPem, "-----END EC PRIVATE KEY-----\n") {
+				t.Errorf("InvalidECKeyFooter")
+			}
+
+			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
+			if decodedPemBlock == nil || decodedPemBlock.Type != "EC PRIVATE KEY" {
+				t.Errorf("DecodePEMFailed")
+				continue
+			}
+
+			parsedEcdsaKey, err := x509.ParseECPrivateKey(decodedPemBlock.Bytes)
+			if err != nil {
+				t.Fatalf(
+					"ParseECDSAKeyFailed: %v [bitSize: %d]",
+					err, testCase.bitSize,
+				)
+			}
+
+			actualCurveName := parsedEcdsaKey.Curve.Params().Name
+			if actualCurveName != testCase.expectedCurve {
+				t.Errorf(
+					"UnexpectedCurve: %s vs %s [requested bitSize: %d]",
+					actualCurveName, testCase.expectedCurve, testCase.bitSize,
+				)
+			}
+		}
+	})
+
+	t.Run("DSAPrivateKey", func(t *testing.T) {
+		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+			Algorithm: tkValueObject.PrivateKeyAlgorithmDSA,
+		})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+			return
+		}
+
+		if !strings.HasPrefix(keyPem, "-----BEGIN DSA PRIVATE KEY-----") {
+			t.Errorf("InvalidDSAKeyHeader")
+		}
+		if !strings.HasSuffix(keyPem, "-----END DSA PRIVATE KEY-----\n") {
+			t.Errorf("InvalidDSAKeyFooter")
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
+		if decodedPemBlock == nil || decodedPemBlock.Type != "DSA PRIVATE KEY" {
+			t.Errorf("DecodePEMFailed")
+		}
+	})
+
+	t.Run("Ed25519PrivateKey", func(t *testing.T) {
+		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+			Algorithm: tkValueObject.PrivateKeyAlgorithmEd25519,
+		})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+			return
+		}
+
+		if !strings.HasPrefix(keyPem, "-----BEGIN PRIVATE KEY-----") {
+			t.Errorf("InvalidEd25519KeyHeader")
+		}
+		if !strings.HasSuffix(keyPem, "-----END PRIVATE KEY-----\n") {
+			t.Errorf("InvalidEd25519KeyFooter")
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
+		if decodedPemBlock == nil || decodedPemBlock.Type != "PRIVATE KEY" {
+			t.Errorf("DecodePEMFailed")
+		}
+	})
+
+	t.Run("DefaultAlgorithm", func(t *testing.T) {
+		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{})
+		if err != nil {
+			t.Errorf("UnexpectedError: %v", err)
+			return
+		}
+
+		// Default should be ECDSA
+		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
+			t.Errorf("DefaultShouldBeECDSA")
+		}
+	})
+
+	t.Run("UnsupportedAlgorithm", func(t *testing.T) {
+		_, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+			Algorithm: "INVALID",
+		})
+		if err == nil {
+			t.Errorf("MissingExpectedError: unsupported algorithm should fail")
+		}
+		if err.Error() != "UnsupportedPrivateKeyAlgorithm" {
+			t.Errorf("UnexpectedErrorMessage: %s", err.Error())
+		}
+	})
+
+	t.Run("InvalidECDSABitSize", func(t *testing.T) {
+		invalidBitSizes := []int{128, 192, 224, 512, 1024}
+
+		for _, bitSize := range invalidBitSizes {
+			_, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+				Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
+				BitSize:   bitSize,
+			})
+			if err == nil {
+				t.Errorf(
+					"MissingExpectedError: invalid ECDSA bitSize %d should fail",
+					bitSize,
+				)
+			}
+			if err != nil && err.Error() != "InvalidECDSABitSize" {
+				t.Errorf(
+					"UnexpectedErrorMessage for bitSize %d: %s",
+					bitSize, err.Error(),
+				)
+			}
+		}
+	})
+}
+
+func TestCertificatePemFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("DefaultCertificate", func(t *testing.T) {
+		certPem, keyPem, err := synth.CertificatePemFactory(CertificateSettings{})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
+			t.Error("InvalidCertHeader")
+		}
+		if !strings.HasSuffix(certPem, "-----END CERTIFICATE-----\n") {
+			t.Error("InvalidCertFooter")
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		if decodedPemBlock == nil || decodedPemBlock.Type != "CERTIFICATE" {
+			t.Error("DecodeCertPEMFailed")
+		}
+
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if cert.Subject.CommonName != "localhost" {
+			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+		}
+		if cert.IsCA {
+			t.Error("DefaultCertShouldNotBeCA")
+		}
+
+		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
+			t.Error("InvalidKeyHeader")
+		}
+	})
+
+	t.Run("WithCommonName", func(t *testing.T) {
+		commonName, _ := tkValueObject.NewFqdn("test.example.com")
+		certPem, _, err := synth.CertificatePemFactory(CertificateSettings{
+			CommonName: &commonName,
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if cert.Subject.CommonName != "test.example.com" {
+			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+		}
+	})
+
+	t.Run("WithAltNames", func(t *testing.T) {
+		altName1, _ := tkValueObject.NewFqdn("alt1.example.com")
+		altName2, _ := tkValueObject.NewFqdn("alt2.example.com")
+
+		certPem, _, err := synth.CertificatePemFactory(CertificateSettings{
+			AltNames: []tkValueObject.Fqdn{altName1, altName2},
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if len(cert.DNSNames) != 2 {
+			t.Errorf("UnexpectedAltNamesCount: %d", len(cert.DNSNames))
+		}
+		if cert.DNSNames[0] != "alt1.example.com" || cert.DNSNames[1] != "alt2.example.com" {
+			t.Errorf("UnexpectedAltNames: %v", cert.DNSNames)
+		}
+	})
+}
+
+func TestCACertificatePemFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("DefaultCACertificate", func(t *testing.T) {
+		certPem, keyPem, err := synth.CACertificatePemFactory(CertificateSettings{})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
+			t.Error("InvalidCertHeader")
+		}
+		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
+			t.Error("InvalidKeyHeader")
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if !cert.IsCA {
+			t.Error("CertShouldBeCA")
+		}
+		if cert.Subject.CommonName != "Test CA" {
+			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+		}
+
+		expectedKeyUsage := x509.KeyUsageCertSign | x509.KeyUsageCRLSign
+		if cert.KeyUsage != expectedKeyUsage {
+			t.Errorf("UnexpectedKeyUsage: %v", cert.KeyUsage)
+		}
+	})
+
+	t.Run("CACertificateWithMaxPathLen", func(t *testing.T) {
+		maxPathLen := 2
+		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
+			MaxPathLengthPtr: &maxPathLen,
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if cert.MaxPathLen != 2 {
+			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
+		}
+	})
+
+	t.Run("CACertificateWithMaxPathLenZero", func(t *testing.T) {
+		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
+			HasMaxPathLengthZero: true,
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if cert.MaxPathLen != 0 {
+			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
+		}
+		if !cert.MaxPathLenZero {
+			t.Error("MaxPathLenZeroShouldBeTrue")
+		}
+	})
+
+	t.Run("CACertificateWithCustomCommonName", func(t *testing.T) {
+		commonName, _ := tkValueObject.NewFqdn("custom-ca.example.com")
+		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
+			CommonName: &commonName,
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if cert.Subject.CommonName != "custom-ca.example.com" {
+			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+		}
+	})
+
+	t.Run("CACertificateSetsIsCATrue", func(t *testing.T) {
+		// Test that CACertificatePemFactory always sets IsCA=true
+		// even if the settings have IsCA=false
+		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
+			IsCA: false, // This should be overridden
+		})
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		decodedPemBlock, _ := pem.Decode([]byte(certPem))
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
+
+		if !cert.IsCA {
+			t.Error("CACertificatePemFactoryShouldAlwaysSetIsCATrue")
+		}
+	})
 }

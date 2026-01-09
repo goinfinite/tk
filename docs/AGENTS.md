@@ -40,6 +40,18 @@ Contains:
 - Go-specific rules
 - Testing requirements
 
+### Review Phase
+
+**When:** After implementation is complete, before marking work as done
+
+**Read:** `docs/DEV-REVIEW.md`
+
+Contains:
+
+- Self-review checklist
+- CodeRabbit integration
+- Issue resolution workflow (test-first approach)
+
 ## Critical Rules (Always Apply)
 
 - **NEVER** create features that weren't explicitly requested
@@ -54,6 +66,7 @@ docs/
 ├── AGENTS.md              # This file - entrypoint
 ├── DEV-PLANNING.md        # Planning guidelines
 ├── DEV-IMPLEMENTATION.md  # Code style and testing rules
+├── DEV-REVIEW.md          # Review process and CodeRabbit integration
 ├── DEVELOPMENT.md         # Architecture and environment setup
 └── history/               # Archived plans (do not read unless actively working on that plan)
 ```
@@ -76,6 +89,7 @@ When you learn something new that should be permanently remembered for this proj
 
 - **Planning learnings**: Update `docs/DEV-PLANNING.md`
 - **Implementation learnings**: Update `docs/DEV-IMPLEMENTATION.md`
+- **Review learnings**: Update `docs/DEV-REVIEW.md`
 - **Architecture learnings**: Update `docs/DEVELOPMENT.md`
 - **Layer-specific learnings**: Update the relevant `.context.md` file
 
