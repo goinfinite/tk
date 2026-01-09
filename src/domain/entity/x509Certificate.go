@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -203,7 +202,7 @@ func NewX509CertificateFromEnvelopedCertificate(
 		return x509CertEntity, err
 	}
 
-	publicKeyHex := fmt.Sprintf("%x", stdlibCert.RawSubjectPublicKeyInfo)
+	publicKeyHex := hex.EncodeToString(stdlibCert.RawSubjectPublicKeyInfo)
 	publicKeyValue, err := tkValueObject.NewX509PublicKeyValue(publicKeyHex)
 	if err != nil {
 		return x509CertEntity, err
