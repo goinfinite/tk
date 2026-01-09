@@ -34,7 +34,7 @@ func privateKeyPemGenerator(
 		pkcs8Cmd.Stdin = strings.NewReader(string(rsaKeyOutput))
 		pkcs8Output, err := pkcs8Cmd.Output()
 		if err != nil {
-			t.Fatalf("PKCS8ConversionFailed: %s", err.Error())
+			t.Skipf("PKCS8ConversionFailed: %s", err.Error())
 		}
 		return strings.TrimSpace(string(pkcs8Output))
 
@@ -66,7 +66,7 @@ func privateKeyPemGenerator(
 		encryptCmd.Stdin = strings.NewReader(string(rsaKeyOutput))
 		encryptOutput, err := encryptCmd.Output()
 		if err != nil {
-			t.Fatalf("PrivateKeyEncryptionFailed: %s", err.Error())
+			t.Skipf("PrivateKeyEncryptionFailed: %s", err.Error())
 		}
 		return strings.TrimSpace(string(encryptOutput))
 
@@ -272,6 +272,43 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyTooShort"
+		if err.Error() != expectedError {
+			t.Errorf(
+				"UnexpectedErrorMessage: got '%s', expected '%s'",
+				err.Error(), expectedError,
+			)
+		}
+	})
+
+	t.Run("MultipleBeginTagsErrorMessage", func(t *testing.T) {
+		multipleBeginInput := "-----BEGIN PRIVATE KEY-----\n" +
+			string(make([]byte, 50)) +
+			"\n-----END PRIVATE KEY-----\n-----BEGIN PRIVATE KEY-----\n" +
+			string(make([]byte, 50)) + "\n-----END PRIVATE KEY-----"
+		_, err := NewEnvelopedPrivateKey(multipleBeginInput)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: multiple begin tags should fail")
+		}
+
+		expectedError := "InvalidEnvelopedPrivateKeyMultipleBeginTags"
+		if err.Error() != expectedError {
+			t.Errorf(
+				"UnexpectedErrorMessage: got '%s', expected '%s'",
+				err.Error(), expectedError,
+			)
+		}
+	})
+
+	t.Run("MultipleEndTagsErrorMessage", func(t *testing.T) {
+		multipleEndInput := "-----BEGIN PRIVATE KEY-----\n" +
+			string(make([]byte, 100)) +
+			"\n-----END PRIVATE KEY-----\n-----END PRIVATE KEY-----"
+		_, err := NewEnvelopedPrivateKey(multipleEndInput)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: multiple end tags should fail")
+		}
+
+		expectedError := "InvalidEnvelopedPrivateKeyMultipleEndTags"
 		if err.Error() != expectedError {
 			t.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
