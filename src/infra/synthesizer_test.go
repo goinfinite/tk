@@ -442,7 +442,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 			}
 
 			if !strings.HasPrefix(keyPem, "-----BEGIN RSA PRIVATE KEY-----") {
-				t.Errorf("InvalidRSAKeyHeader: %s", keyPem[:50])
+				t.Errorf("InvalidRSAKeyHeader: %s", keyPem[:min(50, len(keyPem))])
 			}
 			if !strings.HasSuffix(keyPem, "-----END RSA PRIVATE KEY-----\n") {
 				t.Errorf("InvalidRSAKeyFooter")
@@ -450,7 +450,24 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 			if decodedPemBlock == nil || decodedPemBlock.Type != "RSA PRIVATE KEY" {
-				t.Errorf("FailedToDecodePEM")
+				t.Errorf("DecodePEMFailed")
+				continue
+			}
+
+			parsedRsaKey, err := x509.ParsePKCS1PrivateKey(decodedPemBlock.Bytes)
+			if err != nil {
+				t.Fatalf(
+					"FailedToParseRSAKey: %v [bitSize: %d]",
+					err, testCase.bitSize,
+				)
+			}
+
+			actualBitSize := parsedRsaKey.N.BitLen()
+			if actualBitSize != testCase.expectedBitSize {
+				t.Errorf(
+					"UnexpectedBitSize: %d vs %d [requested: %d]",
+					actualBitSize, testCase.expectedBitSize, testCase.bitSize,
+				)
 			}
 		}
 	})
@@ -485,7 +502,24 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 			if decodedPemBlock == nil || decodedPemBlock.Type != "EC PRIVATE KEY" {
-				t.Errorf("FailedToDecodePEM")
+				t.Errorf("DecodePEMFailed")
+				continue
+			}
+
+			parsedEcdsaKey, err := x509.ParseECPrivateKey(decodedPemBlock.Bytes)
+			if err != nil {
+				t.Fatalf(
+					"ParseECDSAKeyFailed: %v [bitSize: %d]",
+					err, testCase.bitSize,
+				)
+			}
+
+			actualCurveName := parsedEcdsaKey.Curve.Params().Name
+			if actualCurveName != testCase.expectedCurve {
+				t.Errorf(
+					"UnexpectedCurve: %s vs %s [requested bitSize: %d]",
+					actualCurveName, testCase.expectedCurve, testCase.bitSize,
+				)
 			}
 		}
 	})
@@ -508,7 +542,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "DSA PRIVATE KEY" {
-			t.Errorf("FailedToDecodePEM")
+			t.Errorf("DecodePEMFailed")
 		}
 	})
 
@@ -530,7 +564,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "PRIVATE KEY" {
-			t.Errorf("FailedToDecodePEM")
+			t.Errorf("DecodePEMFailed")
 		}
 	})
 
@@ -558,6 +592,29 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 			t.Errorf("UnexpectedErrorMessage: %s", err.Error())
 		}
 	})
+
+	t.Run("InvalidECDSABitSize", func(t *testing.T) {
+		invalidBitSizes := []int{128, 192, 224, 512, 1024}
+
+		for _, bitSize := range invalidBitSizes {
+			_, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
+				Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
+				BitSize:   bitSize,
+			})
+			if err == nil {
+				t.Errorf(
+					"MissingExpectedError: invalid ECDSA bitSize %d should fail",
+					bitSize,
+				)
+			}
+			if err != nil && err.Error() != "InvalidECDSABitSize" {
+				t.Errorf(
+					"UnexpectedErrorMessage for bitSize %d: %s",
+					bitSize, err.Error(),
+				)
+			}
+		}
+	})
 }
 
 func TestCertificatePemFactory(t *testing.T) {
@@ -578,12 +635,12 @@ func TestCertificatePemFactory(t *testing.T) {
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "CERTIFICATE" {
-			t.Error("FailedToDecodeCertPEM")
+			t.Error("DecodeCertPEMFailed")
 		}
 
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("FailedToParseCertificate: %v", err)
+			t.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.Subject.CommonName != "localhost" {
@@ -608,7 +665,10 @@ func TestCertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if cert.Subject.CommonName != "test.example.com" {
 			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
@@ -627,7 +687,10 @@ func TestCertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if len(cert.DNSNames) != 2 {
 			t.Errorf("UnexpectedAltNamesCount: %d", len(cert.DNSNames))
@@ -657,7 +720,7 @@ func TestCACertificatePemFactory(t *testing.T) {
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("FailedToParseCertificate: %v", err)
+			t.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if !cert.IsCA {
@@ -683,7 +746,10 @@ func TestCACertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if cert.MaxPathLen != 2 {
 			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
@@ -699,7 +765,10 @@ func TestCACertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if cert.MaxPathLen != 0 {
 			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
@@ -719,7 +788,10 @@ func TestCACertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if cert.Subject.CommonName != "custom-ca.example.com" {
 			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
@@ -737,7 +809,10 @@ func TestCACertificatePemFactory(t *testing.T) {
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
-		cert, _ := x509.ParseCertificate(decodedPemBlock.Bytes)
+		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
+		if err != nil {
+			t.Fatalf("ParseCertificateFailed: %v", err)
+		}
 
 		if !cert.IsCA {
 			t.Error("CACertificatePemFactoryShouldAlwaysSetIsCATrue")

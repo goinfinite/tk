@@ -122,12 +122,16 @@ func (synth *Synthesizer) privateKeyGenerator(
 		return rsa.GenerateKey(cryptoRand.Reader, bitSize)
 
 	case tkValueObject.PrivateKeyAlgorithmECDSA:
-		ellipticCurve := elliptic.P256()
-		if settings.BitSize == 384 {
+		var ellipticCurve elliptic.Curve
+		switch settings.BitSize {
+		case 0, 256:
+			ellipticCurve = elliptic.P256()
+		case 384:
 			ellipticCurve = elliptic.P384()
-		}
-		if settings.BitSize == 521 {
+		case 521:
 			ellipticCurve = elliptic.P521()
+		default:
+			return generatedKey, errors.New("InvalidECDSABitSize")
 		}
 		return ecdsa.GenerateKey(ellipticCurve, cryptoRand.Reader)
 
@@ -294,26 +298,25 @@ func (synth *Synthesizer) certTemplateGenerator(
 	return template, serialNumber, nil
 }
 
-func (synth *Synthesizer) CertificatePemFactory(
+func (synth *Synthesizer) selfSignedCertPemBytesGenerator(
 	settings CertificateSettings,
-) (certPem string, keyPem string, err error) {
-	privateKeySettings := PrivateKeySettings{
+) (certPemBytes []byte, keyPemBytes []byte, err error) {
+	generatedPrivateKey, err := synth.privateKeyGenerator(PrivateKeySettings{
 		Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
 		BitSize:   256,
-	}
-	generatedPrivateKey, err := synth.privateKeyGenerator(privateKeySettings)
+	})
 	if err != nil {
-		return certPem, keyPem, err
+		return certPemBytes, keyPemBytes, err
 	}
 
 	ecdsaPrivateKey, assertOk := generatedPrivateKey.(*ecdsa.PrivateKey)
 	if !assertOk {
-		return certPem, keyPem, errors.New("PrivateKeyAssertionFailed")
+		return certPemBytes, keyPemBytes, errors.New("PrivateKeyAssertionFailed")
 	}
 
 	certificateTemplate, _, err := synth.certTemplateGenerator(settings)
 	if err != nil {
-		return certPem, keyPem, err
+		return certPemBytes, keyPemBytes, err
 	}
 
 	derEncodedCertBytes, err := x509.CreateCertificate(
@@ -321,23 +324,34 @@ func (synth *Synthesizer) CertificatePemFactory(
 		&ecdsaPrivateKey.PublicKey, ecdsaPrivateKey,
 	)
 	if err != nil {
-		return certPem, keyPem, err
+		return certPemBytes, keyPemBytes, err
 	}
 
-	certPemBytes := pem.EncodeToMemory(
+	certPemBytes = pem.EncodeToMemory(
 		&pem.Block{Type: "CERTIFICATE", Bytes: derEncodedCertBytes},
 	)
 
 	derEncodedPrivateKeyBytes, err := x509.MarshalECPrivateKey(ecdsaPrivateKey)
 	if err != nil {
-		return certPem, keyPem, err
+		return certPemBytes, keyPemBytes, err
 	}
 
-	privateKeyPemBytes := pem.EncodeToMemory(
+	keyPemBytes = pem.EncodeToMemory(
 		&pem.Block{Type: "EC PRIVATE KEY", Bytes: derEncodedPrivateKeyBytes},
 	)
 
-	return string(certPemBytes), string(privateKeyPemBytes), nil
+	return certPemBytes, keyPemBytes, nil
+}
+
+func (synth *Synthesizer) CertificatePemFactory(
+	settings CertificateSettings,
+) (certPem string, keyPem string, err error) {
+	certPemBytes, keyPemBytes, err := synth.selfSignedCertPemBytesGenerator(settings)
+	if err != nil {
+		return certPem, keyPem, err
+	}
+
+	return string(certPemBytes), string(keyPemBytes), nil
 }
 
 func (synth *Synthesizer) CACertificatePemFactory(
@@ -351,50 +365,18 @@ func (synth *Synthesizer) SelfSignedCertificatePairFactory(
 	commonName *tkValueObject.Fqdn,
 	altNames []tkValueObject.Fqdn,
 ) (certPair tls.Certificate, err error) {
-	generatedPrivateKey, err := synth.privateKeyGenerator(PrivateKeySettings{
-		Algorithm: tkValueObject.PrivateKeyAlgorithmECDSA,
-		BitSize:   256,
-	})
-	if err != nil {
-		return certPair, err
-	}
-
-	ecdsaPrivateKey, assertOk := generatedPrivateKey.(*ecdsa.PrivateKey)
-	if !assertOk {
-		return certPair, errors.New("PrivateKeyAssertionFailed")
-	}
-
-	certificateTemplate, _, err := synth.certTemplateGenerator(CertificateSettings{
-		CommonName: commonName,
-		AltNames:   altNames,
-		IsCA:       false,
-	})
-	if err != nil {
-		return certPair, err
-	}
-
-	derEncodedCertBytes, err := x509.CreateCertificate(
-		cryptoRand.Reader, &certificateTemplate, &certificateTemplate,
-		&ecdsaPrivateKey.PublicKey, ecdsaPrivateKey,
+	certPemBytes, keyPemBytes, err := synth.selfSignedCertPemBytesGenerator(
+		CertificateSettings{
+			CommonName: commonName,
+			AltNames:   altNames,
+			IsCA:       false,
+		},
 	)
 	if err != nil {
 		return certPair, err
 	}
 
-	certPemBytes := pem.EncodeToMemory(
-		&pem.Block{Type: "CERTIFICATE", Bytes: derEncodedCertBytes},
-	)
-
-	derEncodedPrivateKeyBytes, err := x509.MarshalECPrivateKey(ecdsaPrivateKey)
-	if err != nil {
-		return certPair, err
-	}
-
-	privateKeyPemBytes := pem.EncodeToMemory(
-		&pem.Block{Type: "EC PRIVATE KEY", Bytes: derEncodedPrivateKeyBytes},
-	)
-
-	return tls.X509KeyPair(certPemBytes, privateKeyPemBytes)
+	return tls.X509KeyPair(certPemBytes, keyPemBytes)
 }
 
 func (synth *Synthesizer) SelfSignedCertificatePairPemFactory(
