@@ -28,6 +28,8 @@ func TestNewX509SubjectName(t *testing.T) {
 			{"invalid&domain", X509SubjectName(""), true},
 			{"123", X509SubjectName("123"), false},
 			{nil, X509SubjectName(""), true},
+			{"*.example domain", X509SubjectName(""), true}, // Wildcards must be DNS-valid (no spaces)
+			{"*.ex ample.com", X509SubjectName(""), true},   // Wildcards must be DNS-valid (no spaces)
 		}
 
 		for _, testCase := range testCaseStructs {

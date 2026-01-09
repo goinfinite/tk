@@ -13,7 +13,7 @@ var x509SubjectNameRegex = regexp.MustCompile(
 )
 
 var x509WildcardSubjectNameRegex = regexp.MustCompile(
-	`^\*\.[a-zA-Z0-9 .\-_]+$`,
+	`^\*\.[a-zA-Z0-9.\-_]+$`,
 )
 
 type X509SubjectName string
