@@ -33,12 +33,18 @@ func NewEnvelopedPrivateKey(
 	}
 
 	beginTagCount := strings.Count(stringValue, "-----BEGIN")
-	if beginTagCount != 1 {
+	if beginTagCount == 0 {
+		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMissingBeginTag")
+	}
+	if beginTagCount > 1 {
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMultipleBeginTags")
 	}
 
 	endTagCount := strings.Count(stringValue, "-----END")
-	if endTagCount != 1 {
+	if endTagCount == 0 {
+		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMissingEndTag")
+	}
+	if endTagCount > 1 {
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMultipleEndTags")
 	}
 

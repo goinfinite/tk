@@ -316,4 +316,38 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 			)
 		}
 	})
+
+	t.Run("MissingBeginTagErrorMessage", func(t *testing.T) {
+		missingBeginInput := string(make([]byte, 100)) +
+			"\n-----END PRIVATE KEY-----"
+		_, err := NewEnvelopedPrivateKey(missingBeginInput)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: missing begin tag should fail")
+		}
+
+		expectedError := "InvalidEnvelopedPrivateKeyMissingBeginTag"
+		if err.Error() != expectedError {
+			t.Errorf(
+				"UnexpectedErrorMessage: got '%s', expected '%s'",
+				err.Error(), expectedError,
+			)
+		}
+	})
+
+	t.Run("MissingEndTagErrorMessage", func(t *testing.T) {
+		missingEndInput := "-----BEGIN PRIVATE KEY-----\n" +
+			string(make([]byte, 100))
+		_, err := NewEnvelopedPrivateKey(missingEndInput)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: missing end tag should fail")
+		}
+
+		expectedError := "InvalidEnvelopedPrivateKeyMissingEndTag"
+		if err.Error() != expectedError {
+			t.Errorf(
+				"UnexpectedErrorMessage: got '%s', expected '%s'",
+				err.Error(), expectedError,
+			)
+		}
+	})
 }
