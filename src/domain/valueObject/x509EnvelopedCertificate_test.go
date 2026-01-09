@@ -1,16 +1,36 @@
 package tkValueObject
 
-import "testing"
+import (
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+func selfSignedCertificatePemGenerator(t *testing.T) string {
+	t.Helper()
+
+	rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
+	rsaKeyOutput, err := rsaKeyCmd.Output()
+	if err != nil {
+		t.Skipf("OpenSslNotAvailable: %s", err.Error())
+	}
+
+	// We're unable to use tkInfra.Synthesizer here due to circular dependency.
+	certCmd := exec.Command(
+		"openssl", "req", "-new", "-x509", "-key", "/dev/stdin",
+		"-days", "1", "-subj", "/CN=test",
+	)
+	certCmd.Stdin = strings.NewReader(string(rsaKeyOutput))
+	certOutput, err := certCmd.Output()
+	if err != nil {
+		t.Fatalf("CertificateGenerationFailed: %s", err.Error())
+	}
+
+	return strings.TrimSpace(string(certOutput))
+}
 
 func TestNewX509EnvelopedCertificate(t *testing.T) {
-	validCert := `-----BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAKL0UG+mRkSvMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTcwODE0MDk1NzU3WhcNMTgwODE0MDk1NzU3WjBF
-MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEAyWm
------END CERTIFICATE-----`
+	validCert := selfSignedCertificatePemGenerator(t)
 
 	t.Run("ValidEnvelopedCertificate", func(t *testing.T) {
 		testCaseStructs := []struct {
