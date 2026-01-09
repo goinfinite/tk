@@ -37,6 +37,11 @@ func TestNewX509DistinguishedName(t *testing.T) {
 				t.Errorf("UnexpectedOrganization")
 			}
 
+			if testCase.organizationalUnit != nil &&
+				len(result.OrganizationalUnit) != len(testCase.organizationalUnit) {
+				t.Errorf("UnexpectedOrganizationalUnitLength")
+			}
+
 			if testCase.locality != nil && result.Locality != testCase.locality {
 				t.Errorf("UnexpectedLocality")
 			}
