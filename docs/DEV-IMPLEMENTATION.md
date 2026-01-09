@@ -25,6 +25,8 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Variable names MUST convey the intention or purpose rather than describing their content
 - Variable names SHOULD reflect the primary flow, not conditional outcomes
 - Variable names MUST be descriptive and avoid generic names like "cert", "data", "result"
+- Single-word variable names are usually too generic and SHOULD be avoided (e.g., use `dsaParameters` instead of `params`, `ellipticCurve` instead of `curve`, `decodedPemBlock` instead of `block`)
+- Exceptions to single-word rule: standard Go conventions like `err` for errors, test variable `t`, and when the single word clearly conveys purpose in context
 - Optional pointer variables MUST have "Ptr" suffix (e.g., `organizationPtr *X509Organization`)
 - Avoid ambiguous variable names - qualify with context when needed (e.g., `stdlibCert` not `parsedCert` to clarify it's from Go stdlib)
 - Create descriptive intermediate variables for mysterious commands (e.g., `sha256FingerprintHex := hex.EncodeToString(sha256HashBytes[:])` instead of inline)
@@ -52,6 +54,8 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Avoid redundant prefixes in struct field names when the context is already clear
 - Struct fields SHOULD be ordered by importance, followed by alphabetical order
 - Struct required fields SHOULD be placed before optional (pointer) fields
+- Structs and types SHOULD NOT be exposed at package level unless they are used by multiple methods across different files or layers
+- Prefer defining auxiliary types inside methods when they are only used within that method's scope
 
 ### Named Return Values
 
@@ -91,6 +95,7 @@ description: Code style, Go-specific rules, and testing guidelines.
 - Use `t.Fatalf` to interrupt tests immediately on critical errors (setup failures, unexpected errors, assertion failures)
 - Use `t.Errorf` only in for loops or situations where the test should continue running after an error
 - When an error prevents the test from proceeding meaningfully, always use `t.Fatalf` instead of `t.Errorf`
+- **NEVER** hardcode certificates, private keys, or secrets in test files - use commands (e.g., `openssl`) to generate them at test time or analyze existing test data
 
 ## Layer-Specific Rules
 
