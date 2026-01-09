@@ -13,8 +13,6 @@ var x509OrgFieldRegex = regexp.MustCompile(
 	`^[a-zA-Z0-9 .,\-_()&/]{1,255}$`,
 )
 
-var x509OrganizationRegex = x509OrgFieldRegex
-
 type X509Organization string
 
 func NewX509Organization(value any) (org X509Organization, err error) {
@@ -28,7 +26,7 @@ func NewX509Organization(value any) (org X509Organization, err error) {
 		return org, errors.New("InvalidX509OrganizationNormalizationFailed")
 	}
 
-	if !x509OrganizationRegex.MatchString(normalizedValue) {
+	if !x509OrgFieldRegex.MatchString(normalizedValue) {
 		return org, errors.New("InvalidX509Organization")
 	}
 

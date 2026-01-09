@@ -6,8 +6,6 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var x509OrganizationalUnitRegex = x509OrgFieldRegex
-
 type X509OrganizationalUnit string
 
 func NewX509OrganizationalUnit(
@@ -23,7 +21,7 @@ func NewX509OrganizationalUnit(
 		return unit, errors.New("InvalidX509OrganizationalUnitNormalizationFailed")
 	}
 
-	if !x509OrganizationalUnitRegex.MatchString(normalizedValue) {
+	if !x509OrgFieldRegex.MatchString(normalizedValue) {
 		return unit, errors.New("InvalidX509OrganizationalUnit")
 	}
 
