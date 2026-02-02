@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.1 - 2026/02/XX
+chore: remove all agents related files
+
 0.2.0 - 2026/01/09
 feat: x509 certificate value objects and entity
 feat: add PrivateKeyPemFactory to Synthesizer (supports RSA, ECDSA, DSA, Ed25519)
