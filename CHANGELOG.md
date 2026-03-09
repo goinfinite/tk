@@ -1,7 +1,12 @@
 # Changelog
 
 ```log
-0.2.1 - 2026/02/XX
+0.2.1 - 2026/03/09
+refactor: remove hardcoded "id" column assumption from PaginationQueryBuilder
+fix: complete IsLocal() loopback detection for IPv4 range and IPv6
+fix: strip IPv6 zone ID suffix in IpAddress value object
+fix: replace RealIP() with echo.ExtractIPDirect() in presentation layer
+fix: extract operatorAccountId from echo context in request input reader
 chore: remove all agents related files
 chore: update dependencies
 fix: export Shell error const
