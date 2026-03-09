@@ -11,6 +11,10 @@ import (
 type UnixTime int64
 
 func NewUnixTime(value any) (unixTime UnixTime, err error) {
+	if existentUnixTime, assertOk := value.(UnixTime); assertOk {
+		return existentUnixTime, nil
+	}
+
 	intValue, err := tkVoUtil.InterfaceToInt64(value)
 	if err != nil {
 		return unixTime, errors.New("UnixTimeMustBeInt64")

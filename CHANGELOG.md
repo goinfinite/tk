@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.2 - 2026/03/09
+refactor: add type assertion short-circuit to VO constructors
+
 0.2.1 - 2026/03/09
 refactor: remove hardcoded "id" column assumption from PaginationQueryBuilder
 fix: complete IsLocal() loopback detection for IPv4 range and IPv6
