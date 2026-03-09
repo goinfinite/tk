@@ -14,12 +14,13 @@ var (
 	// \p{Pc}	a punctuation character such as an underscore that connects words.
 	// \p{Pd}	any kind of hyphen or dash.
 	// \p{Zs}	a whitespace character that is invisible, but does take up space.
+	// \*		a literal asterisk, used for glob patterns (e.g. *.md, composer*).
 	// Unsafe allows for additional characters:
 	// \p{S}	math symbols, currency signs, dingbats, box-drawing characters, etc.
 	// \p{P}	any kind of punctuation character.
-	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
-	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.]*[\p{L}\p{N}\p{Pc}\p{Pd}]$`)
-	forbiddenUnixFileNameRegex = regexp.MustCompile(`^(\.|\.\.|\~|\^|\*|\/|\\)$|[\|\/\\]`)
+	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\(\)\[\]\+\.\*]*[\p{L}\p{N}\p{Pc}\p{Pd}\*]$`)
+	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*]?[\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.\*]*[\p{L}\p{N}\p{Pc}\p{Pd}\*]$`)
+	forbiddenUnixFileNameRegex = regexp.MustCompile(`^(\.|\.\.|\~|\^|\*|\/|\\)$|[\|\/\\]|\*{2,}`)
 )
 
 type UnixFileName string

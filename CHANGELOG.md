@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.3 - 2026/03/09
+fix: allow glob wildcard in UnixFileName VO and forbid consecutive asterisks
+
 0.2.2 - 2026/03/09
 refactor: add type assertion short-circuit to VO constructors
 
