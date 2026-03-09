@@ -3,6 +3,7 @@ package tkValueObject
 import (
 	"errors"
 	"net"
+	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -21,6 +22,7 @@ func NewIpAddress(value any) (ipAddress IpAddress, err error) {
 		return ipAddress, errors.New("IpAddressValueCannotBeEmpty")
 	}
 
+	stringValue, _, _ = strings.Cut(stringValue, "%")
 	if net.ParseIP(stringValue) == nil {
 		return ipAddress, errors.New("InvalidIpAddress")
 	}
@@ -33,7 +35,11 @@ func (vo IpAddress) String() string {
 }
 
 func (vo IpAddress) IsLocal() bool {
-	return vo == IpAddressLocal
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.IsLoopback()
 }
 
 func (vo IpAddress) IsIpv4() bool {

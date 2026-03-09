@@ -63,7 +63,9 @@ func isOperatorTrustworthy(echoContext echo.Context) bool {
 		return false
 	}
 
-	rawOperatorIpAddress := echoContext.RealIP()
+	rawOperatorIpAddress := echo.ExtractIPDirect()(
+		echoContext.Request(),
+	)
 	if rawOperatorIpAddress == "" {
 		return false
 	}
@@ -158,7 +160,10 @@ func apiHandlePanic(echoContext echo.Context) {
 	echoContext.JSON(statusCode, jsonResponse)
 
 	panicReportPtr.RequestUri = echoContext.Request().RequestURI
-	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(echoContext.RealIP())
+	rawIpAddress := echo.ExtractIPDirect()(
+		echoContext.Request(),
+	)
+	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawIpAddress)
 	if ipErr == nil {
 		panicReportPtr.OperatorIpAddress = operatorIpAddress.String()
 	}
