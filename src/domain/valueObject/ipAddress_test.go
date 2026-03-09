@@ -16,6 +16,11 @@ func TestNewIpAddress(t *testing.T) {
 			{"172.16.0.1", IpAddress("172.16.0.1"), false},
 			{"::1", IpAddress("::1"), false},
 			{"2001:db8::1", IpAddress("2001:db8::1"), false},
+			// IPv6 with zone ID suffix
+			{"fe80::1%eth0", IpAddress("fe80::1"), false},
+			{"fe80::e05c:aaff:fe78:825%eno1", IpAddress("fe80::e05c:aaff:fe78:825"), false},
+			// IPv4 with zone ID suffix
+			{"127.0.0.1%something", IpAddress("127.0.0.1"), false},
 			// Invalid IP Addresses
 			{"192.168.1.256", IpAddress(""), true},
 			{"300.0.0.1", IpAddress(""), true},
@@ -72,8 +77,13 @@ func TestNewIpAddress(t *testing.T) {
 			expectedOutput bool
 		}{
 			{IpAddress("127.0.0.1"), true},
+			{IpAddress("127.0.0.2"), true},
+			{IpAddress("127.255.255.255"), true},
+			{IpAddress("::1"), true},
 			{IpAddress("192.168.1.1"), false},
-			{IpAddress("::1"), false},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("::2"), false},
+			{IpAddress("2001:db8::1"), false},
 		}
 
 		for _, testCase := range testCaseStructs {

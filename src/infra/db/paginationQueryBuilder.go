@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
-	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/iancoleman/strcase"
 	"gorm.io/gorm"
 )
@@ -19,6 +18,7 @@ const (
 func PaginationQueryBuilder(
 	dbQuery *gorm.DB,
 	requestPagination tkDto.Pagination,
+	primaryKeyColumn string,
 ) (paginatedQuery *gorm.DB, responsePagination tkDto.Pagination, err error) {
 	if requestPagination.ItemsPerPage == 0 {
 		return paginatedQuery, responsePagination, errors.New(errItemsPerPageCannotBeZero)
@@ -38,19 +38,25 @@ func PaginationQueryBuilder(
 			paginatedQuery = paginatedQuery.Offset(offset)
 		}
 	default:
-		paginatedQuery = paginatedQuery.Where("id > ?", requestPagination.LastSeenId.String())
+		cursorColumn := "id"
+		if primaryKeyColumn != "" {
+			cursorColumn = primaryKeyColumn
+		}
+		paginatedQuery = paginatedQuery.Where(
+			cursorColumn+" > ?",
+			requestPagination.LastSeenId.String(),
+		)
 	}
 
-	orderStatement := "id " + tkValueObject.PaginationSortDirectionAsc.String()
 	if requestPagination.SortBy != nil {
-		orderStatement = requestPagination.SortBy.String()
+		orderStatement := requestPagination.SortBy.String()
 		orderStatement = strings.ToLower(orderStatement)
 		orderStatement = strcase.ToSnake(orderStatement)
 		if requestPagination.SortDirection != nil {
 			orderStatement += " " + requestPagination.SortDirection.String()
 		}
+		paginatedQuery = paginatedQuery.Order(orderStatement)
 	}
-	paginatedQuery = paginatedQuery.Order(orderStatement)
 
 	itemsTotalUint := uint64(itemsTotal)
 	pagesTotal := uint32(
