@@ -1,18 +1,18 @@
 module github.com/goinfinite/tk
 
-go 1.25.5
+go 1.26.1
 
 require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/glebarez/sqlite v1.11.0
-	github.com/goccy/go-yaml v1.19.1
+	github.com/goccy/go-yaml v1.19.2
 	github.com/iancoleman/strcase v0.3.0
 	github.com/joho/godotenv v1.5.1
-	github.com/labstack/echo/v4 v4.15.0
+	github.com/labstack/echo/v4 v4.15.1
 	github.com/rs/zerolog v1.34.0
-	github.com/samber/slog-zerolog/v2 v2.9.0
-	golang.org/x/term v0.38.0
-	golang.org/x/text v0.32.0
+	github.com/samber/slog-zerolog/v2 v2.9.1
+	golang.org/x/term v0.40.0
+	golang.org/x/text v0.34.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -28,16 +28,15 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/samber/lo v1.52.0 // indirect
-	github.com/samber/slog-common v0.19.0 // indirect
+	github.com/samber/lo v1.53.0 // indirect
+	github.com/samber/slog-common v0.20.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	modernc.org/libc v1.67.4 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.42.2 // indirect
+	modernc.org/sqlite v1.46.1 // indirect
 )

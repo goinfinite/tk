@@ -3,6 +3,8 @@
 ```log
 0.2.1 - 2026/02/XX
 chore: remove all agents related files
+chore: update dependencies
+fix: export Shell error const
 
 0.2.0 - 2026/01/09
 feat: x509 certificate value objects and entity
