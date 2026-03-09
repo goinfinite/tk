@@ -21,6 +21,10 @@ type UnixAbsoluteFilePath string
 func NewUnixAbsoluteFilePath(value any, allowUnsafeChars bool) (
 	filePath UnixAbsoluteFilePath, err error,
 ) {
+	if existentFilePath, assertOk := value.(UnixAbsoluteFilePath); assertOk {
+		return existentFilePath, nil
+	}
+
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return filePath, errors.New("UnixAbsoluteFilePathValueMustBeString")

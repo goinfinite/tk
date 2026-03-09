@@ -13,6 +13,10 @@ type IpAddress string
 var IpAddressLocal = IpAddress("127.0.0.1")
 
 func NewIpAddress(value any) (ipAddress IpAddress, err error) {
+	if existentIpAddress, assertOk := value.(IpAddress); assertOk {
+		return existentIpAddress, nil
+	}
+
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return ipAddress, errors.New("IpAddressValueMustBeString")

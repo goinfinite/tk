@@ -12,6 +12,10 @@ var paginationLastSeenIdRegex = regexp.MustCompile(`^\w[\w\-]{0,255}$`)
 type PaginationLastSeenId string
 
 func NewPaginationLastSeenId(value any) (lastSeenId PaginationLastSeenId, err error) {
+	if existentLastSeenId, assertOk := value.(PaginationLastSeenId); assertOk {
+		return existentLastSeenId, nil
+	}
+
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return lastSeenId, errors.New("PaginationLastSeenIdMustBeString")

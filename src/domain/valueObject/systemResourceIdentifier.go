@@ -29,6 +29,10 @@ var systemResourceIdentifierRegex = regexp.MustCompile(`^sri://(?P<accountId>\d{
 type SystemResourceIdentifier string
 
 func NewSystemResourceIdentifier(value any) (sri SystemResourceIdentifier, err error) {
+	if existentSri, assertOk := value.(SystemResourceIdentifier); assertOk {
+		return existentSri, nil
+	}
+
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return sri, errors.New("SystemResourceIdentifierMustBeString")

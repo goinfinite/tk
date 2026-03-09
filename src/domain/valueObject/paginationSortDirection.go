@@ -17,6 +17,10 @@ type PaginationSortDirection string
 func NewPaginationSortDirection(value any) (
 	sortDirection PaginationSortDirection, err error,
 ) {
+	if existentSortDirection, assertOk := value.(PaginationSortDirection); assertOk {
+		return existentSortDirection, nil
+	}
+
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return sortDirection, errors.New("PaginationSortDirectionMustBeString")

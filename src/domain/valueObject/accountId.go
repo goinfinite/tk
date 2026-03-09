@@ -12,6 +12,10 @@ var AccountIdSystem = AccountId(0)
 type AccountId uint64
 
 func NewAccountId(value any) (accountId AccountId, err error) {
+	if existentAccountId, assertOk := value.(AccountId); assertOk {
+		return existentAccountId, nil
+	}
+
 	uint64Value, err := tkVoUtil.InterfaceToUint64(value)
 	if err != nil {
 		return accountId, errors.New("AccountIdMustBeUint64")
