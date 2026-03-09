@@ -151,11 +151,11 @@ Reads a list of trusted IP addresses from the TRUSTED_IPS environment variable.
 
 ## API Request Input Reading
 
-Reads and merges HTTP request input from path parameters, query strings, headers, and request body (JSON or form) into a single map.
+Reads and merges HTTP request input from path parameters, query strings, and request body (JSON or form) into a single map.
 
 **Flow:**
 
-1. `src/presentation/requestInputReader.go` — `ApiRequestInputReader` with `ReadAll` method that merges all input sources; supports dot-notation keys for hierarchical maps and multipart file uploads
+1. `src/presentation/requestInputReader.go` — `ApiRequestInputReader.Reader` merges request body, query params, route params, operator context, and multipart file uploads; supports dot-notation keys for hierarchical maps
 
 ---
 
