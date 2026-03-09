@@ -10,3 +10,5 @@ CLAUDE.md
 AGENTS.md
 .claude
 .agents
+.agents/
+.memory/
