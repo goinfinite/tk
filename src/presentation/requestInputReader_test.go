@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/labstack/echo/v4"
 )
 
@@ -582,14 +583,14 @@ func TestApiRequestInputReader(t *testing.T) {
 		httpRequest.Header.Set("Content-Type", "application/json")
 		httpRecorder := httptest.NewRecorder()
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
-		echoContext.Set("operatorAccountId", uint64(42))
+		echoContext.Set("operatorAccountId", tkValueObject.AccountId(42))
 
 		parsedRequestBody, err := requestInputReader.Reader(echoContext)
 		if err != nil {
 			t.Fatalf("UnexpectedError: %v", err)
 		}
 
-		if parsedRequestBody["operatorAccountId"] != uint64(42) {
+		if parsedRequestBody["operatorAccountId"] != tkValueObject.AccountId(42) {
 			t.Errorf(
 				"OperatorAccountIdMismatch: expected 42, got %v",
 				parsedRequestBody["operatorAccountId"],

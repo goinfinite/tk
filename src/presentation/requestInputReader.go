@@ -117,6 +117,7 @@ func (ApiRequestInputReader) MultipartFilesProcessor(
 //
 // Operator context (if present in Echo context):
 //   - operatorSri: Extracted from context key and included in the result map.
+//   - operatorAccountId: Extracted from context key and included in the result map.
 //   - operatorIpAddress: If missing, populated using echo.ExtractIPDirect().
 //
 // Returns:
@@ -176,6 +177,11 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 	requestBody["operatorSri"] = nil
 	if operatorSri, assertOk := echoContext.Get("operatorSri").(tkValueObject.SystemResourceIdentifier); assertOk {
 		requestBody["operatorSri"] = operatorSri
+	}
+
+	requestBody["operatorAccountId"] = nil
+	if operatorAccountId, assertOk := echoContext.Get("operatorAccountId").(tkValueObject.AccountId); assertOk {
+		requestBody["operatorAccountId"] = operatorAccountId
 	}
 
 	requestBody["operatorIpAddress"] = nil
