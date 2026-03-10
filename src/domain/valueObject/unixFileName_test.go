@@ -51,6 +51,8 @@ func TestNewUnixFileName(t *testing.T) {
 			{123, UnixFileName("123"), false},
 			{true, UnixFileName("true"), false},
 			// Invalid file names
+			{"(file).txt", UnixFileName(""), true},
+			{"+leading.txt", UnixFileName(""), true},
 			{"Imagem - Sem Título & BW.jpg", UnixFileName("Imagem - Sem Título & BW.jpg"), true},
 			{"Imagem - Sem Título # BW.jpg", UnixFileName("Imagem - Sem Título # BW.jpg"), true},
 			{"Imagem - Sem Título @ BW.jpg", UnixFileName("Imagem - Sem Título @ BW.jpg"), true},
@@ -146,8 +148,8 @@ func TestNewUnixFileName(t *testing.T) {
 			{true, UnixFileName("true"), false},
 			{"file.php?blabla", UnixFileName("file.php?blabla"), false},
 			{"file.php;id", UnixFileName("file.php;id"), false},
-			{"@<php52.sandbox.ntorga.com>.php", UnixFileName("@<php52.sandbox.ntorga.com>.php"), false},
 			// Invalid file names
+			{"@<php52.sandbox.ntorga.com>.php", UnixFileName(""), true},
 			{"", UnixFileName(""), true},
 			{"*", UnixFileName(""), true},
 			{"**", UnixFileName(""), true},
