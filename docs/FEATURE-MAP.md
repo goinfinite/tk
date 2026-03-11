@@ -165,7 +165,7 @@ Wraps responses in a standard envelope for API consumers and provides syntax-hig
 
 **Flow:**
 
-1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON responses; `CliResponseWrapper` for terminal output with chroma syntax highlighting
+1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON responses; `LiaisonCliResponseRenderer` for terminal output with chroma syntax highlighting; `SimpleCliResponseRenderer(isSuccess, message)` for simplified CLI usage — maps isSuccess to a LiaisonResponse status and delegates to LiaisonCliResponseRenderer for JSON envelope output
 
 ---
 

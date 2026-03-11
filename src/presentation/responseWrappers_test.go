@@ -490,3 +490,129 @@ func main() {
 		})
 	}
 }
+
+func TestSimpleCliResponseRendererExitCodes(t *testing.T) {
+	testCases := []struct {
+		name             string
+		isSuccess        bool
+		message          string
+		expectedExitCode int
+	}{
+		{
+			name:             "SuccessStatus",
+			isSuccess:        true,
+			message:          "OperationSuccessful",
+			expectedExitCode: 0,
+		},
+		{
+			name:             "FailureStatus",
+			isSuccess:        false,
+			message:          "InvalidAccountId",
+			expectedExitCode: 1,
+		},
+	}
+
+	tempDir := t.TempDir()
+
+	projectRoot, err := filepath.Abs("../../")
+	if err != nil {
+		t.Fatalf("ResolveProjectRootFailed: %v", err)
+	}
+
+	testProgramGoMod := `module testSimpleCliResponseRenderer
+
+go 1.26.1
+
+require github.com/goinfinite/tk v0.0.0
+
+replace github.com/goinfinite/tk => ` + projectRoot + `
+`
+	workingDir, err := filepath.Abs(tempDir)
+	if err != nil {
+		t.Fatalf("ResolveWorkingDirectoryFailed: %v", err)
+	}
+
+	fileClerk := tkInfra.FileClerk{}
+	err = fileClerk.UpdateFileContent(
+		workingDir+"/go.mod", testProgramGoMod, true,
+	)
+	if err != nil {
+		t.Fatalf("WriteGoModFailed: %v", err)
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			isSuccessLiteral := "false"
+			if testCase.isSuccess {
+				isSuccessLiteral = "true"
+			}
+
+			testProgramMain := `package main
+
+import tkPresentation "github.com/goinfinite/tk/src/presentation"
+
+func main() {
+	tkPresentation.SimpleCliResponseRenderer(
+		` + isSuccessLiteral + `, "` + testCase.message + `",
+	)
+}`
+
+			testFile := tempDir +
+				"/testSimpleCliResponseRenderer.go"
+			err = fileClerk.UpdateFileContent(
+				testFile, testProgramMain, true,
+			)
+			if err != nil {
+				t.Fatalf("WriteTestProgramFailed: %v", err)
+			}
+
+			if !fileClerk.FileExists(workingDir + "/go.sum") {
+				goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
+					Command: "go",
+					Args:    []string{"mod", "tidy"},
+					WorkingDirectory: workingDir,
+				})
+				_, err = goModShell.Run()
+				if err != nil {
+					t.Fatalf("RunGoModTidyFailed: %v", err)
+				}
+			}
+
+			goRunShell := tkInfra.NewShell(tkInfra.ShellSettings{
+				Command: "go",
+				Args:    []string{"run", testFile},
+				WorkingDirectory: workingDir,
+				Envs:   []string{"TERM=dumb"},
+			})
+			stdOut, err := goRunShell.Run()
+			var stdErr string
+			var exitCode int
+			switch shellErr := err.(type) {
+			case *tkInfra.ShellError:
+				exitCode = shellErr.ExitCode
+				stdErr = string(shellErr.StdErr)
+			case nil:
+				exitCode = 0
+			default:
+				t.Fatalf("CommandExecutionFailed: %v", err)
+			}
+
+			if exitCode != testCase.expectedExitCode {
+				t.Errorf(
+					"ExitCodeMismatch: expected '%d', got '%d'."+
+						" StdOut: '%s' // StdErr: '%s'",
+					testCase.expectedExitCode, exitCode,
+					stdOut, stdErr,
+				)
+			}
+
+			if !strings.Contains(stdOut, testCase.message) {
+				t.Errorf(
+					"MessageMismatch: expected '%s'"+
+						" to be in '%s'",
+					testCase.message, stdOut,
+				)
+			}
+		})
+	}
+}
