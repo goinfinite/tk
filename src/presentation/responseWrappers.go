@@ -167,3 +167,17 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	}
 	fmt.Println()
 }
+
+func SimpleCliResponseRenderer(
+	isSuccess bool, message string,
+) {
+	status := LiaisonResponseStatusUserError
+	if isSuccess {
+		status = LiaisonResponseStatusSuccess
+	}
+
+	liaisonResponse := NewLiaisonResponseNoMessage(
+		status, message,
+	)
+	LiaisonCliResponseRenderer(liaisonResponse)
+}
