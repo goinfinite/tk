@@ -1,7 +1,13 @@
 # Changelog
 
 ```log
+0.2.4 - 2026/03/12
+fix: add missing os.Exit on interactive terminal path in LiaisonCliResponseRenderer
+refactor: replace binary exit codes with BSD sysexits.h conventions in CLI renderer
+
 0.2.3 - 2026/03/09
+feat: add SimpleCliResponseRenderer for simplified CLI error output
+fix: enforce required first character in UnixFileName regex patterns
 fix: allow glob wildcard in UnixFileName VO and forbid consecutive asterisks
 
 0.2.2 - 2026/03/09
