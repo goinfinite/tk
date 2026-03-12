@@ -368,48 +368,74 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 			name:             "MultiStatus",
 			status:           LiaisonResponseStatusMultiStatus,
 			readableMessage:  "MultipleOperationsOccurred",
-			expectedExitCode: 1,
+			expectedExitCode: 65,
 		},
 		{
 			name:             "UserErrorStatus",
 			status:           LiaisonResponseStatusUserError,
 			readableMessage:  "InvalidUserInput",
-			expectedExitCode: 1,
+			expectedExitCode: 64,
 		},
 		{
 			name:             "UnauthorizedStatus",
 			status:           LiaisonResponseStatusUnauthorized,
 			readableMessage:  "AuthorizationRequired",
-			expectedExitCode: 1,
+			expectedExitCode: 77,
 		},
 		{
 			name:             "ForbiddenStatus",
 			status:           LiaisonResponseStatusForbidden,
 			readableMessage:  "AccessDenied",
-			expectedExitCode: 1,
+			expectedExitCode: 77,
 		},
 		{
 			name:             "InfraErrorStatus",
 			status:           LiaisonResponseStatusInfraError,
 			readableMessage:  "InternalInfrastructureError",
-			expectedExitCode: 1,
+			expectedExitCode: 69,
 		},
 		{
 			name:             "UnknownErrorStatus",
 			status:           LiaisonResponseStatusUnknownError,
 			readableMessage:  "AnUnknownErrorOccurred",
-			expectedExitCode: 1,
+			expectedExitCode: 70,
+		},
+		{
+			name:             "NotFoundStatus",
+			status:           LiaisonResponseStatusNotFound,
+			readableMessage:  "ResourceNotFound",
+			expectedExitCode: 66,
+		},
+		{
+			name:             "TimeoutStatus",
+			status:           LiaisonResponseStatusTimeout,
+			readableMessage:  "RequestTimedOut",
+			expectedExitCode: 75,
+		},
+		{
+			name:             "RateLimitedStatus",
+			status:           LiaisonResponseStatusRateLimited,
+			readableMessage:  "TooManyRequests",
+			expectedExitCode: 75,
 		},
 	}
 
 	// Since LiaisonCliResponseRenderer calls os.Exit, we test the exit code logic
-	// by creating a test program that we run in a subprocess.
+	// by creating a test program that we compile and run in a subprocess.
 	tempDir := t.TempDir()
+
+	projectRoot, err := filepath.Abs("../../")
+	if err != nil {
+		t.Fatalf("ResolveProjectRootFailed: %v", err)
+	}
+
 	testProgramGoMod := `module testLiaisonCliResponseRenderer
 
-go 1.25.3
+go 1.26.1
 
-require github.com/goinfinite/tk v0.1.2
+require github.com/goinfinite/tk v0.0.0
+
+replace github.com/goinfinite/tk => ` + projectRoot + `
 `
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
@@ -421,6 +447,9 @@ require github.com/goinfinite/tk v0.1.2
 	if err != nil {
 		t.Fatalf("WriteGoModFailed: %v", err)
 	}
+
+	testFile := tempDir + "/testLiaisonCliResponseRenderer.go"
+	binaryPath := tempDir + "/testLiaisonCliResponseRenderer"
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -437,7 +466,6 @@ func main() {
 	tkPresentation.LiaisonCliResponseRenderer(liaisonResponse)
 }`
 
-			testFile := tempDir + "/testLiaisonCliResponseRenderer.go"
 			err = fileClerk.UpdateFileContent(testFile, testProgramMain, true)
 			if err != nil {
 				t.Fatalf("WriteTestProgramFailed: %v", err)
@@ -455,13 +483,22 @@ func main() {
 				}
 			}
 
-			goRunShell := tkInfra.NewShell(tkInfra.ShellSettings{
+			goBuildShell := tkInfra.NewShell(tkInfra.ShellSettings{
 				Command:          "go",
-				Args:             []string{"run", testFile},
+				Args:             []string{"build", "-o", binaryPath, testFile},
+				WorkingDirectory: workingDir,
+			})
+			_, err = goBuildShell.Run()
+			if err != nil {
+				t.Fatalf("GoBuildFailed: %v", err)
+			}
+
+			runShell := tkInfra.NewShell(tkInfra.ShellSettings{
+				Command:          binaryPath,
 				WorkingDirectory: workingDir,
 				Envs:             []string{"TERM=dumb"},
 			})
-			stdOut, err := goRunShell.Run()
+			stdOut, err := runShell.Run()
 			var stdErr string
 			var exitCode int
 			switch shellErr := err.(type) {
@@ -508,7 +545,7 @@ func TestSimpleCliResponseRendererExitCodes(t *testing.T) {
 			name:             "FailureStatus",
 			isSuccess:        false,
 			message:          "InvalidAccountId",
-			expectedExitCode: 1,
+			expectedExitCode: 64,
 		},
 	}
 
@@ -540,6 +577,9 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 		t.Fatalf("WriteGoModFailed: %v", err)
 	}
 
+	testFile := tempDir + "/testSimpleCliResponseRenderer.go"
+	binaryPath := tempDir + "/testSimpleCliResponseRenderer"
+
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			isSuccessLiteral := "false"
@@ -557,8 +597,6 @@ func main() {
 	)
 }`
 
-			testFile := tempDir +
-				"/testSimpleCliResponseRenderer.go"
 			err = fileClerk.UpdateFileContent(
 				testFile, testProgramMain, true,
 			)
@@ -568,8 +606,8 @@ func main() {
 
 			if !fileClerk.FileExists(workingDir + "/go.sum") {
 				goModShell := tkInfra.NewShell(tkInfra.ShellSettings{
-					Command: "go",
-					Args:    []string{"mod", "tidy"},
+					Command:          "go",
+					Args:             []string{"mod", "tidy"},
 					WorkingDirectory: workingDir,
 				})
 				_, err = goModShell.Run()
@@ -578,13 +616,22 @@ func main() {
 				}
 			}
 
-			goRunShell := tkInfra.NewShell(tkInfra.ShellSettings{
-				Command: "go",
-				Args:    []string{"run", testFile},
+			goBuildShell := tkInfra.NewShell(tkInfra.ShellSettings{
+				Command:          "go",
+				Args:             []string{"build", "-o", binaryPath, testFile},
 				WorkingDirectory: workingDir,
-				Envs:   []string{"TERM=dumb"},
 			})
-			stdOut, err := goRunShell.Run()
+			_, err = goBuildShell.Run()
+			if err != nil {
+				t.Fatalf("GoBuildFailed: %v", err)
+			}
+
+			runShell := tkInfra.NewShell(tkInfra.ShellSettings{
+				Command:          binaryPath,
+				WorkingDirectory: workingDir,
+				Envs:             []string{"TERM=dumb"},
+			})
+			stdOut, err := runShell.Run()
 			var stdErr string
 			var exitCode int
 			switch shellErr := err.(type) {

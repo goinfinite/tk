@@ -113,16 +113,43 @@ func LiaisonApiResponseEmitter(
 }
 
 func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
-	exitCode := 0
+	const (
+		exitCodeOk          = 0
+		exitCodeUsage       = 64
+		exitCodeDataErr     = 65
+		exitCodeNoInput     = 66
+		exitCodeUnavailable = 69
+		exitCodeSoftware    = 70
+		exitCodeTempFail    = 75
+		exitCodeNoPerm      = 77
+	)
+
+	exitCode := exitCodeOk
 	switch liaisonResponse.Status {
-	case LiaisonResponseStatusMultiStatus, LiaisonResponseStatusUserError,
-		LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError,
-		LiaisonResponseStatusUnauthorized, LiaisonResponseStatusForbidden,
-		LiaisonResponseStatusNotFound, LiaisonResponseStatusTimeout,
-		LiaisonResponseStatusRateLimited:
-		exitCode = 1
+	case LiaisonResponseStatusSuccess:
+		exitCode = exitCodeOk
+	case LiaisonResponseStatusCreated:
+		exitCode = exitCodeOk
+	case LiaisonResponseStatusUserError:
+		exitCode = exitCodeUsage
+	case LiaisonResponseStatusMultiStatus:
+		exitCode = exitCodeDataErr
+	case LiaisonResponseStatusNotFound:
+		exitCode = exitCodeNoInput
+	case LiaisonResponseStatusInfraError:
+		exitCode = exitCodeUnavailable
+	case LiaisonResponseStatusUnknownError:
+		exitCode = exitCodeSoftware
+	case LiaisonResponseStatusTimeout:
+		exitCode = exitCodeTempFail
+	case LiaisonResponseStatusRateLimited:
+		exitCode = exitCodeTempFail
+	case LiaisonResponseStatusUnauthorized:
+		exitCode = exitCodeNoPerm
+	case LiaisonResponseStatusForbidden:
+		exitCode = exitCodeNoPerm
 	default:
-		exitCode = 0
+		exitCode = exitCodeSoftware
 	}
 
 	stdoutFileDescriptor := int(os.Stdout.Fd())
@@ -131,7 +158,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 		jsonBytes, err := json.Marshal(liaisonResponse)
 		if err != nil {
 			fmt.Println("ResponseEncodingError")
-			os.Exit(1)
+			os.Exit(exitCodeSoftware)
 		}
 
 		fmt.Println(string(jsonBytes))
@@ -141,7 +168,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	prettyJsonBytes, err := json.MarshalIndent(liaisonResponse, "", "  ")
 	if err != nil {
 		fmt.Println("ResponseEncodingError")
-		os.Exit(1)
+		os.Exit(exitCodeSoftware)
 	}
 
 	syntaxHighlightingLexer := lexers.Get("json")
@@ -152,7 +179,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	shIterator, err := syntaxHighlightingLexer.Tokenise(nil, string(prettyJsonBytes))
 	if err != nil {
 		fmt.Println("SyntaxHighlightingTokenizingError")
-		os.Exit(1)
+		os.Exit(exitCodeSoftware)
 	}
 
 	shFormatter := formatters.Get("terminal256")
@@ -163,9 +190,10 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	err = shFormatter.Format(os.Stdout, styles.Vulcan, shIterator)
 	if err != nil {
 		fmt.Println("SyntaxHighlightingFormatError")
-		os.Exit(1)
+		os.Exit(exitCodeSoftware)
 	}
 	fmt.Println()
+	os.Exit(exitCode)
 }
 
 func SimpleCliResponseRenderer(
