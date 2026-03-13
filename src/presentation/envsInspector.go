@@ -69,7 +69,6 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	}
 
 	missingRequiredEnvVars := []string{}
-	synthesizer := tkInfra.Synthesizer{}
 	for _, envVarName := range envsInspector.requiredEnvVars {
 		envVarValue := os.Getenv(envVarName)
 		if envVarValue != "" {
@@ -81,7 +80,10 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 			continue
 		}
 
-		envVarValue = synthesizer.PasswordFactory(32, true)
+		envVarValue, err = tkInfra.NewCypherSecretKey()
+		if err != nil {
+			return errors.New("EnvsInspectorSecretKeyGenerationError")
+		}
 		envVarStr := envVarName + "=" + envVarValue + "\n"
 
 		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
