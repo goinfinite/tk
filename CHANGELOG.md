@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.5 - 2026/03/13
+fix: replace PasswordFactory with NewCypherSecretKey in EnvsInspector
+
 0.2.4 - 2026/03/12
 fix: add missing os.Exit on interactive terminal path in LiaisonCliResponseRenderer
 refactor: replace binary exit codes with BSD sysexits.h conventions in CLI renderer
