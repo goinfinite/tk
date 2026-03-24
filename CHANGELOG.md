@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.2.6 - 2026/03/24
+fix: switch UnixAbsoluteFilePath regex from allowlist to blacklist with security test suite
+fix: switch UnixFileName regex from allowlist to blacklist with tilde and bracket support
+fix: add tilde expansion pattern detection to UnixRelativeFilePath
+
 0.2.5 - 2026/03/13
 fix: replace PasswordFactory with NewCypherSecretKey in EnvsInspector
 
