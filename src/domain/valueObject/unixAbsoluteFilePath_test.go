@@ -42,7 +42,6 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"../file.php", UnixAbsoluteFilePath(""), true},
 			{"./file.php", UnixAbsoluteFilePath(""), true},
 			{"~/", UnixAbsoluteFilePath(""), true},
-			{"~file.php", UnixAbsoluteFilePath(""), true},
 			{"~/file.php", UnixAbsoluteFilePath(""), true},
 			{"/~/file.php", UnixAbsoluteFilePath(""), true},
 			{"/home/../file.php", UnixAbsoluteFilePath(""), true},
@@ -54,6 +53,14 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"/var/www/<script>alert(1)</script>", UnixAbsoluteFilePath(""), true},
 			{"/home/user/file\nanother", UnixAbsoluteFilePath(""), true},
 			{"//../etc/passwd", UnixAbsoluteFilePath(""), true},
+			// Legitimate Unix paths with special chars
+			{"~file.php", UnixAbsoluteFilePath("/~file.php"), false},
+			{"/home/user/photo (1).jpg", UnixAbsoluteFilePath("/home/user/photo (1).jpg"), false},
+			{"/home/user/[Backup] notes.txt", UnixAbsoluteFilePath("/home/user/[Backup] notes.txt"), false},
+			{"/home/user/file~", UnixAbsoluteFilePath("/home/user/file~"), false},
+			{"/mime.properties0,v", UnixAbsoluteFilePath("/mime.properties0,v"), false},
+			{"/crond.reboot", UnixAbsoluteFilePath("/crond.reboot"), false},
+			{"/sys/block/nvme0n1/bdi/subsystem/0:84", UnixAbsoluteFilePath("/sys/block/nvme0n1/bdi/subsystem/0:84"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -119,6 +126,10 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{"/etc/passwd\x00", UnixAbsoluteFilePath(""), true},
 			{"/home/user/file\nanother", UnixAbsoluteFilePath(""), true},
 			{"//../etc/passwd", UnixAbsoluteFilePath(""), true},
+			// Legitimate Unix paths with special chars (unsafe allows more)
+			{"/mime.properties0,v", UnixAbsoluteFilePath("/mime.properties0,v"), false},
+			{"/crond.reboot", UnixAbsoluteFilePath("/crond.reboot"), false},
+			{"/sys/block/nvme0n1/bdi/subsystem/0:84", UnixAbsoluteFilePath("/sys/block/nvme0n1/bdi/subsystem/0:84"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -277,5 +288,141 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
+	})
+
+	t.Run("SecurityTestSuite", func(t *testing.T) {
+		t.Run("StrictModeBlocksShellInjection", func(t *testing.T) {
+			shellInjectionInputValues := []string{
+				"/tmp/file;rm -rf /",
+				"/tmp/file|cat /etc/passwd",
+				"/tmp/file&whoami",
+				"/tmp/file$PATH",
+				"/tmp/file`id`",
+				"/tmp/file>output",
+				"/tmp/file<input",
+				"/tmp/file{malicious}",
+				"/tmp/file!history",
+				"/tmp/file#comment",
+				"/tmp/file*glob",
+				"/tmp/file?glob",
+			}
+
+			for _, inputValue := range shellInjectionInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, false)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%s]", inputValue)
+				}
+			}
+		})
+
+		t.Run("BothModesBlockControlChars", func(t *testing.T) {
+			controlCharInputValues := []string{
+				"/tmp/file" + string([]byte{0x00}) + "injection",
+				"/tmp/file" + string([]byte{0x1f}) + "injection",
+				"/tmp/file" + string([]byte{0x7f}) + "injection",
+				"/tmp/file\ninjection",
+				"/tmp/file\rinjection",
+				"/tmp/file\tinjection",
+			}
+
+			for _, inputValue := range controlCharInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, false)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%q]", inputValue)
+				}
+
+				_, err = NewUnixAbsoluteFilePath(inputValue, true)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%q]", inputValue)
+				}
+			}
+		})
+
+		t.Run("BothModesBlockPathTraversal", func(t *testing.T) {
+			traversalInputValues := []string{
+				"../etc/passwd",
+				"./etc/passwd",
+				"~/",
+				"/home/../etc/passwd",
+				"/home/../../etc/passwd",
+				"//../etc/passwd",
+			}
+
+			for _, inputValue := range traversalInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, false)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%s]", inputValue)
+				}
+
+				_, err = NewUnixAbsoluteFilePath(inputValue, true)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%s]", inputValue)
+				}
+			}
+		})
+
+		t.Run("UnsafeModeAllowsShellChars", func(t *testing.T) {
+			shellCharInputValues := []string{
+				"/tmp/file;malicious",
+				"/tmp/file|pipe",
+				"/tmp/file&background",
+				"/tmp/file$dollar",
+				"/tmp/file>redirect",
+				"/tmp/file<in",
+				"/tmp/file(paren)",
+				"/tmp/file{brace}",
+				"/tmp/file[bracket]",
+				"/tmp/file!bang",
+				"/tmp/file#hash",
+				"/tmp/file*star",
+				"/tmp/file?question",
+			}
+
+			for _, inputValue := range shellCharInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, true)
+				if err != nil {
+					t.Errorf("UnexpectedError: [%s]", inputValue)
+				}
+			}
+		})
+
+		t.Run("StrictModeAllowsLegitimateSpecialChars", func(t *testing.T) {
+			legitInputValues := []string{
+				"/home/user/photo (1).jpg",
+				"/home/user/[Backup] notes.txt",
+				"/home/user/file~",
+				"/~localfile.txt",
+			}
+
+			for _, inputValue := range legitInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, false)
+				if err != nil {
+					t.Errorf("UnexpectedError: [%s]", inputValue)
+				}
+			}
+		})
+
+		t.Run("BothModesBlockTildeExpansionPatterns", func(t *testing.T) {
+			tildeExpansionInputValues := []string{
+				"~/",
+				"~/file.php",
+				"/~/file.php",
+				"~user/file.php",
+				"/~user/file.php",
+				"/~admin/config",
+			}
+
+			for _, inputValue := range tildeExpansionInputValues {
+				_, err := NewUnixAbsoluteFilePath(inputValue, false)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%s]", inputValue)
+				}
+
+				_, err = NewUnixAbsoluteFilePath(inputValue, true)
+				if err == nil {
+					t.Errorf("MissingExpectedError: [%s]", inputValue)
+				}
+			}
+		})
 	})
 }

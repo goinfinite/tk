@@ -11,9 +11,10 @@ import (
 
 // @see https://www.regular-expressions.info/unicodecategory.html
 // UnixFileNameRegex combined with characters allowed in absolute paths.
+// Blacklist approach: block control chars and shell-dangerous chars; allow all else.
 var (
-	unixAbsoluteFilePathStrictRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\(\)\[\]\+\.\/]*$`)
-	unixAbsoluteFilePathUnsafeRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][\p{L}\p{N}\p{Pc}\p{Pd}\p{Zs}\p{S}\p{P}\(\)\[\]\+\.\/]*$`)
+	unixAbsoluteFilePathStrictRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][^\x00-\x1f\x7f;|&$` + "`" + `><{}!#*?@%\\]*$`)
+	unixAbsoluteFilePathUnsafeRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][^\x00-\x1f\x7f]*$`)
 )
 
 type UnixAbsoluteFilePath string
