@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.2.7 - 2026/04/06
+feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
+feat: add RequesterIpExtractor with XFF-aware IP extraction
+refactor: replace ExtractIPDirect with RequesterIpExtractor at all call sites
+
 0.2.6 - 2026/03/24
 fix: switch UnixAbsoluteFilePath regex from allowlist to blacklist with security test suite
 fix: switch UnixFileName regex from allowlist to blacklist with tilde and bracket support

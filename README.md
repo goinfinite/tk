@@ -180,6 +180,20 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   trustedIpAddresses, trustedIpsReadingErr := TrustedIpsReader()
   ```
 
+- **TrustedCidrsReader**: Parse a comma-separated list of trusted CIDR blocks from the `TRUSTED_CIDRS` environment variable.
+
+  ```go
+  trustedCidrBlocks, trustedCidrsReadingErr := TrustedCidrsReader()
+  ```
+
+- **RequesterIpExtractor**: XFF-aware IP extraction with configurable trust. Reads `IP_EXTRACT_DISABLE_TRUST` env var (disables XFF trust, falls back to direct extraction) and builds trust options from `TrustedCidrsReader`.
+
+  ```go
+  extractor := NewRequesterIpExtractor()
+
+  ipAddress := extractor.Execute(httpRequest)
+  ```
+
 - **ReadThrough**: Read-through utilities for TLS certificate pairs from `CERTIFICATE_PAIR_CERT_PATH` and `CERTIFICATE_PAIR_KEY_PATH` env vars, generating self-signed certificates in `PKI_DIR` if not provided.
 
   ```go
