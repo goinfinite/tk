@@ -190,12 +190,11 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}
 	if requestBody["operatorIpAddress"] == nil {
-		rawIpAddress := tkInfra.NewRequesterIpExtractor().Execute(
+		operatorIpAddress, extractionErr := tkInfra.NewRequesterIpExtractor().Execute(
 			echoContext.Request(),
 		)
-		operatorIpAddress, err := tkValueObject.NewIpAddress(rawIpAddress)
-		if err != nil {
-			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidOperatorIpAddress")
+		if extractionErr != nil {
+			return requestBody, extractionErr
 		}
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}

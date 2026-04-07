@@ -7,6 +7,7 @@ feat: add RequesterIpExtractor with XFF-aware IP extraction
 feat: add HttpHeader value object with validation
 feat: add IsLinkLocal to IpAddress and Contains to CidrBlock
 refactor: replace ExtractIPDirect with RequesterIpExtractor at all call sites
+refactor: simplify RequesterIpExtractor consumers for (IpAddress, error) return
 fix: replace negation logic in CidrBlock and IpAddress with explicit checks (CWE-20, CWE-284)
 fix: fail-closed on invalid IP_EXTRACT_DISABLE_TRUST and trim whitespace in CIDR parsing
 

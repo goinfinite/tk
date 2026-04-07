@@ -5,116 +5,187 @@ import (
 	"testing"
 )
 
-func TestExtractRequesterIpAddress(t *testing.T) {
+func TestRequesterIpExtractor(t *testing.T) {
 	testCaseStructs := []struct {
-		description         string
-		disableTrustEnvVal  string
-		trustedCidrsEnvVal  string
-		remoteAddr          string
-		xffHeader           string
-		expectedIp          string
-		skipExpectedIpCheck bool
+		description        string
+		headerChainEnvVal  string
+		trustedCidrsEnvVal string
+		remoteAddr         string
+		requestHeaders     map[string]string
+		expectedIp         string
+		expectError        bool
 	}{
 		{
-			description:        "DefaultXffTrustExtractsClientIpBehindTrustedLoopbackProxy",
-			disableTrustEnvVal: "",
+			description:        "XffInChainExtractsRightmostUntrusted",
+			headerChainEnvVal:  "X-Forwarded-For",
 			trustedCidrsEnvVal: "",
 			remoteAddr:         "127.0.0.1:1234",
-			xffHeader:          "203.0.113.5",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "203.0.113.5"},
 			expectedIp:         "203.0.113.5",
 		},
 		{
-			description:        "CustomCidrIsTrusted",
-			disableTrustEnvVal: "",
-			trustedCidrsEnvVal: "198.51.100.0/24",
-			remoteAddr:         "198.51.100.1:5678",
-			xffHeader:          "203.0.113.7",
-			expectedIp:         "203.0.113.7",
-		},
-		{
-			description:        "DirectExtractionWhenTrustDisabled",
-			disableTrustEnvVal: "true",
+			description:        "DefaultChainBehaviorUsesXffFirst",
+			headerChainEnvVal:  "",
 			trustedCidrsEnvVal: "",
-			remoteAddr:         "10.0.0.5:9000",
-			xffHeader:          "203.0.113.9",
-			expectedIp:         "10.0.0.5",
+			remoteAddr:         "127.0.0.1:1234",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "203.0.113.10"},
+			expectedIp:         "203.0.113.10",
 		},
 		{
-			description:        "EndToEndXffWithCustomCidr",
-			disableTrustEnvVal: "",
-			trustedCidrsEnvVal: "192.0.2.0/24",
-			remoteAddr:         "192.0.2.10:4321",
-			xffHeader:          "198.51.100.42",
-			expectedIp:         "198.51.100.42",
-		},
-		{
-			description:        "InvalidCidrInEnvVarDoesNotCrash",
-			disableTrustEnvVal: "",
-			trustedCidrsEnvVal: "notacidr,10.0.0.0/8",
-			remoteAddr:         "10.0.0.1:1111",
-			xffHeader:          "203.0.113.1",
-			expectedIp:         "203.0.113.1",
-		},
-		{
-			description:        "MissingXffFallsBackToRemoteAddr",
-			disableTrustEnvVal: "",
+			description:        "HeaderChainFallbackToXffWhenXRealIpEmpty",
+			headerChainEnvVal:  "X-Real-IP,X-Forwarded-For",
 			trustedCidrsEnvVal: "",
-			remoteAddr:         "203.0.113.55:2222",
-			xffHeader:          "",
-			expectedIp:         "203.0.113.55",
-		},
-		{
-			description:        "XffInjectionFromUntrustedRemoteRejected",
-			disableTrustEnvVal: "",
-			trustedCidrsEnvVal: "",
-			remoteAddr:         "203.0.113.20:5555",
-			xffHeader:          "1.2.3.4",
+			remoteAddr:         "127.0.0.1:1234",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "203.0.113.20"},
 			expectedIp:         "203.0.113.20",
 		},
 		{
-			description:        "Ipv6InXff",
-			disableTrustEnvVal: "",
+			description:        "HeaderChainPrefersXRealIpOverXff",
+			headerChainEnvVal:  "X-Real-IP,X-Forwarded-For",
 			trustedCidrsEnvVal: "",
 			remoteAddr:         "127.0.0.1:1234",
-			xffHeader:          "2001:db8::1",
-			expectedIp:         "2001:db8::1",
+			requestHeaders: map[string]string{
+				"X-Real-IP":       "203.0.113.30",
+				"X-Forwarded-For": "203.0.113.31",
+			},
+			expectedIp: "203.0.113.30",
 		},
 		{
-			description:        "XffChainWithTrustedProxyReturnsNearestUntrusted",
-			disableTrustEnvVal: "",
+			description:        "XffChainWithMultipleProxiesReturnsNearestUntrusted",
+			headerChainEnvVal:  "X-Forwarded-For",
 			trustedCidrsEnvVal: "",
 			remoteAddr:         "10.0.0.1:1234",
-			xffHeader:          "1.1.1.1, 203.0.113.1",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "1.1.1.1, 203.0.113.1"},
 			expectedIp:         "203.0.113.1",
 		},
 		{
-			description:        "UntrustedProxyInChainReturnsRemoteAddr",
-			disableTrustEnvVal: "",
+			description:        "CustomHeaderInChainReadWhenDirectConnectionTrusted",
+			headerChainEnvVal:  "CF-Connecting-IP,X-Real-IP",
 			trustedCidrsEnvVal: "",
-			remoteAddr:         "203.0.113.99:9999",
-			xffHeader:          "10.0.0.1, 203.0.113.50",
+			remoteAddr:         "127.0.0.1:8080",
+			requestHeaders:     map[string]string{"CF-Connecting-IP": "203.0.113.40"},
+			expectedIp:         "203.0.113.40",
+		},
+		{
+			description:        "TrustedCidrAppliesToCustomHeader",
+			headerChainEnvVal:  "X-Real-IP",
+			trustedCidrsEnvVal: "198.51.100.0/24",
+			remoteAddr:         "198.51.100.5:9000",
+			requestHeaders:     map[string]string{"X-Real-IP": "203.0.113.50"},
+			expectedIp:         "203.0.113.50",
+		},
+		{
+			description:        "AllHeadersEmptyInChainReturnsDirect",
+			headerChainEnvVal:  "X-Real-IP,CF-Connecting-IP",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "127.0.0.1:3333",
+			requestHeaders:     map[string]string{},
+			expectedIp:         "127.0.0.1",
+		},
+		{
+			description:        "MalformedIpInCustomHeaderFallsBackToDirect",
+			headerChainEnvVal:  "X-Real-IP",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "127.0.0.1:4444",
+			requestHeaders:     map[string]string{"X-Real-IP": "not-an-ip"},
+			expectedIp:         "127.0.0.1",
+		},
+		{
+			description:        "XffFromUntrustedRemoteExtractsHeaderValue",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "203.0.113.20:5555",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "1.2.3.4"},
+			expectedIp:         "1.2.3.4",
+		},
+		{
+			description:        "Ipv6RemoteAddrTrustedLoopback",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "[::1]:1234",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "2001:db8::1"},
+			expectedIp:         "2001:db8::1",
+		},
+		{
+			description:        "InvalidCidrInEnvVarDoesNotCrash",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "notacidr,10.0.0.0/8",
+			remoteAddr:         "10.0.0.1:1111",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "203.0.113.1"},
+			expectedIp:         "203.0.113.1",
+		},
+		{
+			description:        "PrivateNetworkRemoteAddrTrustedForCustomHeader",
+			headerChainEnvVal:  "X-Real-IP",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "192.168.1.1:7777",
+			requestHeaders:     map[string]string{"X-Real-IP": "203.0.113.60"},
+			expectedIp:         "203.0.113.60",
+		},
+		{
+			description:        "XffChainSkipsTrustedProxyInMiddle",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "10.0.0.0/8",
+			remoteAddr:         "10.0.0.2:1234",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "1.2.3.4, 10.0.0.1"},
+			expectedIp:         "1.2.3.4",
+		},
+		{
+			description:        "XffChainMalformedEntrySkipped",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For": "1.2.3.4, not-an-ip, 203.0.113.1",
+			},
+			expectedIp: "203.0.113.1",
+		},
+		{
+			description:        "DirectKeywordInChainParsesRemoteAddr",
+			headerChainEnvVal:  "Direct",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "203.0.113.99:5555",
+			requestHeaders:     map[string]string{},
 			expectedIp:         "203.0.113.99",
+		},
+		{
+			description:        "RemoteAddrKeywordInChainAfterEmptyHeaders",
+			headerChainEnvVal:  "X-Real-IP,RemoteAddr",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "198.51.100.1:8080",
+			requestHeaders:     map[string]string{},
+			expectedIp:         "198.51.100.1",
 		},
 	}
 
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
-			t.Setenv("IP_EXTRACT_DISABLE_TRUST", testCase.disableTrustEnvVal)
+			t.Setenv(ipExtractHeaderEnvVarName, testCase.headerChainEnvVal)
 			t.Setenv(TrustedCidrsEnvVarName, testCase.trustedCidrsEnvVal)
 
 			extractor := NewRequesterIpExtractor()
 
 			httpRequest, _ := http.NewRequest(http.MethodGet, "/", nil)
 			httpRequest.RemoteAddr = testCase.remoteAddr
-			if testCase.xffHeader != "" {
-				httpRequest.Header.Set("X-Forwarded-For", testCase.xffHeader)
+			for headerName, headerVal := range testCase.requestHeaders {
+				httpRequest.Header.Set(headerName, headerVal)
 			}
 
-			actualIpAddress := extractor.Execute(httpRequest)
-			if actualIpAddress != testCase.expectedIp {
+			actualIpAddress, extractionErr := extractor.Execute(httpRequest)
+			if testCase.expectError {
+				if extractionErr == nil {
+					t.Errorf("MissingExpectedError")
+				}
+				return
+			}
+			if extractionErr != nil {
+				t.Errorf("UnexpectedError: '%s'", extractionErr.Error())
+				return
+			}
+			if actualIpAddress.String() != testCase.expectedIp {
 				t.Errorf(
 					"IpAddressMismatch: got='%s', want='%s'",
-					actualIpAddress, testCase.expectedIp,
+					actualIpAddress.String(), testCase.expectedIp,
 				)
 			}
 		})

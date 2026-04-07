@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfra "github.com/goinfinite/tk/src/infra"
 	"github.com/labstack/echo/v4"
 )
@@ -63,15 +62,10 @@ func isOperatorTrustworthy(echoContext echo.Context) bool {
 		return false
 	}
 
-	rawOperatorIpAddress := tkInfra.NewRequesterIpExtractor().Execute(
+	operatorIpAddress, extractionErr := tkInfra.NewRequesterIpExtractor().Execute(
 		echoContext.Request(),
 	)
-	if rawOperatorIpAddress == "" {
-		return false
-	}
-
-	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawOperatorIpAddress)
-	if ipErr != nil {
+	if extractionErr != nil {
 		return false
 	}
 
@@ -160,11 +154,10 @@ func apiHandlePanic(echoContext echo.Context) {
 	echoContext.JSON(statusCode, jsonResponse)
 
 	panicReportPtr.RequestUri = echoContext.Request().RequestURI
-	rawIpAddress := tkInfra.NewRequesterIpExtractor().Execute(
+	operatorIpAddress, extractionErr := tkInfra.NewRequesterIpExtractor().Execute(
 		echoContext.Request(),
 	)
-	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawIpAddress)
-	if ipErr == nil {
+	if extractionErr == nil {
 		panicReportPtr.OperatorIpAddress = operatorIpAddress.String()
 	}
 
