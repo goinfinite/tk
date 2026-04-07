@@ -188,6 +188,8 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
 
 - **RequesterIpExtractor**: XFF-aware IP extraction with configurable trust. Reads `IP_EXTRACT_DISABLE_TRUST` env var (disables XFF trust, falls back to direct extraction) and builds trust options from `TrustedCidrsReader`.
 
+  > **Security:** `TRUSTED_CIDRS` must only contain known proxy CIDR ranges. Edge proxies must sanitize or overwrite inbound `X-Forwarded-For` headers before forwarding. Misconfiguration allows clients to spoof their IP address.
+
   ```go
   extractor := NewRequesterIpExtractor()
 

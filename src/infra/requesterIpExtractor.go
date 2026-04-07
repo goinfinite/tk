@@ -60,7 +60,7 @@ func DisableTrustReader() bool {
 			"IpExtractDisableTrustEnvVarInvalid",
 			slog.String("err", parseErr.Error()),
 		)
-		return false
+		return true
 	}
 
 	return parsedDisableTrust

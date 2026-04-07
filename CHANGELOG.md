@@ -6,6 +6,7 @@ feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
 feat: add RequesterIpExtractor with XFF-aware IP extraction
 refactor: replace ExtractIPDirect with RequesterIpExtractor at all call sites
 fix: replace negation logic in CidrBlock and IpAddress with explicit checks (CWE-20, CWE-284)
+fix: fail-closed on invalid IP_EXTRACT_DISABLE_TRUST and trim whitespace in CIDR parsing
 
 0.2.6 - 2026/03/24
 fix: switch UnixAbsoluteFilePath regex from allowlist to blacklist with security test suite

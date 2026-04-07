@@ -47,6 +47,13 @@ func TestTrustedCidrsReader(t *testing.T) {
 			},
 		},
 		{
+			envValue: " 192.168.1.0/24 , 10.0.0.0/8 ",
+			expectedOutput: []tkValueObject.CidrBlock{
+				tkValueObject.CidrBlock("192.168.1.0/24"),
+				tkValueObject.CidrBlock("10.0.0.0/8"),
+			},
+		},
+		{
 			envValue:       "999.999.999.999/24",
 			expectedOutput: []tkValueObject.CidrBlock{},
 		},

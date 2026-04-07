@@ -19,9 +19,16 @@ func TrustedCidrsReader() (trustedCidrBlocks []tkValueObject.CidrBlock, err erro
 	}
 
 	for rawTrustedCidr := range strings.SplitSeq(rawTrustedCidrsEnvValue, ",") {
-		trustedCidrBlock, err := tkValueObject.NewCidrBlock(rawTrustedCidr)
+		trimmedCidr := strings.TrimSpace(rawTrustedCidr)
+		if trimmedCidr == "" {
+			continue
+		}
+		trustedCidrBlock, err := tkValueObject.NewCidrBlock(trimmedCidr)
 		if err != nil {
-			slog.Debug("InvalidTrustedCidrBlock", slog.String("rawTrustedCidr", rawTrustedCidr))
+			slog.Debug(
+				"InvalidTrustedCidrBlock",
+				slog.String("rawTrustedCidr", trimmedCidr),
+			)
 			continue
 		}
 		trustedCidrBlocks = append(trustedCidrBlocks, trustedCidrBlock)
