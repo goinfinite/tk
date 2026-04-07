@@ -186,14 +186,14 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   trustedCidrBlocks, trustedCidrsReadingErr := TrustedCidrsReader()
   ```
 
-- **RequesterIpExtractor**: XFF-aware IP extraction with configurable trust. Reads `IP_EXTRACT_DISABLE_TRUST` env var (disables XFF trust, falls back to direct extraction) and builds trust options from `TrustedCidrsReader`.
+- **RequesterIpExtractor**: Headers-first IP extraction with a right-to-left trust chain walk. Reads `IP_EXTRACT_HEADER` env var as a comma-separated ordered chain (default: `X-Forwarded-For,X-Real-IP`). Each header is walked right-to-left; the first entry that is not a trusted IP (local, private, link-local, or in `TRUSTED_CIDRS`) is returned. The chain supports the special keywords `Direct` and `RemoteAddr` to force extraction from `http.Request.RemoteAddr`. Falls back implicitly to `RemoteAddr` when all headers are exhausted.
 
-  > **Security:** `TRUSTED_CIDRS` must only contain known proxy CIDR ranges. Edge proxies must sanitize or overwrite inbound `X-Forwarded-For` headers before forwarding. Misconfiguration allows clients to spoof their IP address.
+  > **Security:** Right-to-left traversal means values appended by untrusted clients are skipped automatically. The actual risk is `TRUSTED_CIDRS` configured too broadly, which would cause the extractor to skip a proxy range that includes untrusted clients.
 
   ```go
   extractor := NewRequesterIpExtractor()
 
-  ipAddress := extractor.Execute(httpRequest)
+  ipAddress, err := extractor.Execute(httpRequest)
   ```
 
 - **ReadThrough**: Read-through utilities for TLS certificate pairs from `CERTIFICATE_PAIR_CERT_PATH` and `CERTIFICATE_PAIR_KEY_PATH` env vars, generating self-signed certificates in `PKI_DIR` if not provided.

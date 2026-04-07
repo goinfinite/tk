@@ -1,81 +1,143 @@
 package tkInfra
 
 import (
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 
-	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
-	"github.com/labstack/echo/v4"
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
+)
+
+const (
+	ipExtractHeaderEnvVarName  string = "IP_EXTRACT_HEADER"
+	ipExtractHeaderDefaults    string = "X-Forwarded-For,X-Real-IP"
+	ipExtractDirectKeyword     string = "Direct"
+	ipExtractRemoteAddrKeyword string = "RemoteAddr"
 )
 
 type RequesterIpExtractor struct {
-	disableTrust bool
-	trustOptions []echo.TrustOption
+	extractionHeaders []tkValueObject.HttpHeader
+	trustedCidrBlocks []tkValueObject.CidrBlock
 }
 
-func TrustOptionsReader() []echo.TrustOption {
-	trustOptions := []echo.TrustOption{
-		echo.TrustLoopback(true),
-		echo.TrustLinkLocal(true),
-		echo.TrustPrivateNet(true),
+func IpExtractHeaderReader() []tkValueObject.HttpHeader {
+	rawIpExtractHeaderEnvVal := os.Getenv(ipExtractHeaderEnvVarName)
+	if rawIpExtractHeaderEnvVal == "" {
+		rawIpExtractHeaderEnvVal = ipExtractHeaderDefaults
 	}
 
+	var extractionHeaders []tkValueObject.HttpHeader
+	for rawHeader := range strings.SplitSeq(rawIpExtractHeaderEnvVal, ",") {
+		httpHeader, err := tkValueObject.NewHttpHeader(rawHeader)
+		if err != nil {
+			slog.Debug(
+				"InvalidIpExtractHeaderName",
+				slog.String("headerName", rawHeader),
+			)
+			continue
+		}
+		extractionHeaders = append(extractionHeaders, httpHeader)
+	}
+
+	if len(extractionHeaders) == 0 {
+		for rawHeader := range strings.SplitSeq(ipExtractHeaderDefaults, ",") {
+			httpHeader, _ := tkValueObject.NewHttpHeader(rawHeader)
+			extractionHeaders = append(extractionHeaders, httpHeader)
+		}
+	}
+
+	return extractionHeaders
+}
+
+func NewRequesterIpExtractor() RequesterIpExtractor {
 	cidrBlocks, cidrsReadingErr := TrustedCidrsReader()
 	if cidrsReadingErr != nil {
 		slog.Debug(
 			"TrustedCidrsReaderError",
 			slog.String("err", cidrsReadingErr.Error()),
 		)
-		return trustOptions
 	}
 
-	for _, cidrBlock := range cidrBlocks {
-		_, ipNet, parseErr := net.ParseCIDR(cidrBlock.String())
-		if parseErr != nil {
-			slog.Debug(
-				"InvalidCidrBlockForTrustOption",
-				slog.String("cidrBlock", cidrBlock.String()),
-			)
-			continue
-		}
-		trustOptions = append(trustOptions, echo.TrustIPRange(ipNet))
+	return RequesterIpExtractor{
+		extractionHeaders: IpExtractHeaderReader(),
+		trustedCidrBlocks: cidrBlocks,
 	}
-
-	return trustOptions
 }
 
-func DisableTrustReader() bool {
-	const ipExtractDisableTrustEnvVarName = "IP_EXTRACT_DISABLE_TRUST"
-
-	disableTrustEnvVal := os.Getenv(ipExtractDisableTrustEnvVarName)
-	if disableTrustEnvVal == "" {
-		return false
+func (extractor RequesterIpExtractor) remoteAddrParser(
+	remoteAddr string,
+) (ipAddress tkValueObject.IpAddress, err error) {
+	directIp, _, splitErr := net.SplitHostPort(remoteAddr)
+	if splitErr != nil {
+		directIp = remoteAddr
 	}
 
-	parsedDisableTrust, parseErr := tkVoUtil.InterfaceToBool(disableTrustEnvVal)
-	if parseErr != nil {
-		slog.Debug(
-			"IpExtractDisableTrustEnvVarInvalid",
-			slog.String("err", parseErr.Error()),
-		)
+	ipAddress, err = tkValueObject.NewIpAddress(directIp)
+	if err != nil {
+		return ipAddress, errors.New("UnparsableRemoteAddr")
+	}
+
+	return ipAddress, nil
+}
+
+func (extractor RequesterIpExtractor) isIpTrusted(
+	ipAddress tkValueObject.IpAddress,
+) bool {
+	if ipAddress.IsLocal() || ipAddress.IsPrivate() || ipAddress.IsLinkLocal() {
 		return true
 	}
 
-	return parsedDisableTrust
+	for _, cidrBlock := range extractor.trustedCidrBlocks {
+		if cidrBlock.Contains(ipAddress) {
+			return true
+		}
+	}
+
+	return false
 }
 
-func NewRequesterIpExtractor() RequesterIpExtractor {
-	return RequesterIpExtractor{
-		disableTrust: DisableTrustReader(),
-		trustOptions: TrustOptionsReader(),
+func (extractor RequesterIpExtractor) HeaderIpExtractor(
+	httpRequest *http.Request,
+	extractionHeader tkValueObject.HttpHeader,
+) (ipAddress tkValueObject.IpAddress, err error) {
+	headerValue := httpRequest.Header.Get(extractionHeader.String())
+	headerEntries := strings.Split(headerValue, ",")
+
+	for _, headerEntry := range slices.Backward(headerEntries) {
+		candidateIp, parseErr := tkValueObject.NewIpAddress(headerEntry)
+		if parseErr != nil {
+			continue
+		}
+		if extractor.isIpTrusted(candidateIp) {
+			continue
+		}
+		return candidateIp, nil
 	}
+
+	return ipAddress, errors.New("NoUntrustedIpInHeader")
 }
 
-func (extractor RequesterIpExtractor) Execute(request *http.Request) string {
-	if extractor.disableTrust {
-		return echo.ExtractIPDirect()(request)
+func (extractor RequesterIpExtractor) Execute(
+	httpRequest *http.Request,
+) (tkValueObject.IpAddress, error) {
+	for _, extractionHeader := range extractor.extractionHeaders {
+		headerStr := extractionHeader.String()
+		if headerStr == ipExtractDirectKeyword ||
+			headerStr == ipExtractRemoteAddrKeyword {
+			return extractor.remoteAddrParser(httpRequest.RemoteAddr)
+		}
+
+		extractedIp, extractionErr := extractor.HeaderIpExtractor(
+			httpRequest, extractionHeader,
+		)
+		if extractionErr == nil {
+			return extractedIp, nil
+		}
 	}
-	return echo.ExtractIPFromXFFHeader(extractor.trustOptions...)(request)
+
+	return extractor.remoteAddrParser(httpRequest.RemoteAddr)
 }
