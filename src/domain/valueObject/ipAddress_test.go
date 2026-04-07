@@ -117,7 +117,13 @@ func TestNewIpAddress(t *testing.T) {
 			expectedOutput bool
 		}{
 			{IpAddress("192.168.1.1"), false},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("127.0.0.1"), false},
 			{IpAddress("::1"), true},
+			{IpAddress("2001:db8::1"), true},
+			{IpAddress("fe80::1"), true},
+			{IpAddress(""), false},
+			{IpAddress("not-an-ip"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -151,7 +157,16 @@ func TestNewIpAddress(t *testing.T) {
 			expectedOutput bool
 		}{
 			{IpAddress("192.168.1.1"), false},
-			{IpAddress("::1"), true},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("172.16.0.1"), false},
+			{IpAddress("127.0.0.1"), false},
+			{IpAddress("127.0.0.2"), false},
+			{IpAddress("::1"), false},
+			{IpAddress("8.8.8.8"), true},
+			{IpAddress("1.1.1.1"), true},
+			{IpAddress("2001:db8::1"), true},
+			{IpAddress(""), false},
+			{IpAddress("not-an-ip"), false},
 		}
 
 		for _, testCase := range testCaseStructs {

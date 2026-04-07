@@ -49,7 +49,11 @@ func (vo CidrBlock) IsIpv4() bool {
 }
 
 func (vo CidrBlock) IsIpv6() bool {
-	return !vo.IsIpv4()
+	_, cidrBlock, err := net.ParseCIDR(vo.String())
+	if err != nil {
+		return false
+	}
+	return cidrBlock.IP.To4() == nil
 }
 
 func (vo CidrBlock) IsPrivate() bool {
@@ -61,5 +65,9 @@ func (vo CidrBlock) IsPrivate() bool {
 }
 
 func (vo CidrBlock) IsPublic() bool {
-	return !vo.IsPrivate()
+	_, cidrBlock, err := net.ParseCIDR(vo.String())
+	if err != nil {
+		return false
+	}
+	return !cidrBlock.IP.IsPrivate()
 }

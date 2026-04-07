@@ -99,8 +99,8 @@ func TestNewCidrBlock(t *testing.T) {
 			{CidrBlock("::1/128"), true},
 			{CidrBlock("2001:db8::/32"), true},
 			{CidrBlock("::/0"), true},
-			{CidrBlock(""), true},
-			{CidrBlock("invalid"), true},
+			{CidrBlock(""), false},
+			{CidrBlock("invalid"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -143,12 +143,12 @@ func TestNewCidrBlock(t *testing.T) {
 			{CidrBlock("192.168.1.0/24"), false},
 			{CidrBlock("10.0.0.0/8"), false},
 			{CidrBlock("172.16.0.0/12"), false},
-			{CidrBlock("8.8.8.0/24"), true},    // Google DNS (public)
-			{CidrBlock("0.0.0.0/0"), true},     // All IPv4 addresses
-			{CidrBlock("fd00::/8"), false},     // Private IPv6
-			{CidrBlock("2001:db8::/32"), true}, // Documentation IPv6 (not private)
-			{CidrBlock(""), true},
-			{CidrBlock("invalid"), true},
+			{CidrBlock("8.8.8.0/24"), true},
+			{CidrBlock("0.0.0.0/0"), true},
+			{CidrBlock("fd00::/8"), false},
+			{CidrBlock("2001:db8::/32"), true},
+			{CidrBlock(""), false},
+			{CidrBlock("invalid"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
