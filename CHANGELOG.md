@@ -1,9 +1,11 @@
 # Changelog
 
 ```log
-0.2.7 - 2026/04/06
+0.2.7 - 2026/04/07
 feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
 feat: add RequesterIpExtractor with XFF-aware IP extraction
+feat: add HttpHeader value object with validation
+feat: add IsLinkLocal to IpAddress and Contains to CidrBlock
 refactor: replace ExtractIPDirect with RequesterIpExtractor at all call sites
 fix: replace negation logic in CidrBlock and IpAddress with explicit checks (CWE-20, CWE-284)
 fix: fail-closed on invalid IP_EXTRACT_DISABLE_TRUST and trim whitespace in CIDR parsing

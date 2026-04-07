@@ -62,6 +62,14 @@ func (vo IpAddress) IsIpv6() bool {
 	return parsedIpAddress.To4() == nil
 }
 
+func (vo IpAddress) IsLinkLocal() bool {
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.IsLinkLocalUnicast()
+}
+
 func (vo IpAddress) IsPrivate() bool {
 	parsedIpAddress := net.ParseIP(vo.String())
 	if parsedIpAddress == nil {

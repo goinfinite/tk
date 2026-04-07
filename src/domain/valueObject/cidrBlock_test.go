@@ -135,6 +135,35 @@ func TestNewCidrBlock(t *testing.T) {
 		}
 	})
 
+	t.Run("ContainsMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			cidrBlock      CidrBlock
+			ipAddress      IpAddress
+			expectedOutput bool
+		}{
+			{CidrBlock("10.0.0.0/8"), IpAddress("10.1.2.3"), true},
+			{CidrBlock("10.0.0.0/8"), IpAddress("10.255.255.255"), true},
+			{CidrBlock("2001:db8::/32"), IpAddress("2001:db8::1"), true},
+			{CidrBlock("192.168.1.0/24"), IpAddress("192.168.1.100"), true},
+			{CidrBlock("10.0.0.0/8"), IpAddress("192.168.1.1"), false},
+			{CidrBlock("10.0.0.0/8"), IpAddress("11.0.0.1"), false},
+			{CidrBlock("2001:db8::/32"), IpAddress("2001:db9::1"), false},
+			{CidrBlock("10.0.0.0/8"), IpAddress("not-an-ip"), false},
+			{CidrBlock("invalid"), IpAddress("10.0.0.1"), false},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.cidrBlock.Contains(testCase.ipAddress)
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v' [%v contains %v]",
+					actualOutput, testCase.expectedOutput,
+					testCase.cidrBlock, testCase.ipAddress,
+				)
+			}
+		}
+	})
+
 	t.Run("IsPublicMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock

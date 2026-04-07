@@ -71,3 +71,15 @@ func (vo CidrBlock) IsPublic() bool {
 	}
 	return !cidrBlock.IP.IsPrivate()
 }
+
+func (vo CidrBlock) Contains(ipAddress IpAddress) bool {
+	_, cidrBlock, err := net.ParseCIDR(vo.String())
+	if err != nil {
+		return false
+	}
+	parsedIpAddress := net.ParseIP(ipAddress.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return cidrBlock.Contains(parsedIpAddress)
+}
