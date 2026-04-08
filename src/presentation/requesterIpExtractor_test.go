@@ -1,8 +1,10 @@
-package tkInfra
+package tkPresentation
 
 import (
 	"net/http"
 	"testing"
+
+	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
 func TestRequesterIpExtractor(t *testing.T) {
@@ -161,7 +163,7 @@ func TestRequesterIpExtractor(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Setenv(ipExtractHeaderEnvVarName, testCase.headerChainEnvVal)
-			t.Setenv(TrustedCidrsEnvVarName, testCase.trustedCidrsEnvVal)
+			t.Setenv(tkInfra.TrustedCidrsEnvVarName, testCase.trustedCidrsEnvVal)
 
 			extractor := NewRequesterIpExtractor()
 
@@ -196,7 +198,7 @@ func TestRequesterIpExtractor_InvalidHeaderConfig_FailsClosed(
 	t *testing.T,
 ) {
 	t.Setenv(ipExtractHeaderEnvVarName, "!!!invalid!!!")
-	t.Setenv(TrustedCidrsEnvVarName, "")
+	t.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
 
 	extractor := NewRequesterIpExtractor()
 	if len(extractor.extractionHeaders) != 0 {
@@ -211,7 +213,7 @@ func TestRequesterIpExtractor_HeaderChainUsesAllValues(
 	t *testing.T,
 ) {
 	t.Setenv(ipExtractHeaderEnvVarName, "X-Forwarded-For")
-	t.Setenv(TrustedCidrsEnvVarName, "")
+	t.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
 
 	extractor := NewRequesterIpExtractor()
 

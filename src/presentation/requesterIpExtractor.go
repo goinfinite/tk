@@ -1,4 +1,4 @@
-package tkInfra
+package tkPresentation
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
+	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
 const (
@@ -60,7 +61,7 @@ func IpExtractHeaderReader() []tkValueObject.HttpHeader {
 }
 
 func NewRequesterIpExtractor() RequesterIpExtractor {
-	cidrBlocks, cidrsReadingErr := TrustedCidrsReader()
+	cidrBlocks, cidrsReadingErr := tkInfra.TrustedCidrsReader()
 	if cidrsReadingErr != nil {
 		slog.Debug(
 			"TrustedCidrsReaderError",

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
-	tkInfra "github.com/goinfinite/tk/src/infra"
 	"github.com/labstack/echo/v4"
 )
 
@@ -119,7 +118,7 @@ func (ApiRequestInputReader) MultipartFilesProcessor(
 // Operator context (if present in Echo context):
 //   - operatorSri: Extracted from context key and included in the result map.
 //   - operatorAccountId: Extracted from context key and included in the result map.
-//   - operatorIpAddress: If missing, populated using tkInfra.NewRequesterIpExtractor().Execute().
+//   - operatorIpAddress: If missing, populated using NewRequesterIpExtractor().Execute().
 //
 // Returns:
 //   - A map[string]any containing all extracted request data, or
@@ -190,7 +189,7 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}
 	if requestBody["operatorIpAddress"] == nil {
-		operatorIpAddress, extractionErr := tkInfra.NewRequesterIpExtractor().Execute(
+		operatorIpAddress, extractionErr := NewRequesterIpExtractor().Execute(
 			echoContext.Request(),
 		)
 		if extractionErr != nil {

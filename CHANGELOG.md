@@ -12,6 +12,7 @@ refactor: drop echo from RequesterIpExtractor, unified header extraction with Di
 fix: replace negation logic in CidrBlock and IpAddress with explicit checks (CWE-20, CWE-284)
 fix: fail-closed on invalid IP_EXTRACT_DISABLE_TRUST and trim whitespace in CIDR parsing
 fix: add loopback check to CidrBlock.IsPublic, fail-closed IpExtractHeaderReader, Header.Values for multi-header XFF, echo.NewHTTPError wrapping
+refactor: move RequesterIpExtractor to presentation, unify TrustedIpsReader into TrustedCidrsReader
 
 0.2.6 - 2026/03/24
 fix: switch UnixAbsoluteFilePath regex from allowlist to blacklist with security test suite

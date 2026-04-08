@@ -9,29 +9,35 @@ import (
 )
 
 const (
+	TrustedIpsEnvVarName   string = "TRUSTED_IPS"
 	TrustedCidrsEnvVarName string = "TRUSTED_CIDRS"
 )
 
 func TrustedCidrsReader() (trustedCidrBlocks []tkValueObject.CidrBlock, err error) {
-	rawTrustedCidrsEnvValue := os.Getenv(TrustedCidrsEnvVarName)
-	if rawTrustedCidrsEnvValue == "" {
-		return trustedCidrBlocks, nil
-	}
+	rawEntries := os.Getenv(TrustedIpsEnvVarName) + "," +
+		os.Getenv(TrustedCidrsEnvVarName)
 
-	for rawTrustedCidr := range strings.SplitSeq(rawTrustedCidrsEnvValue, ",") {
-		trimmedCidr := strings.TrimSpace(rawTrustedCidr)
-		if trimmedCidr == "" {
+	for rawEntry := range strings.SplitSeq(rawEntries, ",") {
+		if rawEntry == "" {
 			continue
 		}
-		trustedCidrBlock, err := tkValueObject.NewCidrBlock(trimmedCidr)
-		if err != nil {
-			slog.Debug(
-				"InvalidTrustedCidrBlock",
-				slog.String("rawTrustedCidr", trimmedCidr),
-			)
+
+		cidrBlock, cidrErr := tkValueObject.NewCidrBlock(rawEntry)
+		if cidrErr == nil {
+			trustedCidrBlocks = append(trustedCidrBlocks, cidrBlock)
 			continue
 		}
-		trustedCidrBlocks = append(trustedCidrBlocks, trustedCidrBlock)
+
+		ipAddress, ipErr := tkValueObject.NewIpAddress(rawEntry)
+		if ipErr == nil {
+			trustedCidrBlocks = append(trustedCidrBlocks, ipAddress.ToCidrBlock())
+			continue
+		}
+
+		slog.Debug(
+			"InvalidTrustedEntry",
+			slog.String("rawEntry", rawEntry),
+		)
 	}
 
 	return trustedCidrBlocks, nil
