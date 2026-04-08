@@ -174,10 +174,10 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   dnsRecords, lookupErr := dnsLookup.Execute()
   ```
 
-- **TrustedIpsReader**: Parse a comma-separated list of trusted IP addresses from the `TRUSTED_IPS` environment variable.
+- **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`.
 
   ```go
-  trustedIpAddresses, trustedIpsReadingErr := TrustedIpsReader()
+  trustedCidrBlocks, trustedCidrsReadingErr := TrustedCidrsReader()
   ```
 
 - **ReadThrough**: Read-through utilities for TLS certificate pairs from `CERTIFICATE_PAIR_CERT_PATH` and `CERTIFICATE_PAIR_KEY_PATH` env vars, generating self-signed certificates in `PKI_DIR` if not provided.
@@ -236,7 +236,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
 
 For web applications built with Echo:
 
-- **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` env var to mask sensitive information. It can be used with CLI applications as well.
+- **PanicHandler**: Handle panics in HTTP requests, log filtered stack traces (excluding domain layers), and respond with error messages; uses `TRUSTED_IPS` and `TRUSTED_CIDRS` env vars to mask sensitive information from untrusted operators. It can be used with CLI applications as well.
 
   ```go
   // ForApiInitialization
@@ -259,6 +259,16 @@ For web applications built with Echo:
   ```go
   inputReader := ApiRequestInputReader{}
   requestData, requestParsingErr := inputReader.Reader(echoContext)
+  ```
+
+- **RequesterIpExtractor**: Headers-first IP extraction with a right-to-left trust chain walk. Reads `IP_EXTRACT_HEADER` env var as a comma-separated ordered chain (default: `X-Forwarded-For,X-Real-IP`). Each header is walked right-to-left; the first entry that is not a trusted IP (local, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`) is returned. The chain supports the special keywords `Direct` and `RemoteAddr` to force extraction from `http.Request.RemoteAddr`. Falls back implicitly to `RemoteAddr` when all headers are exhausted.
+
+  > **Security:** Right-to-left traversal means values appended by untrusted clients are skipped automatically. The actual risk is `TRUSTED_CIDRS` configured too broadly, which would cause the extractor to skip a proxy range that includes untrusted clients.
+
+  ```go
+  extractor := NewRequesterIpExtractor()
+
+  ipAddress, err := extractor.Execute(httpRequest)
   ```
 
 ### Presentation Helpers

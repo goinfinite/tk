@@ -99,8 +99,8 @@ func TestNewCidrBlock(t *testing.T) {
 			{CidrBlock("::1/128"), true},
 			{CidrBlock("2001:db8::/32"), true},
 			{CidrBlock("::/0"), true},
-			{CidrBlock(""), true},
-			{CidrBlock("invalid"), true},
+			{CidrBlock(""), false},
+			{CidrBlock("invalid"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -135,6 +135,35 @@ func TestNewCidrBlock(t *testing.T) {
 		}
 	})
 
+	t.Run("ContainsMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			cidrBlock      CidrBlock
+			ipAddress      IpAddress
+			expectedOutput bool
+		}{
+			{CidrBlock("10.0.0.0/8"), IpAddress("10.1.2.3"), true},
+			{CidrBlock("10.0.0.0/8"), IpAddress("10.255.255.255"), true},
+			{CidrBlock("2001:db8::/32"), IpAddress("2001:db8::1"), true},
+			{CidrBlock("192.168.1.0/24"), IpAddress("192.168.1.100"), true},
+			{CidrBlock("10.0.0.0/8"), IpAddress("192.168.1.1"), false},
+			{CidrBlock("10.0.0.0/8"), IpAddress("11.0.0.1"), false},
+			{CidrBlock("2001:db8::/32"), IpAddress("2001:db9::1"), false},
+			{CidrBlock("10.0.0.0/8"), IpAddress("not-an-ip"), false},
+			{CidrBlock("invalid"), IpAddress("10.0.0.1"), false},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.cidrBlock.Contains(testCase.ipAddress)
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v' [%v contains %v]",
+					actualOutput, testCase.expectedOutput,
+					testCase.cidrBlock, testCase.ipAddress,
+				)
+			}
+		}
+	})
+
 	t.Run("IsPublicMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
@@ -143,12 +172,14 @@ func TestNewCidrBlock(t *testing.T) {
 			{CidrBlock("192.168.1.0/24"), false},
 			{CidrBlock("10.0.0.0/8"), false},
 			{CidrBlock("172.16.0.0/12"), false},
-			{CidrBlock("8.8.8.0/24"), true},    // Google DNS (public)
-			{CidrBlock("0.0.0.0/0"), true},     // All IPv4 addresses
-			{CidrBlock("fd00::/8"), false},     // Private IPv6
-			{CidrBlock("2001:db8::/32"), true}, // Documentation IPv6 (not private)
-			{CidrBlock(""), true},
-			{CidrBlock("invalid"), true},
+			{CidrBlock("127.0.0.1/32"), false},
+			{CidrBlock("::1/128"), false},
+			{CidrBlock("8.8.8.0/24"), true},
+			{CidrBlock("0.0.0.0/0"), true},
+			{CidrBlock("fd00::/8"), false},
+			{CidrBlock("2001:db8::/32"), true},
+			{CidrBlock(""), false},
+			{CidrBlock("invalid"), false},
 		}
 
 		for _, testCase := range testCaseStructs {

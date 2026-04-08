@@ -118,7 +118,7 @@ func (ApiRequestInputReader) MultipartFilesProcessor(
 // Operator context (if present in Echo context):
 //   - operatorSri: Extracted from context key and included in the result map.
 //   - operatorAccountId: Extracted from context key and included in the result map.
-//   - operatorIpAddress: If missing, populated using echo.ExtractIPDirect().
+//   - operatorIpAddress: If missing, populated using NewRequesterIpExtractor().Execute().
 //
 // Returns:
 //   - A map[string]any containing all extracted request data, or
@@ -189,12 +189,13 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}
 	if requestBody["operatorIpAddress"] == nil {
-		rawIpAddress := echo.ExtractIPDirect()(
+		operatorIpAddress, extractionErr := NewRequesterIpExtractor().Execute(
 			echoContext.Request(),
 		)
-		operatorIpAddress, err := tkValueObject.NewIpAddress(rawIpAddress)
-		if err != nil {
-			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidOperatorIpAddress")
+		if extractionErr != nil {
+			return requestBody, echo.NewHTTPError(
+				http.StatusBadRequest, "InvalidOperatorIpAddress",
+			)
 		}
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}

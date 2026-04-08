@@ -55,7 +55,19 @@ func (vo IpAddress) IsIpv4() bool {
 }
 
 func (vo IpAddress) IsIpv6() bool {
-	return !vo.IsIpv4()
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.To4() == nil
+}
+
+func (vo IpAddress) IsLinkLocal() bool {
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return parsedIpAddress.IsLinkLocalUnicast()
 }
 
 func (vo IpAddress) IsPrivate() bool {
@@ -67,7 +79,11 @@ func (vo IpAddress) IsPrivate() bool {
 }
 
 func (vo IpAddress) IsPublic() bool {
-	return !vo.IsPrivate()
+	parsedIpAddress := net.ParseIP(vo.String())
+	if parsedIpAddress == nil {
+		return false
+	}
+	return !parsedIpAddress.IsPrivate() && !parsedIpAddress.IsLoopback()
 }
 
 func (vo IpAddress) ToCidrBlock() CidrBlock {

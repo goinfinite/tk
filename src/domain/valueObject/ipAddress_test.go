@@ -117,7 +117,13 @@ func TestNewIpAddress(t *testing.T) {
 			expectedOutput bool
 		}{
 			{IpAddress("192.168.1.1"), false},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("127.0.0.1"), false},
 			{IpAddress("::1"), true},
+			{IpAddress("2001:db8::1"), true},
+			{IpAddress("fe80::1"), true},
+			{IpAddress(""), false},
+			{IpAddress("not-an-ip"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -151,13 +157,52 @@ func TestNewIpAddress(t *testing.T) {
 			expectedOutput bool
 		}{
 			{IpAddress("192.168.1.1"), false},
-			{IpAddress("::1"), true},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("172.16.0.1"), false},
+			{IpAddress("127.0.0.1"), false},
+			{IpAddress("127.0.0.2"), false},
+			{IpAddress("::1"), false},
+			{IpAddress("8.8.8.8"), true},
+			{IpAddress("1.1.1.1"), true},
+			{IpAddress("2001:db8::1"), true},
+			{IpAddress(""), false},
+			{IpAddress("not-an-ip"), false},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsPublic()
 			if actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("IsLinkLocalMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     IpAddress
+			expectedOutput bool
+		}{
+			{IpAddress("169.254.1.1"), true},
+			{IpAddress("169.254.255.254"), true},
+			{IpAddress("fe80::1"), true},
+			{IpAddress("fe80::e05c:aaff:fe78:825"), true},
+			{IpAddress("192.168.1.1"), false},
+			{IpAddress("127.0.0.1"), false},
+			{IpAddress("10.0.0.1"), false},
+			{IpAddress("8.8.8.8"), false},
+			{IpAddress("::1"), false},
+			{IpAddress("2001:db8::1"), false},
+			{IpAddress("not-an-ip"), false},
+			{IpAddress(""), false},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.IsLinkLocal()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
+					actualOutput, testCase.expectedOutput, testCase.inputValue,
+				)
 			}
 		}
 	})

@@ -8,11 +8,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 
-	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfra "github.com/goinfinite/tk/src/infra"
+	tkPresentation "github.com/goinfinite/tk/src/presentation"
 	"github.com/labstack/echo/v4"
 )
 
@@ -58,24 +57,25 @@ func panicReportFactory(recoveredValue any) *PanicReport {
 }
 
 func isOperatorTrustworthy(echoContext echo.Context) bool {
-	trustedIpAddresses, err := tkInfra.TrustedIpsReader()
+	trustedCidrBlocks, err := tkInfra.TrustedCidrsReader()
 	if err != nil {
 		return false
 	}
 
-	rawOperatorIpAddress := echo.ExtractIPDirect()(
+	operatorIpAddress, extractionErr := tkPresentation.NewRequesterIpExtractor().Execute(
 		echoContext.Request(),
 	)
-	if rawOperatorIpAddress == "" {
+	if extractionErr != nil {
 		return false
 	}
 
-	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawOperatorIpAddress)
-	if ipErr != nil {
-		return false
+	for _, cidrBlock := range trustedCidrBlocks {
+		if cidrBlock.Contains(operatorIpAddress) {
+			return true
+		}
 	}
 
-	return slices.Contains(trustedIpAddresses, operatorIpAddress)
+	return false
 }
 
 func logPanic(panicReportPtr *PanicReport) {
@@ -160,11 +160,10 @@ func apiHandlePanic(echoContext echo.Context) {
 	echoContext.JSON(statusCode, jsonResponse)
 
 	panicReportPtr.RequestUri = echoContext.Request().RequestURI
-	rawIpAddress := echo.ExtractIPDirect()(
+	operatorIpAddress, extractionErr := tkPresentation.NewRequesterIpExtractor().Execute(
 		echoContext.Request(),
 	)
-	operatorIpAddress, ipErr := tkValueObject.NewIpAddress(rawIpAddress)
-	if ipErr == nil {
+	if extractionErr == nil {
 		panicReportPtr.OperatorIpAddress = operatorIpAddress.String()
 	}
 
