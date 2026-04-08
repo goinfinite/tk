@@ -172,6 +172,8 @@ func TestNewCidrBlock(t *testing.T) {
 			{CidrBlock("192.168.1.0/24"), false},
 			{CidrBlock("10.0.0.0/8"), false},
 			{CidrBlock("172.16.0.0/12"), false},
+			{CidrBlock("127.0.0.1/32"), false},
+			{CidrBlock("::1/128"), false},
 			{CidrBlock("8.8.8.0/24"), true},
 			{CidrBlock("0.0.0.0/0"), true},
 			{CidrBlock("fd00::/8"), false},

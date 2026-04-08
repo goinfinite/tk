@@ -194,7 +194,9 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 			echoContext.Request(),
 		)
 		if extractionErr != nil {
-			return requestBody, extractionErr
+			return requestBody, echo.NewHTTPError(
+				http.StatusBadRequest, "InvalidOperatorIpAddress",
+			)
 		}
 		requestBody["operatorIpAddress"] = operatorIpAddress
 	}

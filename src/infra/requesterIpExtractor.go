@@ -25,13 +25,13 @@ type RequesterIpExtractor struct {
 }
 
 func IpExtractHeaderReader() []tkValueObject.HttpHeader {
-	rawIpExtractHeaderEnvVal := os.Getenv(ipExtractHeaderEnvVarName)
-	if rawIpExtractHeaderEnvVal == "" {
-		rawIpExtractHeaderEnvVal = ipExtractHeaderDefaults
+	rawEnvVal, envVarWasSet := os.LookupEnv(ipExtractHeaderEnvVarName)
+	if !envVarWasSet || rawEnvVal == "" {
+		rawEnvVal = ipExtractHeaderDefaults
 	}
 
 	var extractionHeaders []tkValueObject.HttpHeader
-	for rawHeader := range strings.SplitSeq(rawIpExtractHeaderEnvVal, ",") {
+	for rawHeader := range strings.SplitSeq(rawEnvVal, ",") {
 		httpHeader, err := tkValueObject.NewHttpHeader(rawHeader)
 		if err != nil {
 			slog.Debug(
@@ -40,13 +40,19 @@ func IpExtractHeaderReader() []tkValueObject.HttpHeader {
 			)
 			continue
 		}
-		extractionHeaders = append(extractionHeaders, httpHeader)
+		extractionHeaders = append(
+			extractionHeaders, httpHeader,
+		)
 	}
 
-	if len(extractionHeaders) == 0 {
-		for rawHeader := range strings.SplitSeq(ipExtractHeaderDefaults, ",") {
+	if !envVarWasSet && len(extractionHeaders) == 0 {
+		for rawHeader := range strings.SplitSeq(
+			ipExtractHeaderDefaults, ",",
+		) {
 			httpHeader, _ := tkValueObject.NewHttpHeader(rawHeader)
-			extractionHeaders = append(extractionHeaders, httpHeader)
+			extractionHeaders = append(
+				extractionHeaders, httpHeader,
+			)
 		}
 	}
 
@@ -104,11 +110,20 @@ func (extractor RequesterIpExtractor) HeaderIpExtractor(
 	httpRequest *http.Request,
 	extractionHeader tkValueObject.HttpHeader,
 ) (ipAddress tkValueObject.IpAddress, err error) {
-	headerValue := httpRequest.Header.Get(extractionHeader.String())
-	headerEntries := strings.Split(headerValue, ",")
+	headerValues := httpRequest.Header.Values(
+		extractionHeader.String(),
+	)
 
-	for _, headerEntry := range slices.Backward(headerEntries) {
-		candidateIp, parseErr := tkValueObject.NewIpAddress(headerEntry)
+	var allEntries []string
+	for _, headerValue := range headerValues {
+		entries := strings.Split(headerValue, ",")
+		allEntries = append(allEntries, entries...)
+	}
+
+	for _, headerEntry := range slices.Backward(allEntries) {
+		candidateIp, parseErr := tkValueObject.NewIpAddress(
+			headerEntry,
+		)
 		if parseErr != nil {
 			continue
 		}

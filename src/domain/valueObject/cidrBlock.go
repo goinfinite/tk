@@ -69,7 +69,7 @@ func (vo CidrBlock) IsPublic() bool {
 	if err != nil {
 		return false
 	}
-	return !cidrBlock.IP.IsPrivate()
+	return !cidrBlock.IP.IsPrivate() && !cidrBlock.IP.IsLoopback()
 }
 
 func (vo CidrBlock) Contains(ipAddress IpAddress) bool {

@@ -191,3 +191,44 @@ func TestRequesterIpExtractor(t *testing.T) {
 		})
 	}
 }
+
+func TestRequesterIpExtractor_InvalidHeaderConfig_FailsClosed(
+	t *testing.T,
+) {
+	t.Setenv(ipExtractHeaderEnvVarName, "!!!invalid!!!")
+	t.Setenv(TrustedCidrsEnvVarName, "")
+
+	extractor := NewRequesterIpExtractor()
+	if len(extractor.extractionHeaders) != 0 {
+		t.Errorf(
+			"ExpectedEmptyHeaders: got=%d",
+			len(extractor.extractionHeaders),
+		)
+	}
+}
+
+func TestRequesterIpExtractor_HeaderChainUsesAllValues(
+	t *testing.T,
+) {
+	t.Setenv(ipExtractHeaderEnvVarName, "X-Forwarded-For")
+	t.Setenv(TrustedCidrsEnvVarName, "")
+
+	extractor := NewRequesterIpExtractor()
+
+	httpRequest, _ := http.NewRequest(http.MethodGet, "/", nil)
+	httpRequest.RemoteAddr = "127.0.0.1:1234"
+	httpRequest.Header.Add("X-Forwarded-For", "1.1.1.1")
+	httpRequest.Header.Add("X-Forwarded-For", "203.0.113.5")
+
+	actualIpAddress, extractionErr := extractor.Execute(httpRequest)
+	if extractionErr != nil {
+		t.Errorf("UnexpectedError: '%s'", extractionErr.Error())
+		return
+	}
+	if actualIpAddress.String() != "203.0.113.5" {
+		t.Errorf(
+			"IpAddressMismatch: got='%s', want='203.0.113.5'",
+			actualIpAddress.String(),
+		)
+	}
+}

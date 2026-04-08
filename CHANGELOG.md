@@ -1,7 +1,7 @@
 # Changelog
 
 ```log
-0.2.7 - 2026/04/07
+0.2.7 - 2026/04/08
 feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
 feat: add RequesterIpExtractor with XFF-aware IP extraction
 feat: add HttpHeader value object with validation
@@ -11,6 +11,7 @@ refactor: simplify RequesterIpExtractor consumers for (IpAddress, error) return
 refactor: drop echo from RequesterIpExtractor, unified header extraction with Direct/RemoteAddr keywords
 fix: replace negation logic in CidrBlock and IpAddress with explicit checks (CWE-20, CWE-284)
 fix: fail-closed on invalid IP_EXTRACT_DISABLE_TRUST and trim whitespace in CIDR parsing
+fix: add loopback check to CidrBlock.IsPublic, fail-closed IpExtractHeaderReader, Header.Values for multi-header XFF, echo.NewHTTPError wrapping
 
 0.2.6 - 2026/03/24
 fix: switch UnixAbsoluteFilePath regex from allowlist to blacklist with security test suite
