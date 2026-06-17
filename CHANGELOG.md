@@ -3,6 +3,8 @@
 ```log
 0.2.8 - 2026/06/17
 feat: add in-memory transient database service for ephemeral key-value storage with Count(), ReadAll(), and CreatedAt support
+feat: add honeypot value objects for middleware settings validation
+feat: add honeypot middleware with ban system, payload serving, and env-driven configuration
 
 0.2.7 - 2026/04/08
 feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
