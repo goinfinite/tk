@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.8 - 2026/06/17
+feat: add in-memory transient database service for ephemeral key-value storage with Count(), ReadAll(), and CreatedAt support
+
 0.2.7 - 2026/04/08
 feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
 feat: add RequesterIpExtractor with XFF-aware IP extraction

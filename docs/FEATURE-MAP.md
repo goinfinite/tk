@@ -208,3 +208,28 @@ Catches panics, logs stack traces, and returns safe error responses.
 1. `src/presentation/middleware/panicHandler.go` — `ApiPanicHandler` is Echo middleware that catches panics, writes stack traces to `logs/panic.log`, filters domain-layer frames, and returns HTTP 500 with masked error for untrusted clients; `CliPanicHandler` does the same for CLI via `defer`
 
 ---
+
+## Honeypot IP Blocking
+
+Intercepts security scanner probes with fake-vulnerability payloads, then blocks source IP with 24h TTL. All subsequent requests from banned IPs redirect to xkcd.com.
+
+**Flow:**
+
+1. `src/presentation/honeypotMiddleware.go` — `HoneypotMiddlewareSettings` struct (BanDuration, RedirectUrl, ExtraPathRoutes, AggressivenessMode, ActivePathCount, MaxEntries, MaxStreamSizeBytes, StatsInterval); `NewHoneypotMiddleware(settings, activityRecordCmdRepo, activityRecordQueryRepo)` returns echo.MiddlewareFunc; `HoneypotAggressivenessMode` type (immediate/balanced/tolerant/observe) with env var parsing
+2. Middleware intercepts honeypot paths via map lookup (not route table): checks all requests against path map, returns fake payload + creates HoneypotHit ActivityRecord
+3. Middleware checks all requests against ban list: queries ActivityRecordQueryRepo for HoneypotHit records with CreatedAfterAt filter (24h window), returns 302 if banned
+4. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord with RecordCode="HoneypotHit", RecordLevel="SECURITY", OperatorIpAddress extracted via RequesterIpExtractor
+5. `src/infra/activityRecord/activityRecordQueryRepo.go` — queries ActivityRecord with CreatedAfterAt filter for TTL enforcement
+6. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from X-Forwarded-For/X-Real-IP headers (if trusted proxy) or RemoteAddr
+7. Fake payloads: 25 paths including /.env (dotenv), /wp-config.php (PHP constants), /actuator/env (JSON), /backup.sql (SQL), /.git/config (git config), /server-status (Apache HTML), /phpmyadmin (login form), etc.
+8. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store for hit-count tracking; KeyValueModel with Key, Value, CreatedAt fields; methods: Has, Read, ReadAll, Set, Count
+
+**Environment Variables:**
+
+- `HONEYPOT_AGGRESSIVENESS` — aggressiveness mode (immediate/balanced/tolerant/observe), default balanced
+- `HONEYPOT_ACTIVE_PATHS` — number of active honeypot paths, default 30, floor 30
+- `HONEYPOT_MAX_ENTRIES` — max transient DB entries, default 5000, floor 100, ceiling 50000
+- `HONEYPOT_MAX_STREAM_SIZE` — max stream size in bytes, default 20MB, floor 5MB
+- `HONEYPOT_STATS_INTERVAL` — stats aggregation interval, default 30m, floor 5m
+
+---

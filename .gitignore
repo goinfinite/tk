@@ -12,3 +12,6 @@ AGENTS.md
 .agents
 .agents/
 .memory/
+opencode.json
+.claude/
+.ignore
