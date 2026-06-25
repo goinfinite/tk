@@ -3,6 +3,8 @@
 ```log
 0.2.8 - 2026/06/25
 feat: add graduated ban tiers, maintenance watchdog, and persistent hit tracking to honeypot middleware
+refactor: extract honeypot repo interfaces and infra implementations from middleware
+refactor: consolidate honeypot DTOs into domain layer
 
 0.2.8 - 2026/06/17
 feat: add in-memory transient database service for ephemeral key-value storage with Count(), ReadAll(), and CreatedAt support

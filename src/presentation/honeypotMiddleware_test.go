@@ -14,8 +14,10 @@ import (
 	"time"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
+	tkRepository "github.com/goinfinite/tk/src/domain/repository"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfraDb "github.com/goinfinite/tk/src/infra/db"
+	tkInfraHoneypot "github.com/goinfinite/tk/src/infra/honeypot"
 	"github.com/labstack/echo/v4"
 )
 
@@ -70,6 +72,16 @@ func newTransientDbSvc() *tkInfraDb.TransientDatabaseService {
 	return dbSvc
 }
 
+func newHoneypotRepos(
+	dbSvc *tkInfraDb.TransientDatabaseService,
+) (tkRepository.HoneypotCmdRepo, tkRepository.HoneypotQueryRepo) {
+	if dbSvc == nil {
+		return nil, nil
+	}
+	return tkInfraHoneypot.NewHoneypotCmdRepo(dbSvc),
+		tkInfraHoneypot.NewHoneypotQueryRepo(dbSvc)
+}
+
 func populateTransientDbWithHits(
 	dbSvc *tkInfraDb.TransientDatabaseService,
 	ipString string,
@@ -79,7 +91,7 @@ func populateTransientDbWithHits(
 	dbSvc.Handler.Where("key = ?", hitKey).Delete(
 		&tkInfraDb.KeyValueModel{},
 	)
-	hitData := honeypotHitData{
+	hitData := tkDto.HoneypotHitData{
 		Count:      hitCount,
 		FirstHitAt: time.Now().UTC().Format(time.RFC3339),
 		Endpoints:  map[string]int{"/.env": hitCount},
@@ -103,7 +115,7 @@ func populateTransientDbWithOldHits(
 		&tkInfraDb.KeyValueModel{},
 	)
 	firstHitAt := time.Now().UTC().Add(-age).Format(time.RFC3339)
-	hitData := honeypotHitData{
+	hitData := tkDto.HoneypotHitData{
 		Count:      hitCount,
 		FirstHitAt: firstHitAt,
 		Endpoints:  map[string]int{"/.env": hitCount},
@@ -130,7 +142,7 @@ func TestHoneypotMiddlewareCreation(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.name, func(t *testing.T) {
 			middleware := NewHoneypotMiddleware(
-				testCase.settings, nil, nil,
+				testCase.settings, nil, nil, nil,
 			)
 			defer middleware.Stop()
 			if middleware == nil {
@@ -152,10 +164,13 @@ func TestHoneypotBanBehavior(t *testing.T) {
 			},
 		}
 		transientDbSvc := newTransientDbSvc()
+		honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+			transientDbSvc,
+		)
 
 		middleware := NewHoneypotMiddleware(
 			newStandardSettings(),
-			transientDbSvc, cmdRepo,
+			honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 		)
 		defer middleware.Stop()
 
@@ -206,10 +221,13 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		populateTransientDbWithHits(
 			transientDbSvc, "1.2.3.4", 3,
 		)
+		honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+			transientDbSvc,
+		)
 
 		middleware := NewHoneypotMiddleware(
 			newStandardSettings(),
-			transientDbSvc, cmdRepo,
+			honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 		)
 		defer middleware.Stop()
 
@@ -250,10 +268,13 @@ func TestHoneypotBanBehavior(t *testing.T) {
 			transientDbSvc, "1.2.3.4", 3,
 			25*time.Hour,
 		)
+		honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+			transientDbSvc,
+		)
 
 		middleware := NewHoneypotMiddleware(
 			newStandardSettings(),
-			transientDbSvc, cmdRepo,
+			honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 		)
 		defer middleware.Stop()
 
@@ -291,10 +312,13 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		populateTransientDbWithHits(
 			transientDbSvc, "1.2.3.4", 3,
 		)
+		honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+			transientDbSvc,
+		)
 
 		middleware := NewHoneypotMiddleware(
 			newStandardSettings(),
-			transientDbSvc, cmdRepo,
+			honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 		)
 		defer middleware.Stop()
 
@@ -335,10 +359,13 @@ func TestAllRequestsCheckedAgainstBanList(t *testing.T) {
 			populateTransientDbWithHits(
 				transientDbSvc, "1.2.3.4", 3,
 			)
+			honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+				transientDbSvc,
+			)
 
 			middleware := NewHoneypotMiddleware(
 				newStandardSettings(),
-				transientDbSvc, nil,
+				honeypotCmdRepo, honeypotQueryRepo, nil,
 			)
 			defer middleware.Stop()
 
@@ -369,12 +396,15 @@ func TestAllRequestsCheckedAgainstBanList(t *testing.T) {
 func TestAllHoneypotPathsReturnPayloads(t *testing.T) {
 	cmdRepo := newNoopCmdRepo()
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -425,10 +455,13 @@ func TestHoneypotFailOpenBehavior(t *testing.T) {
 	t.Run("InvalidIpFormatIgnored", func(t *testing.T) {
 		cmdRepo := newNoopCmdRepo()
 		transientDbSvc := newTransientDbSvc()
+		honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+			transientDbSvc,
+		)
 
 		middleware := NewHoneypotMiddleware(
 			newStandardSettings(),
-			transientDbSvc, cmdRepo,
+			honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 		)
 		defer middleware.Stop()
 
@@ -455,7 +488,7 @@ func TestHoneypotFailOpenBehavior(t *testing.T) {
 
 	t.Run("TransientDbUnavailableFailsOpen", func(t *testing.T) {
 		middleware := NewHoneypotMiddleware(
-			newStandardSettings(), nil, nil,
+			newStandardSettings(), nil, nil, nil,
 		)
 		defer middleware.Stop()
 
@@ -485,7 +518,7 @@ func TestEmptySettingsUsesDefaults(t *testing.T) {
 	settings := HoneypotMiddlewareSettings{}
 
 	middleware := NewHoneypotMiddleware(
-		settings, nil, nil,
+		settings, nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -497,9 +530,12 @@ func TestEmptySettingsUsesDefaults(t *testing.T) {
 	populateTransientDbWithHits(
 		transientDbSvc, "1.2.3.4", 3,
 	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middlewareWithDb := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middlewareWithDb.Stop()
 
@@ -531,9 +567,13 @@ func TestSharedNATBlocksLegitimateUsers(t *testing.T) {
 	populateTransientDbWithHits(
 		transientDbSvc, "1.2.3.4", 3,
 	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -564,12 +604,15 @@ func TestBurpScanFloodsHoneypot(t *testing.T) {
 		},
 	}
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -665,7 +708,7 @@ func TestCustomExtraPathRoutesReturnPayload(t *testing.T) {
 			}
 
 			honeypotMiddleware := NewHoneypotMiddleware(
-				honeypotSettings, nil, nil,
+				honeypotSettings, nil, nil, nil,
 			)
 			defer honeypotMiddleware.Stop()
 
@@ -718,9 +761,13 @@ func TestXForwardedForSpoofingAttempt(t *testing.T) {
 		},
 	}
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -748,9 +795,13 @@ func TestXForwardedForSpoofingAttempt(t *testing.T) {
 
 func TestGraduatedBanTierZeroNormalTraffic(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -778,9 +829,13 @@ func TestGraduatedBanTierZeroNormalTraffic(t *testing.T) {
 func TestGraduatedBanTierOneServesPayloadNoBan(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -820,9 +875,13 @@ func TestGraduatedBanTierOneServesPayloadNoBan(t *testing.T) {
 func TestGraduatedBanTierOneIncrementsHitCount(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -841,7 +900,7 @@ func TestGraduatedBanTierOneIncrementsHitCount(t *testing.T) {
 		t.Fatalf("HitDataNotStored: %v", readErr)
 	}
 
-	var hitData honeypotHitData
+	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
 	if hitData.Count != 1 {
@@ -852,9 +911,13 @@ func TestGraduatedBanTierOneIncrementsHitCount(t *testing.T) {
 func TestGraduatedBanTierTwoBannedOnHoneypotPaths(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 2)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -877,9 +940,13 @@ func TestGraduatedBanTierTwoBannedOnHoneypotPaths(t *testing.T) {
 func TestGraduatedBanTierThreeFullBan(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 3)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -916,9 +983,13 @@ func TestHoneypotHitCountResetsAfterTTL(t *testing.T) {
 	populateTransientDbWithOldHits(
 		transientDbSvc, "1.2.3.4", 3, 25*time.Hour,
 	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -943,14 +1014,18 @@ func TestHoneypotHitCountResetsAfterTTL(t *testing.T) {
 	}
 }
 
-func TestNewHoneypotMiddlewareAcceptsSettingsTransientDbSvcAndCmdRepo(
+func TestNewHoneypotMiddlewareAcceptsSettingsAndRepos(
 	t *testing.T,
 ) {
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -963,7 +1038,7 @@ func TestNewHoneypotMiddlewareReturnsHoneypotMiddlewareStruct(
 	t *testing.T,
 ) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -973,7 +1048,7 @@ func TestNewHoneypotMiddlewareReturnsHoneypotMiddlewareStruct(
 
 func TestMiddlewareFuncReturnsEchoMiddlewareFunc(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -990,9 +1065,13 @@ func TestStopMethodCancelsContext(t *testing.T) {
 	)
 
 	goroutinesBefore := runtime.NumGoroutine()
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		settings, newTransientDbSvc(), nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 
 	time.Sleep(50 * time.Millisecond)
@@ -1014,7 +1093,7 @@ func TestStopMethodCancelsContext(t *testing.T) {
 
 func TestStopMethodIsIdempotent(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 
 	middleware.Stop()
@@ -1023,7 +1102,7 @@ func TestStopMethodIsIdempotent(t *testing.T) {
 
 func TestStopCalledMultipleTimesIsSafe(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 
 	middleware.Stop()
@@ -1038,12 +1117,15 @@ func TestStopCalledMultipleTimesIsSafe(t *testing.T) {
 func TestEndpointHitCountTrackedInValueJson(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1061,7 +1143,7 @@ func TestEndpointHitCountTrackedInValueJson(t *testing.T) {
 	}
 
 	rawValue, _ := transientDbSvc.Read("honeypot:hit:1.2.3.4")
-	var hitData honeypotHitData
+	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
 	if hitData.Count != 3 {
@@ -1097,9 +1179,10 @@ func TestCleanExpiredEntriesRemovesStaleEntries(t *testing.T) {
 	}
 	transientDbSvc.Handler.Create(&newEntry)
 
-	cleanExpiredEntries(
-		transientDbSvc.Handler, 24*time.Hour,
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
 	)
+	honeypotCmdRepo.CleanExpiredEntries(24 * time.Hour)
 
 	var remaining []tkInfraDb.KeyValueModel
 	transientDbSvc.Handler.Find(&remaining)
@@ -1123,9 +1206,10 @@ func TestCleanExpiredEntriesPreservesActiveEntries(t *testing.T) {
 	}
 	transientDbSvc.Handler.Create(&activeEntry)
 
-	cleanExpiredEntries(
-		transientDbSvc.Handler, 24*time.Hour,
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
 	)
+	honeypotCmdRepo.CleanExpiredEntries(24 * time.Hour)
 
 	if transientDbSvc.Count() != 1 {
 		t.Errorf("ActiveEntryShouldBePreserved")
@@ -1146,7 +1230,10 @@ func TestEnforceMaxEntriesDeletesOldestEntries(t *testing.T) {
 		transientDbSvc.Handler.Create(&entry)
 	}
 
-	enforceMaxEntries(transientDbSvc.Handler, 3)
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
+	)
+	honeypotCmdRepo.EnforceMaxEntries(3)
 
 	remaining := transientDbSvc.Count()
 	if remaining != 3 {
@@ -1168,7 +1255,10 @@ func TestEnforceMaxEntriesFloorRespected(t *testing.T) {
 		transientDbSvc.Handler.Create(&entry)
 	}
 
-	enforceMaxEntries(transientDbSvc.Handler, 5)
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
+	)
+	honeypotCmdRepo.EnforceMaxEntries(5)
 
 	if transientDbSvc.Count() != 3 {
 		t.Errorf("EntriesBelowMaxShouldNotBeDeleted")
@@ -1189,7 +1279,10 @@ func TestEnforceMaxEntriesCeilingRespected(t *testing.T) {
 		transientDbSvc.Handler.Create(&entry)
 	}
 
-	enforceMaxEntries(transientDbSvc.Handler, 5)
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
+	)
+	honeypotCmdRepo.EnforceMaxEntries(5)
 
 	remaining := transientDbSvc.Count()
 	if remaining != 5 {
@@ -1200,12 +1293,15 @@ func TestEnforceMaxEntriesCeilingRespected(t *testing.T) {
 func TestAggressivenessImmediateFirstHitBans(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeImmediate
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1247,12 +1343,16 @@ func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 					testCase.hitCount,
 				)
 			}
+			honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+				transientDbSvc,
+			)
 
 			settings := newStandardSettings()
 			settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeBalanced
 
 			middleware := NewHoneypotMiddleware(
-				settings, transientDbSvc, nil,
+				settings,
+				honeypotCmdRepo, honeypotQueryRepo, nil,
 			)
 			defer middleware.Stop()
 
@@ -1315,12 +1415,16 @@ func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 				transientDbSvc, testIp,
 				testCase.hitCount,
 			)
+			honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+				transientDbSvc,
+			)
 
 			settings := newStandardSettings()
 			settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeTolerant
 
 			middleware := NewHoneypotMiddleware(
-				settings, transientDbSvc, nil,
+				settings,
+				honeypotCmdRepo, honeypotQueryRepo, nil,
 			)
 			defer middleware.Stop()
 
@@ -1350,12 +1454,15 @@ func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 func TestAggressivenessObserveNeverBans(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 50)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1377,12 +1484,15 @@ func TestAggressivenessObserveNeverBans(t *testing.T) {
 func TestAggressivenessObserveAlwaysServesPayloads(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 50)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1404,7 +1514,7 @@ func TestAggressivenessObserveAlwaysServesPayloads(t *testing.T) {
 
 func TestNoSeparateWatchdogSettingsStruct(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -1426,8 +1536,12 @@ func TestWatchdogAutoStartedByConstructor(t *testing.T) {
 	)
 
 	goroutinesBefore := runtime.NumGoroutine()
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 	middleware := NewHoneypotMiddleware(
-		settings, newTransientDbSvc(), nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1446,8 +1560,12 @@ func TestWatchdogStoppedByStopMethod(t *testing.T) {
 		"5m",
 	)
 
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 	middleware := NewHoneypotMiddleware(
-		settings, newTransientDbSvc(), nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 
 	time.Sleep(50 * time.Millisecond)
@@ -1483,8 +1601,12 @@ func TestMaintenanceWatchdogCleansExpiredEntries(t *testing.T) {
 	}
 	transientDbSvc.Handler.Create(&oldEntry)
 
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1504,9 +1626,13 @@ func TestMaintenanceWatchdogPreservesActiveEntries(t *testing.T) {
 	testIp := newUniqueTestIp()
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, testIp, 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1532,7 +1658,10 @@ func TestMaintenanceWatchdogEnforcesMaxEntries(t *testing.T) {
 		)
 	}
 
-	enforceMaxEntries(transientDbSvc.Handler, 5)
+	honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(
+		transientDbSvc,
+	)
+	honeypotCmdRepo.EnforceMaxEntries(5)
 
 	remaining := transientDbSvc.Count()
 	if remaining > 10 {
@@ -1556,13 +1685,17 @@ func TestStatsReportIncludesCorrectBannedIpCount(t *testing.T) {
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
 	populateTransientDbWithHits(transientDbSvc, "2.2.2.2", 2)
 	populateTransientDbWithHits(transientDbSvc, "3.3.3.3", 3)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1597,13 +1730,17 @@ func TestStatsReportIncludesTopOffenders(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 5)
 	populateTransientDbWithHits(transientDbSvc, "2.2.2.2", 10)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1632,13 +1769,17 @@ func TestStatsReportIncludesTopEndpoints(t *testing.T) {
 
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 5)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1667,13 +1808,17 @@ func TestStatsReportJsonMatchesExpectedSchema(t *testing.T) {
 
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1706,13 +1851,17 @@ func TestStatsReportUsesHoneypotPeriodicReportRecordCode(t *testing.T) {
 
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1737,13 +1886,17 @@ func TestStatsReportUsesSecurityRecordLevel(t *testing.T) {
 
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1767,9 +1920,13 @@ func TestEmptyTransientDbSkipsStatsReport(t *testing.T) {
 	}
 
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1795,9 +1952,13 @@ func TestCleanupRunsBeforeStatsInSameTick(t *testing.T) {
 
 	testIp := newUniqueTestIp()
 	populateTransientDbWithHits(transientDbSvc, testIp, 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1824,9 +1985,13 @@ func TestStatsProducedRegardlessOfCleanupVolume(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	testIp := newUniqueTestIp()
 	populateTransientDbWithHits(transientDbSvc, testIp, 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1843,8 +2008,12 @@ func TestWatchdogRespectsContextCancellation(t *testing.T) {
 		"5m",
 	)
 
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 	middleware := NewHoneypotMiddleware(
-		settings, newTransientDbSvc(), nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 
 	time.Sleep(50 * time.Millisecond)
@@ -1862,9 +2031,13 @@ func TestWatchdogReadsBanDurationAsTTL(t *testing.T) {
 	populateTransientDbWithOldHits(
 		transientDbSvc, testIp, 3, 25*time.Hour,
 	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1892,9 +2065,12 @@ func TestProbabilisticEnforcementTriggersOnWrite(t *testing.T) {
 	cmdRepo := newNoopCmdRepo()
 	settings := newStandardSettings()
 	settings.MaxEntries, _ = tkValueObject.NewHoneypotMaxEntries(100)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1911,12 +2087,15 @@ func TestProbabilisticEnforcementTriggersOnWrite(t *testing.T) {
 func TestProbabilisticEnforcementNotAlwaysTriggered(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.MaxEntries, _ = tkValueObject.NewHoneypotMaxEntries(5000)
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -1931,7 +2110,7 @@ func TestProbabilisticEnforcementNotAlwaysTriggered(t *testing.T) {
 
 func TestGraduatedBanTransientDbReadErrorHandled(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -1944,9 +2123,13 @@ func TestGraduatedBanTransientDbReadErrorHandled(t *testing.T) {
 
 func TestTransientDbReadErrorHandled(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1958,7 +2141,7 @@ func TestTransientDbReadErrorHandled(t *testing.T) {
 
 func TestProbabilisticEnforcementHandlesMaxEntriesError(t *testing.T) {
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil,
+		newStandardSettings(), nil, nil, nil,
 	)
 	defer middleware.Stop()
 
@@ -1973,9 +2156,13 @@ func TestStopOnUninitializedMiddlewareDoesNotPanic(t *testing.T) {
 func TestMaintenanceWatchdogHandlesNilCmdRepo(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, nil,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -1985,6 +2172,9 @@ func TestMaintenanceWatchdogHandlesNilCmdRepo(t *testing.T) {
 func TestMaintenanceWatchdogRecoversFromPanicInTick(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.StatsInterval, _ = tkValueObject.NewHoneypotStatsInterval(
@@ -1992,7 +2182,7 @@ func TestMaintenanceWatchdogRecoversFromPanicInTick(t *testing.T) {
 	)
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -2013,11 +2203,11 @@ func TestTransientDbReadAllErrorDuringStatsSkipsReport(t *testing.T) {
 	}
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, cmdRepo,
+		newStandardSettings(), nil, nil, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if recordCreated {
 		t.Errorf("NilTransientDbShouldSkipStatsReport")
@@ -2038,16 +2228,19 @@ func TestAggressivenessModeObserveReportsZeroBannedIps(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 5)
 	populateTransientDbWithHits(transientDbSvc, "2.2.2.2", 10)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -2074,6 +2267,9 @@ func TestWatchdogUsesStatsIntervalFromSettings(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	testIp := newUniqueTestIp()
 	populateTransientDbWithHits(transientDbSvc, testIp, 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	statsCount := 0
 	cmdRepo := mockActivityRecordCmdRepo{
@@ -2088,7 +2284,7 @@ func TestWatchdogUsesStatsIntervalFromSettings(t *testing.T) {
 	}
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2105,9 +2301,13 @@ func TestScannerFloodTriggersTierEscalation(t *testing.T) {
 	testIp := newUniqueTestIp()
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2128,7 +2328,7 @@ func TestScannerFloodTriggersTierEscalation(t *testing.T) {
 	}
 
 	rawValue, _ := transientDbSvc.Read("honeypot:hit:" + testIp)
-	var hitData honeypotHitData
+	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
 	if hitData.Count != 2 {
@@ -2152,9 +2352,13 @@ func TestConcurrentHitsCountCorrectly(t *testing.T) {
 	testIp := newUniqueTestIp()
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2172,7 +2376,7 @@ func TestConcurrentHitsCountCorrectly(t *testing.T) {
 	waitGroup.Wait()
 
 	rawValue, _ := transientDbSvc.Read("honeypot:hit:" + testIp)
-	var hitData honeypotHitData
+	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
 	if hitData.Count != goroutineCount {
@@ -2192,9 +2396,13 @@ func TestPhaseOneCoreBehaviorPreservedAfterPhaseThree(t *testing.T) {
 			return nil
 		},
 	}
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), transientDbSvc, cmdRepo,
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2223,12 +2431,15 @@ func TestAggressivenessImmediateAutoBansScannerOnFirstProbe(
 ) {
 	transientDbSvc := newTransientDbSvc()
 	populateTransientDbWithHits(transientDbSvc, "1.2.3.4", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeImmediate
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, nil,
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
 	)
 	defer middleware.Stop()
 
@@ -2254,12 +2465,15 @@ func TestAggressivenessObserveGathersIntelWithoutInterference(
 	testIp := newUniqueTestIp()
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2300,9 +2514,12 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 	cmdRepo := newNoopCmdRepo()
 	settings := newStandardSettings()
 	settings.MaxEntries, _ = tkValueObject.NewHoneypotMaxEntries(100)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2328,6 +2545,9 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
 	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
 
 	settings := newStandardSettings()
 	settings.StatsInterval, _ = tkValueObject.NewHoneypotStatsInterval(
@@ -2335,7 +2555,7 @@ func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 	)
 
 	middleware := NewHoneypotMiddleware(
-		settings, transientDbSvc, cmdRepo,
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
 	)
 	defer middleware.Stop()
 
@@ -2360,7 +2580,7 @@ func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 		t.Fatalf("HitDataLost: %v", readErr)
 	}
 
-	var hitData honeypotHitData
+	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
 	if hitData.Count < 1 {

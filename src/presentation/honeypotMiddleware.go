@@ -9,23 +9,17 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
-	tkInfraDb "github.com/goinfinite/tk/src/infra/db"
 	"github.com/labstack/echo/v4"
-	"gorm.io/gorm"
 )
 
 //go:embed honeypot/payloads/*
 var honeypotPayloadsFs embed.FS
-
-const honeypotHitKeyPrefix = "honeypot:hit:"
 
 type HoneypotPathMapping struct {
 	Body     string
@@ -45,24 +39,8 @@ type HoneypotMiddlewareSettings struct {
 }
 
 type HoneypotHttpPayload struct {
-	ContentType string
 	Body        string
-}
-
-type honeypotHitData struct {
-	Count      int            `json:"count"`
-	FirstHitAt string         `json:"firstHitAt"`
-	Endpoints  map[string]int `json:"endpoints"`
-}
-
-type honeypotStatsOffender struct {
-	IpAddress string `json:"ipAddress"`
-	HitCount  int    `json:"hitCount"`
-}
-
-type honeypotStatsEndpoint struct {
-	Path     string `json:"path"`
-	HitCount int    `json:"hitCount"`
+	ContentType string
 }
 
 type honeypotPayloadLoader struct {
@@ -139,51 +117,14 @@ func (loader honeypotPayloadLoader) totalCandidatePoolSize() int {
 type HoneypotMiddleware struct {
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo
 	cancelFunc            context.CancelFunc
+	honeypotCmdRepo       tkRepository.HoneypotCmdRepo
 	honeypotHttpPayloads  honeypotPayloadLoader
+	honeypotQueryRepo     tkRepository.HoneypotQueryRepo
 	honeypotRecordCode    tkValueObject.ActivityRecordCode
 	honeypotRecordLevel   tkValueObject.ActivityRecordLevel
 	ipExtractor           RequesterIpExtractor
 	settings              HoneypotMiddlewareSettings
-	transientDbSvc        *tkInfraDb.TransientDatabaseService
 	writeMu               sync.Mutex
-}
-
-func cleanExpiredEntries(
-	handler *gorm.DB,
-	ttlDuration time.Duration,
-) {
-	cutoff := time.Now().Add(-ttlDuration)
-	handler.Where(
-		"created_at < ?", cutoff,
-	).Delete(&tkInfraDb.KeyValueModel{})
-}
-
-func enforceMaxEntries(
-	handler *gorm.DB,
-	maxEntries int,
-) {
-	var totalCount int64
-	handler.Model(
-		&tkInfraDb.KeyValueModel{},
-	).Count(&totalCount)
-
-	if int(totalCount) <= maxEntries {
-		return
-	}
-
-	excessCount := int(totalCount) - maxEntries
-	keysToDelete := make([]string, 0, excessCount)
-	handler.Model(
-		&tkInfraDb.KeyValueModel{},
-	).Order("created_at ASC").Limit(
-		excessCount,
-	).Pluck("key", &keysToDelete)
-
-	if len(keysToDelete) > 0 {
-		handler.Where(
-			"key IN ?", keysToDelete,
-		).Delete(&tkInfraDb.KeyValueModel{})
-	}
 }
 
 func (middleware *HoneypotMiddleware) lookupHoneypotPath(
@@ -261,58 +202,22 @@ func (middleware *HoneypotMiddleware) incrementHitCount(
 	ipString string,
 	interceptPath string,
 ) {
-	if middleware.transientDbSvc == nil {
+	if middleware.honeypotCmdRepo == nil {
 		return
 	}
 
 	middleware.writeMu.Lock()
 	defer middleware.writeMu.Unlock()
 
-	handler := middleware.transientDbSvc.Handler
-	hitKey := honeypotHitKeyPrefix + ipString
-
-	rawValue, readErr := middleware.transientDbSvc.Read(hitKey)
-
-	var hitData honeypotHitData
-	if readErr == nil {
-		parseErr := json.Unmarshal(
-			[]byte(rawValue), &hitData,
-		)
-		if parseErr != nil {
-			slog.Debug("HoneypotHitDataParseFailed",
-				slog.String("err", parseErr.Error()))
-		}
-	}
-
-	if hitData.Count == 0 {
-		hitData.FirstHitAt = time.Now().UTC().Format(
-			time.RFC3339,
-		)
-		hitData.Endpoints = make(map[string]int)
-	}
-
-	hitData.Count++
-	hitData.Endpoints[interceptPath]++
-
-	jsonBytes, marshalErr := json.Marshal(hitData)
-	if marshalErr != nil {
-		slog.Debug("HoneypotHitDataMarshalFailed",
-			slog.String("err", marshalErr.Error()))
+	ipAddr, ipErr := tkValueObject.NewIpAddress(ipString)
+	if ipErr != nil {
 		return
 	}
 
-	setErr := middleware.transientDbSvc.Set(
-		hitKey, string(jsonBytes),
-	)
-	if setErr != nil {
-		slog.Debug("HoneypotHitCountSetFailed",
-			slog.String("err", setErr.Error()))
-		return
-	}
+	middleware.honeypotCmdRepo.IncrementHit(ipAddr, interceptPath)
 
 	if rand.Float64() < 0.02 {
-		enforceMaxEntries(
-			handler,
+		middleware.honeypotCmdRepo.EnforceMaxEntries(
 			middleware.settings.MaxEntries.Int(),
 		)
 	}
@@ -321,19 +226,19 @@ func (middleware *HoneypotMiddleware) incrementHitCount(
 func (middleware *HoneypotMiddleware) determineBanTier(
 	ipString string,
 ) int {
-	if middleware.transientDbSvc == nil {
+	if middleware.honeypotQueryRepo == nil {
 		return 0
 	}
 
-	hitKey := honeypotHitKeyPrefix + ipString
-	rawValue, readErr := middleware.transientDbSvc.Read(hitKey)
+	ipAddr, ipErr := tkValueObject.NewIpAddress(ipString)
+	if ipErr != nil {
+		return 0
+	}
+
+	hitData, readErr := middleware.honeypotQueryRepo.ReadHitRecord(
+		ipAddr,
+	)
 	if readErr != nil {
-		return 0
-	}
-
-	var hitData honeypotHitData
-	parseErr := json.Unmarshal([]byte(rawValue), &hitData)
-	if parseErr != nil {
 		return 0
 	}
 
@@ -356,102 +261,19 @@ func (middleware *HoneypotMiddleware) determineBanTier(
 	)
 }
 
-func buildTopOffenders(
-	ipHitCounts map[string]int,
-	limit int,
-) []honeypotStatsOffender {
-	offenders := make(
-		[]honeypotStatsOffender, 0, len(ipHitCounts),
-	)
-	for ipAddr, hitCount := range ipHitCounts {
-		offenders = append(offenders, honeypotStatsOffender{
-			IpAddress: ipAddr,
-			HitCount:  hitCount,
-		})
-	}
-	sort.Slice(offenders, func(a, b int) bool {
-		return offenders[a].HitCount > offenders[b].HitCount
-	})
-	if len(offenders) > limit {
-		offenders = offenders[:limit]
-	}
-	return offenders
-}
-
-func buildTopEndpoints(
-	endpointCounts map[string]int,
-	limit int,
-) []honeypotStatsEndpoint {
-	endpoints := make(
-		[]honeypotStatsEndpoint, 0, len(endpointCounts),
-	)
-	for endpointPath, hitCount := range endpointCounts {
-		endpoints = append(endpoints, honeypotStatsEndpoint{
-			Path:     endpointPath,
-			HitCount: hitCount,
-		})
-	}
-	sort.Slice(endpoints, func(a, b int) bool {
-		return endpoints[a].HitCount > endpoints[b].HitCount
-	})
-	if len(endpoints) > limit {
-		endpoints = endpoints[:limit]
-	}
-	return endpoints
-}
-
-func (middleware *HoneypotMiddleware) aggregateStats() {
-	if middleware.transientDbSvc == nil {
+func (middleware *HoneypotMiddleware) reportStats() {
+	if middleware.honeypotQueryRepo == nil {
 		return
 	}
 
-	entries, readAllErr := middleware.transientDbSvc.ReadAll()
-	if readAllErr != nil {
-		slog.Debug("HoneypotStatsReadAllFailed",
-			slog.String("err", readAllErr.Error()))
+	statsReport, reportErr := middleware.honeypotQueryRepo.ReadReport(
+		middleware.settings.BanDuration,
+		middleware.settings.AggressivenessMode,
+	)
+	if reportErr != nil {
+		slog.Debug("HoneypotStatsReadReportFailed",
+			slog.String("err", reportErr.Error()))
 		return
-	}
-
-	ipHitCounts := make(map[string]int)
-	endpointCounts := make(map[string]int)
-	bannedIpCount := 0
-
-	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Key, honeypotHitKeyPrefix) {
-			continue
-		}
-
-		var hitData honeypotHitData
-		parseErr := json.Unmarshal(
-			[]byte(entry.Value), &hitData,
-		)
-		if parseErr != nil {
-			continue
-		}
-
-		ipAddr := strings.TrimPrefix(
-			entry.Key, honeypotHitKeyPrefix,
-		)
-		resolvedTier := middleware.settings.AggressivenessMode.ResolveTier(
-			hitData.Count,
-		)
-		if resolvedTier >= 2 {
-			bannedIpCount++
-		}
-
-		ipHitCounts[ipAddr] = hitData.Count
-		for endpointPath, count := range hitData.Endpoints {
-			endpointCounts[endpointPath] += count
-		}
-	}
-
-	topOffenders := buildTopOffenders(ipHitCounts, 10)
-	topEndpoints := buildTopEndpoints(endpointCounts, 10)
-
-	statsReport := map[string]any{
-		"bannedIpCount": bannedIpCount,
-		"topOffenders":  topOffenders,
-		"topEndpoints":  topEndpoints,
 	}
 
 	reportJson, marshalErr := json.Marshal(statsReport)
@@ -488,24 +310,25 @@ func (middleware *HoneypotMiddleware) aggregateStats() {
 }
 
 func (middleware *HoneypotMiddleware) runMaintenanceTick() {
-	if middleware.transientDbSvc == nil {
+	if middleware.honeypotCmdRepo != nil {
+		middleware.honeypotCmdRepo.CleanExpiredEntries(
+			middleware.settings.BanDuration,
+		)
+		middleware.honeypotCmdRepo.EnforceMaxEntries(
+			middleware.settings.MaxEntries.Int(),
+		)
+	}
+
+	if middleware.honeypotQueryRepo == nil {
 		return
 	}
 
-	handler := middleware.transientDbSvc.Handler
-	ttlDuration := middleware.settings.BanDuration
-
-	cleanExpiredEntries(handler, ttlDuration)
-	enforceMaxEntries(
-		handler, middleware.settings.MaxEntries.Int(),
-	)
-
-	entryCount := middleware.transientDbSvc.Count()
+	entryCount := middleware.honeypotQueryRepo.Count()
 	if entryCount == 0 {
 		return
 	}
 
-	middleware.aggregateStats()
+	middleware.reportStats()
 }
 
 func (middleware *HoneypotMiddleware) honeypotMaintenanceWatchdog(
@@ -590,7 +413,8 @@ func (middleware *HoneypotMiddleware) Stop() {
 
 func NewHoneypotMiddleware(
 	settings HoneypotMiddlewareSettings,
-	transientDbSvc *tkInfraDb.TransientDatabaseService,
+	honeypotCmdRepo tkRepository.HoneypotCmdRepo,
+	honeypotQueryRepo tkRepository.HoneypotQueryRepo,
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
 ) *HoneypotMiddleware {
 	if settings.BanDuration <= 0 {
@@ -708,12 +532,13 @@ func NewHoneypotMiddleware(
 	middleware := &HoneypotMiddleware{
 		activityRecordCmdRepo: activityRecordCmdRepo,
 		cancelFunc:            cancelFunc,
+		honeypotCmdRepo:       honeypotCmdRepo,
 		honeypotHttpPayloads:  *payloadLoader,
+		honeypotQueryRepo:     honeypotQueryRepo,
 		honeypotRecordCode:    honeypotRecordCode,
 		honeypotRecordLevel:   tkValueObject.ActivityRecordLevelSecurity,
 		ipExtractor:           NewRequesterIpExtractor(),
 		settings:              settings,
-		transientDbSvc:        transientDbSvc,
 	}
 
 	go middleware.honeypotMaintenanceWatchdog(ctx)
