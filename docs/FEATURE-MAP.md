@@ -211,18 +211,16 @@ Catches panics, logs stack traces, and returns safe error responses.
 
 ## Honeypot IP Blocking
 
-Intercepts security scanner probes with fake-vulnerability payloads, then blocks source IP with 24h TTL. All subsequent requests from banned IPs redirect to xkcd.com.
+Intercepts security scanner probes with fake-vulnerability payloads and graduated ban tiers. Hit counts tracked in transient DB with aggressiveness-mode-driven tier escalation (immediate/balanced/tolerant/observe). Maintenance watchdog cleans expired entries and produces periodic stats reports.
 
 **Flow:**
 
-1. `src/presentation/honeypotMiddleware.go` — `HoneypotMiddlewareSettings` struct with VO-typed fields (ActivePathCount HoneypotActivePathCount, AggressivenessMode HoneypotAggressivenessMode, MaxEntries HoneypotMaxEntries, MaxStreamSizeBytes HoneypotMaxStreamSizeBytes, RedirectUrl Url, StatsInterval HoneypotStatsInterval); `HoneypotPathMapping` uses UrlPath and MimeType VOs; `NewHoneypotMiddleware(settings, activityRecordCmdRepo, activityRecordQueryRepo)` returns echo.MiddlewareFunc; env var parsing done directly via VO constructors in constructor; `resolveAggressivenessMode` package-level function handles deprecated mode fallback; `HoneypotActivePathCount`, `HoneypotMaxEntries`, `HoneypotMaxStreamSizeBytes`, `HoneypotStatsInterval` value objects in `src/domain/valueObject/`
-2. Middleware intercepts honeypot paths via map lookup (not route table): checks all requests against path map, returns fake payload + creates HoneypotHit ActivityRecord
-3. Middleware checks all requests against ban list: queries ActivityRecordQueryRepo for HoneypotHit records with CreatedAfterAt filter (24h window), returns 302 if banned
-4. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord with RecordCode="HoneypotHit", RecordLevel="SECURITY", OperatorIpAddress extracted via RequesterIpExtractor
-5. `src/infra/activityRecord/activityRecordQueryRepo.go` — queries ActivityRecord with CreatedAfterAt filter for TTL enforcement
-6. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from X-Forwarded-For/X-Real-IP headers (if trusted proxy) or RemoteAddr
-7. Fake payloads: 25 paths including /.env (dotenv), /wp-config.php (PHP constants), /actuator/env (JSON), /backup.sql (SQL), /.git/config (git config), /server-status (Apache HTML), /phpmyadmin (login form), etc.
-8. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store for hit-count tracking; KeyValueModel with Key, Value, CreatedAt fields; methods: Has, Read, ReadAll, Set, Count
+1. `src/presentation/honeypotMiddleware.go` — `*HoneypotMiddleware` struct; `NewHoneypotMiddleware(settings, transientDbSvc, activityRecordCmdRepo)` returns pointer; `MiddlewareFunc()` returns echo.MiddlewareFunc; `Stop()` cancels watchdog context (idempotent, nil-safe); `Execute()` implements graduated ban logic: tier 0 passes, tier 1 serves payload + increments hit count, tier 2 redirects honeypot paths, tier 3 redirects all paths; `determineBanTier(ipString)` reads hit data from transient DB and resolves tier via `AggressivenessMode.ResolveTier(count)` with TTL check; `incrementHitCount(ipString, path)` stores JSON `{"count":N,"firstHitAt":"RFC3339","endpoints":{...}}` keyed by `honeypot:hit:<ip>` with mutex-protected atomic read-modify-write; probabilistic ~2% `enforceMaxEntries` trigger via `math/rand.Float64()`; `honeypotMaintenanceWatchdog(ctx)` goroutine ticks at StatsInterval: `cleanExpiredEntries` (GORM delete by created_at) → `enforceMaxEntries` (pluck oldest keys then delete) → `aggregateStats` (skip when Count() == 0); stats JSON `{"bannedIpCount":N,"topOffenders":[...],"topEndpoints":[...]}` stored as ActivityRecord with RecordCode "HoneypotPeriodicReport" and RecordLevel "SECURITY"
+2. `src/domain/valueObject/honeypotAggressivenessMode.go` — `HoneypotAggressivenessMode` VO with `ResolveTier(hitCount int) int`: immediate (1+=3), balanced (0=0,1=1,2=2,3+=3), tolerant (0-1=0,2-4=1,5+=2), observe (always 1)
+3. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store; `KeyValueModel{Key, Value, CreatedAt}`; methods: Has, Read, ReadAll, Set, Count
+4. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from headers or RemoteAddr
+5. Fake payloads: 25 embedded paths (/.env, /wp-config.php, /backup.sql, etc.) via embed.FS
+6. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord for hit tracking and stats reports
 
 **Environment Variables:**
 

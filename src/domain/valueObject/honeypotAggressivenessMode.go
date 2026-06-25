@@ -42,3 +42,33 @@ func NewHoneypotAggressivenessMode(value any) (
 func (vo HoneypotAggressivenessMode) String() string {
 	return string(vo)
 }
+
+func (vo HoneypotAggressivenessMode) ResolveTier(hitCount int) int {
+	switch vo {
+	case HoneypotAggressivenessModeImmediate:
+		if hitCount >= 1 {
+			return 3
+		}
+		return 0
+	case HoneypotAggressivenessModeBalanced:
+		if hitCount >= 3 {
+			return 3
+		}
+		if hitCount <= 0 {
+			return 0
+		}
+		return hitCount
+	case HoneypotAggressivenessModeTolerant:
+		if hitCount >= 5 {
+			return 2
+		}
+		if hitCount >= 2 {
+			return 1
+		}
+		return 0
+	case HoneypotAggressivenessModeObserve:
+		return 1
+	default:
+		return 0
+	}
+}

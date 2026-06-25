@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.8 - 2026/06/25
+feat: add graduated ban tiers, maintenance watchdog, and persistent hit tracking to honeypot middleware
+
 0.2.8 - 2026/06/17
 feat: add in-memory transient database service for ephemeral key-value storage with Count(), ReadAll(), and CreatedAt support
 feat: add honeypot value objects for middleware settings validation

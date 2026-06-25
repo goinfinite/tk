@@ -127,3 +127,96 @@ func TestHoneypotAggressivenessModeString(t *testing.T) {
 		})
 	}
 }
+
+func TestHoneypotAggressivenessModeResolveTier(t *testing.T) {
+	testCaseStructs := []struct {
+		name         string
+		mode         HoneypotAggressivenessMode
+		hitCount     int
+		expectedTier int
+	}{
+		{
+			"ImmediateZeroHitsTierZero",
+			HoneypotAggressivenessModeImmediate, 0, 0,
+		},
+		{
+			"ImmediateOneHitTierThree",
+			HoneypotAggressivenessModeImmediate, 1, 3,
+		},
+		{
+			"ImmediateFiveHitsTierThree",
+			HoneypotAggressivenessModeImmediate, 5, 3,
+		},
+		{
+			"BalancedZeroHitsTierZero",
+			HoneypotAggressivenessModeBalanced, 0, 0,
+		},
+		{
+			"BalancedOneHitTierOne",
+			HoneypotAggressivenessModeBalanced, 1, 1,
+		},
+		{
+			"BalancedTwoHitsTierTwo",
+			HoneypotAggressivenessModeBalanced, 2, 2,
+		},
+		{
+			"BalancedThreeHitsTierThree",
+			HoneypotAggressivenessModeBalanced, 3, 3,
+		},
+		{
+			"BalancedTenHitsTierThree",
+			HoneypotAggressivenessModeBalanced, 10, 3,
+		},
+		{
+			"TolerantZeroHitsTierZero",
+			HoneypotAggressivenessModeTolerant, 0, 0,
+		},
+		{
+			"TolerantOneHitTierZero",
+			HoneypotAggressivenessModeTolerant, 1, 0,
+		},
+		{
+			"TolerantTwoHitsTierOne",
+			HoneypotAggressivenessModeTolerant, 2, 1,
+		},
+		{
+			"TolerantFourHitsTierOne",
+			HoneypotAggressivenessModeTolerant, 4, 1,
+		},
+		{
+			"TolerantFiveHitsTierTwo",
+			HoneypotAggressivenessModeTolerant, 5, 2,
+		},
+		{
+			"TolerantTenHitsTierTwo",
+			HoneypotAggressivenessModeTolerant, 10, 2,
+		},
+		{
+			"ObserveZeroHitsTierOne",
+			HoneypotAggressivenessModeObserve, 0, 1,
+		},
+		{
+			"ObserveOneHitTierOne",
+			HoneypotAggressivenessModeObserve, 1, 1,
+		},
+		{
+			"ObserveFiftyHitsTierOne",
+			HoneypotAggressivenessModeObserve, 50, 1,
+		},
+	}
+
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			actualTier := testCase.mode.ResolveTier(
+				testCase.hitCount,
+			)
+			if actualTier != testCase.expectedTier {
+				t.Errorf("TierMismatch: mode=%s, hits=%d, "+
+					"got=%d, want=%d",
+					testCase.mode.String(),
+					testCase.hitCount,
+					actualTier, testCase.expectedTier)
+			}
+		})
+	}
+}
