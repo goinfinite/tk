@@ -3,10 +3,8 @@ package tkPresentation
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"errors"
 	"log/slog"
-	"math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -14,6 +12,7 @@ import (
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
+	tkUseCase "github.com/goinfinite/tk/src/domain/useCase"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/labstack/echo/v4"
 )
@@ -116,15 +115,15 @@ func (loader honeypotPayloadLoader) totalCandidatePoolSize() int {
 
 type HoneypotMiddleware struct {
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo
+	banDecisionResolver   func(requesterIp string) int
 	cancelFunc            context.CancelFunc
-	honeypotCmdRepo       tkRepository.HoneypotCmdRepo
+	hitRecorder           func(requesterIp string, interceptPath string)
 	honeypotHttpPayloads  honeypotPayloadLoader
-	honeypotQueryRepo     tkRepository.HoneypotQueryRepo
 	honeypotRecordCode    tkValueObject.ActivityRecordCode
 	honeypotRecordLevel   tkValueObject.ActivityRecordLevel
 	ipExtractor           RequesterIpExtractor
+	maintenanceRunner     func()
 	settings              HoneypotMiddlewareSettings
-	writeMu               sync.Mutex
 }
 
 func (middleware *HoneypotMiddleware) lookupHoneypotPath(
@@ -198,139 +197,6 @@ func (middleware *HoneypotMiddleware) recordHoneypotHit(
 	}
 }
 
-func (middleware *HoneypotMiddleware) incrementHitCount(
-	ipString string,
-	interceptPath string,
-) {
-	if middleware.honeypotCmdRepo == nil {
-		return
-	}
-
-	middleware.writeMu.Lock()
-	defer middleware.writeMu.Unlock()
-
-	ipAddr, ipErr := tkValueObject.NewIpAddress(ipString)
-	if ipErr != nil {
-		return
-	}
-
-	middleware.honeypotCmdRepo.IncrementHit(ipAddr, interceptPath)
-
-	if rand.Float64() < 0.02 {
-		middleware.honeypotCmdRepo.EnforceMaxEntries(
-			middleware.settings.MaxEntries.Int(),
-		)
-	}
-}
-
-func (middleware *HoneypotMiddleware) determineBanTier(
-	ipString string,
-) int {
-	if middleware.honeypotQueryRepo == nil {
-		return 0
-	}
-
-	ipAddr, ipErr := tkValueObject.NewIpAddress(ipString)
-	if ipErr != nil {
-		return 0
-	}
-
-	hitData, readErr := middleware.honeypotQueryRepo.ReadHitRecord(
-		ipAddr,
-	)
-	if readErr != nil {
-		return 0
-	}
-
-	firstHitAt, timeParseErr := time.Parse(
-		time.RFC3339, hitData.FirstHitAt,
-	)
-	if timeParseErr != nil {
-		return 0
-	}
-
-	banWindowStart := time.Now().Add(
-		-middleware.settings.BanDuration,
-	)
-	if firstHitAt.Before(banWindowStart) {
-		return 0
-	}
-
-	return middleware.settings.AggressivenessMode.ResolveTier(
-		hitData.Count,
-	)
-}
-
-func (middleware *HoneypotMiddleware) reportStats() {
-	if middleware.honeypotQueryRepo == nil {
-		return
-	}
-
-	statsReport, reportErr := middleware.honeypotQueryRepo.ReadReport(
-		middleware.settings.BanDuration,
-		middleware.settings.AggressivenessMode,
-	)
-	if reportErr != nil {
-		slog.Debug("HoneypotStatsReadReportFailed",
-			slog.String("err", reportErr.Error()))
-		return
-	}
-
-	reportJson, marshalErr := json.Marshal(statsReport)
-	if marshalErr != nil {
-		slog.Debug("HoneypotStatsMarshalFailed",
-			slog.String("err", marshalErr.Error()))
-		return
-	}
-
-	if middleware.activityRecordCmdRepo == nil {
-		return
-	}
-
-	statsRecordCode, _ := tkValueObject.NewActivityRecordCode(
-		"HoneypotPeriodicReport",
-	)
-
-	createRequest := tkDto.CreateActivityRecord{
-		RecordLevel: tkValueObject.ActivityRecordLevelSecurity,
-		RecordCode:  statsRecordCode,
-		AffectedResources: []tkValueObject.SystemResourceIdentifier{},
-		RecordDetails: map[string]string{
-			"statsReport": string(reportJson),
-		},
-	}
-
-	createErr := middleware.activityRecordCmdRepo.Create(
-		createRequest,
-	)
-	if createErr != nil {
-		slog.Debug("HoneypotStatsReportCreationFailed",
-			slog.String("err", createErr.Error()))
-	}
-}
-
-func (middleware *HoneypotMiddleware) runMaintenanceTick() {
-	if middleware.honeypotCmdRepo != nil {
-		middleware.honeypotCmdRepo.CleanExpiredEntries(
-			middleware.settings.BanDuration,
-		)
-		middleware.honeypotCmdRepo.EnforceMaxEntries(
-			middleware.settings.MaxEntries.Int(),
-		)
-	}
-
-	if middleware.honeypotQueryRepo == nil {
-		return
-	}
-
-	entryCount := middleware.honeypotQueryRepo.Count()
-	if entryCount == 0 {
-		return
-	}
-
-	middleware.reportStats()
-}
-
 func (middleware *HoneypotMiddleware) honeypotMaintenanceWatchdog(
 	ctx context.Context,
 ) {
@@ -352,7 +218,7 @@ func (middleware *HoneypotMiddleware) honeypotMaintenanceWatchdog(
 						)
 					}
 				}()
-				middleware.runMaintenanceTick()
+				middleware.maintenanceRunner()
 			}()
 		}
 	}
@@ -376,7 +242,7 @@ func (middleware *HoneypotMiddleware) Execute(
 		}
 
 		ipString := requesterIp.String()
-		banTier := middleware.determineBanTier(ipString)
+		banTier := middleware.banDecisionResolver(ipString)
 
 		if banTier >= 3 {
 			return middleware.serveBanRedirect(echoContext)
@@ -393,7 +259,7 @@ func (middleware *HoneypotMiddleware) Execute(
 			return middleware.serveBanRedirect(echoContext)
 		}
 
-		middleware.incrementHitCount(
+		middleware.hitRecorder(
 			ipString, httpRequest.URL.Path,
 		)
 		middleware.recordHoneypotHit(
@@ -529,15 +395,77 @@ func NewHoneypotMiddleware(
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
+	var writeMu sync.Mutex
+
+	banDecisionResolver := func(ipString string) int {
+		requesterIp, ipErr := tkValueObject.NewIpAddress(
+			ipString,
+		)
+		if ipErr != nil {
+			return 0
+		}
+
+		banTier, _ := tkUseCase.ReadHoneypotBanDecision(
+			honeypotQueryRepo,
+			requesterIp,
+			settings.BanDuration,
+			settings.AggressivenessMode,
+		)
+		return banTier
+	}
+
+	hitRecorder := func(
+		ipString string, interceptPath string,
+	) {
+		requesterIp, ipErr := tkValueObject.NewIpAddress(
+			ipString,
+		)
+		if ipErr != nil {
+			return
+		}
+
+		writeMu.Lock()
+		defer writeMu.Unlock()
+
+		tkUseCase.CreateHoneypotHit(
+			honeypotCmdRepo,
+			requesterIp,
+			interceptPath,
+			settings.MaxEntries.Int(),
+		)
+	}
+
+	statsRecordCode, statsCodeErr := tkValueObject.NewActivityRecordCode(
+		"HoneypotPeriodicReport",
+	)
+	if statsCodeErr != nil {
+		slog.Debug("HoneypotStatsCodeCreationFailed",
+			slog.String("err", statsCodeErr.Error()))
+	}
+
+	maintenanceRunner := func() {
+		tkUseCase.RunHoneypotMaintenance(
+			honeypotCmdRepo,
+			honeypotQueryRepo,
+			activityRecordCmdRepo,
+			settings.BanDuration,
+			settings.MaxEntries.Int(),
+			settings.AggressivenessMode,
+			statsRecordCode,
+			tkValueObject.ActivityRecordLevelSecurity,
+		)
+	}
+
 	middleware := &HoneypotMiddleware{
 		activityRecordCmdRepo: activityRecordCmdRepo,
+		banDecisionResolver:   banDecisionResolver,
 		cancelFunc:            cancelFunc,
-		honeypotCmdRepo:       honeypotCmdRepo,
+		hitRecorder:           hitRecorder,
 		honeypotHttpPayloads:  *payloadLoader,
-		honeypotQueryRepo:     honeypotQueryRepo,
 		honeypotRecordCode:    honeypotRecordCode,
 		honeypotRecordLevel:   tkValueObject.ActivityRecordLevelSecurity,
 		ipExtractor:           NewRequesterIpExtractor(),
+		maintenanceRunner:     maintenanceRunner,
 		settings:              settings,
 	}
 

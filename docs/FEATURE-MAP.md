@@ -215,12 +215,16 @@ Intercepts security scanner probes with fake-vulnerability payloads and graduate
 
 **Flow:**
 
-1. `src/presentation/honeypotMiddleware.go` — `*HoneypotMiddleware` struct; `NewHoneypotMiddleware(settings, transientDbSvc, activityRecordCmdRepo)` returns pointer; `MiddlewareFunc()` returns echo.MiddlewareFunc; `Stop()` cancels watchdog context (idempotent, nil-safe); `Execute()` implements graduated ban logic: tier 0 passes, tier 1 serves payload + increments hit count, tier 2 redirects honeypot paths, tier 3 redirects all paths; `determineBanTier(ipString)` reads hit data from transient DB and resolves tier via `AggressivenessMode.ResolveTier(count)` with TTL check; `incrementHitCount(ipString, path)` stores JSON `{"count":N,"firstHitAt":"RFC3339","endpoints":{...}}` keyed by `honeypot:hit:<ip>` with mutex-protected atomic read-modify-write; probabilistic ~2% `enforceMaxEntries` trigger via `math/rand.Float64()`; `honeypotMaintenanceWatchdog(ctx)` goroutine ticks at StatsInterval: `cleanExpiredEntries` (GORM delete by created_at) → `enforceMaxEntries` (pluck oldest keys then delete) → `aggregateStats` (skip when Count() == 0); stats JSON `{"bannedIpCount":N,"topOffenders":[...],"topEndpoints":[...]}` stored as ActivityRecord with RecordCode "HoneypotPeriodicReport" and RecordLevel "SECURITY"
-2. `src/domain/valueObject/honeypotAggressivenessMode.go` — `HoneypotAggressivenessMode` VO with `ResolveTier(hitCount int) int`: immediate (1+=3), balanced (0=0,1=1,2=2,3+=3), tolerant (0-1=0,2-4=1,5+=2), observe (always 1)
-3. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store; `KeyValueModel{Key, Value, CreatedAt}`; methods: Has, Read, ReadAll, Set, Count
-4. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from headers or RemoteAddr
-5. Fake payloads: 25 embedded paths (/.env, /wp-config.php, /backup.sql, etc.) via embed.FS
-6. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord for hit tracking and stats reports
+1. `src/presentation/honeypotMiddleware.go` — `*HoneypotMiddleware` struct; `NewHoneypotMiddleware(settings, honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo)` returns pointer; `MiddlewareFunc()` returns echo.MiddlewareFunc; `Stop()` cancels watchdog context (idempotent, nil-safe); `Execute()` delegates to `banDecisionResolver` (wraps `ReadHoneypotBanDecision` use case) for tier check: tier 0 passes, tier 1 serves payload + delegates to `hitRecorder` (wraps `CreateHoneypotHit`), tier 2 redirects honeypot paths, tier 3 redirects all; `recordHoneypotHit` creates activity record for each hit; `honeypotMaintenanceWatchdog(ctx)` goroutine ticks at StatsInterval calling `maintenanceRunner` (wraps `RunHoneypotMaintenance`)
+2. `src/domain/useCase/honeypotReadBanDecision.go` — resolves ban tier from hit record with TTL check; returns (0, error) on nil repo, read error, or malformed timestamp
+3. `src/domain/useCase/honeypotCreateHit.go` — increments hit count via cmd repo and probabilistically (~2%) enforces max entries; no-op on nil repo
+4. `src/domain/useCase/honeypotReadStatsReport.go` — delegates to query repo's `ReadReport`; returns empty report on nil repo
+5. `src/domain/useCase/honeypotRunMaintenance.go` — cleans expired entries, enforces max entries, produces stats report as activity record with RecordCode "HoneypotPeriodicReport" and RecordLevel "SECURITY"; skips stats when DB empty or repos nil; errors logged via slog.Debug
+6. `src/domain/valueObject/honeypotAggressivenessMode.go` — `HoneypotAggressivenessMode` VO with `ResolveTier(hitCount int) int`: immediate (1+=3), balanced (0=0,1=1,2=2,3+=3), tolerant (0-1=0,2-4=1,5+=2), observe (always 1)
+7. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store; `KeyValueModel{Key, Value, CreatedAt}`; methods: Has, Read, ReadAll, Set, Count
+8. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from headers or RemoteAddr
+9. Fake payloads: 25 embedded paths (/.env, /wp-config.php, /backup.sql, etc.) via embed.FS
+10. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord for hit tracking and stats reports
 
 **Environment Variables:**
 

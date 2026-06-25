@@ -15,6 +15,7 @@ import (
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
+	tkUseCase "github.com/goinfinite/tk/src/domain/useCase"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfraDb "github.com/goinfinite/tk/src/infra/db"
 	tkInfraHoneypot "github.com/goinfinite/tk/src/infra/honeypot"
@@ -1610,7 +1611,7 @@ func TestMaintenanceWatchdogCleansExpiredEntries(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 
 	var remaining []tkInfraDb.KeyValueModel
 	transientDbSvc.Handler.Find(&remaining)
@@ -1636,7 +1637,7 @@ func TestMaintenanceWatchdogPreservesActiveEntries(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 
 	if transientDbSvc.Count() == 0 {
 		t.Errorf("ActiveEntriesShouldBePreserved")
@@ -1695,7 +1696,7 @@ func TestStatsReportIncludesCorrectBannedIpCount(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1740,7 +1741,7 @@ func TestStatsReportIncludesTopOffenders(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1779,7 +1780,7 @@ func TestStatsReportIncludesTopEndpoints(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1818,7 +1819,7 @@ func TestStatsReportJsonMatchesExpectedSchema(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1861,7 +1862,7 @@ func TestStatsReportUsesHoneypotPeriodicReportRecordCode(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1896,7 +1897,7 @@ func TestStatsReportUsesSecurityRecordLevel(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1930,7 +1931,7 @@ func TestEmptyTransientDbSkipsStatsReport(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 
 	if recordCreated {
 		t.Errorf("EmptyDbShouldSkipStatsReport")
@@ -1962,7 +1963,7 @@ func TestCleanupRunsBeforeStatsInSameTick(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Errorf("StatsShouldBeProducedAfterCleanup")
@@ -1995,7 +1996,7 @@ func TestStatsProducedRegardlessOfCleanupVolume(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 
 	if statsCount == 0 {
 		t.Errorf("StatsShouldBeProducedEvenWithNoCleanup")
@@ -2041,7 +2042,12 @@ func TestWatchdogReadsBanDurationAsTTL(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	tier := middleware.determineBanTier(testIp)
+	testIpAddr, _ := tkValueObject.NewIpAddress(testIp)
+	tier, _ := tkUseCase.ReadHoneypotBanDecision(
+		honeypotQueryRepo, testIpAddr,
+		24*time.Hour,
+		tkValueObject.HoneypotAggressivenessModeBalanced,
+	)
 	if tier != 0 {
 		t.Errorf("ExpiredHitsShouldReturnTierZero: got=%d",
 			tier)
@@ -2075,7 +2081,11 @@ func TestProbabilisticEnforcementTriggersOnWrite(t *testing.T) {
 	defer middleware.Stop()
 
 	for range 500 {
-		middleware.incrementHitCount("1.2.3.4", "/.env")
+		existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
+		tkUseCase.CreateHoneypotHit(
+			honeypotCmdRepo, existentIp,
+			"/.env", settings.MaxEntries.Int(),
+		)
 	}
 
 	remaining := transientDbSvc.Count()
@@ -2100,7 +2110,11 @@ func TestProbabilisticEnforcementNotAlwaysTriggered(t *testing.T) {
 	defer middleware.Stop()
 
 	countBefore := transientDbSvc.Count()
-	middleware.incrementHitCount("1.2.3.4", "/.env")
+	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
+	tkUseCase.CreateHoneypotHit(
+		honeypotCmdRepo, existentIp,
+		"/.env", settings.MaxEntries.Int(),
+	)
 	countAfter := transientDbSvc.Count()
 
 	if countAfter != countBefore+1 {
@@ -2109,12 +2123,12 @@ func TestProbabilisticEnforcementNotAlwaysTriggered(t *testing.T) {
 }
 
 func TestGraduatedBanTransientDbReadErrorHandled(t *testing.T) {
-	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil, nil,
+	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
+	tier, _ := tkUseCase.ReadHoneypotBanDecision(
+		nil, existentIp,
+		24*time.Hour,
+		tkValueObject.HoneypotAggressivenessModeBalanced,
 	)
-	defer middleware.Stop()
-
-	tier := middleware.determineBanTier("1.2.3.4")
 	if tier != 0 {
 		t.Errorf("NilTransientDbShouldReturnTierZero: got=%d",
 			tier)
@@ -2123,29 +2137,26 @@ func TestGraduatedBanTransientDbReadErrorHandled(t *testing.T) {
 
 func TestTransientDbReadErrorHandled(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
-	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
-		transientDbSvc,
-	)
+	_, honeypotQueryRepo := newHoneypotRepos(transientDbSvc)
 
-	middleware := NewHoneypotMiddleware(
-		newStandardSettings(),
-		honeypotCmdRepo, honeypotQueryRepo, nil,
+	existentIp, _ := tkValueObject.NewIpAddress(
+		"nonexistent.ip",
 	)
-	defer middleware.Stop()
-
-	tier := middleware.determineBanTier("nonexistent.ip")
+	tier, _ := tkUseCase.ReadHoneypotBanDecision(
+		honeypotQueryRepo, existentIp,
+		24*time.Hour,
+		tkValueObject.HoneypotAggressivenessModeBalanced,
+	)
 	if tier != 0 {
 		t.Errorf("MissingKeyShouldReturnTierZero: got=%d", tier)
 	}
 }
 
 func TestProbabilisticEnforcementHandlesMaxEntriesError(t *testing.T) {
-	middleware := NewHoneypotMiddleware(
-		newStandardSettings(), nil, nil, nil,
+	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
+	tkUseCase.CreateHoneypotHit(
+		nil, existentIp, "/.env", 5000,
 	)
-	defer middleware.Stop()
-
-	middleware.incrementHitCount("1.2.3.4", "/.env")
 }
 
 func TestStopOnUninitializedMiddlewareDoesNotPanic(t *testing.T) {
@@ -2166,7 +2177,7 @@ func TestMaintenanceWatchdogHandlesNilCmdRepo(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
 }
 
 func TestMaintenanceWatchdogRecoversFromPanicInTick(t *testing.T) {
@@ -2207,7 +2218,7 @@ func TestTransientDbReadAllErrorDuringStatsSkipsReport(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if recordCreated {
 		t.Errorf("NilTransientDbShouldSkipStatsReport")
@@ -2240,7 +2251,7 @@ func TestAggressivenessModeObserveReportsZeroBannedIps(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.reportStats()
+	middleware.maintenanceRunner()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -2288,8 +2299,8 @@ func TestWatchdogUsesStatsIntervalFromSettings(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.runMaintenanceTick()
-	middleware.runMaintenanceTick()
+	middleware.maintenanceRunner()
+	middleware.maintenanceRunner()
 
 	if statsCount < 2 {
 		t.Errorf("WatchdogShouldTickMultipleTimes: got=%d",
@@ -2351,31 +2362,31 @@ func TestScannerFloodTriggersTierEscalation(t *testing.T) {
 func TestConcurrentHitsCountCorrectly(t *testing.T) {
 	testIp := newUniqueTestIp()
 	transientDbSvc := newTransientDbSvc()
-	cmdRepo := newNoopCmdRepo()
-	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
-		transientDbSvc,
-	)
-
-	middleware := NewHoneypotMiddleware(
-		newStandardSettings(),
-		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
-	)
-	defer middleware.Stop()
+	honeypotCmdRepo, _ := newHoneypotRepos(transientDbSvc)
 
 	goroutineCount := 10
 	var waitGroup sync.WaitGroup
+	var writeMu sync.Mutex
 	waitGroup.Add(goroutineCount)
 
+	existentIp, _ := tkValueObject.NewIpAddress(testIp)
 	for goroutineIndex := range goroutineCount {
 		go func(index int) {
 			defer waitGroup.Done()
-			middleware.incrementHitCount(testIp, "/.env")
+			writeMu.Lock()
+			defer writeMu.Unlock()
+			tkUseCase.CreateHoneypotHit(
+				honeypotCmdRepo, existentIp,
+				"/.env", 5000,
+			)
 		}(goroutineIndex)
 	}
 
 	waitGroup.Wait()
 
-	rawValue, _ := transientDbSvc.Read("honeypot:hit:" + testIp)
+	rawValue, _ := transientDbSvc.Read(
+		"honeypot:hit:" + testIp,
+	)
 	var hitData tkDto.HoneypotHitData
 	json.Unmarshal([]byte(rawValue), &hitData)
 
@@ -2511,26 +2522,21 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 	t *testing.T,
 ) {
 	transientDbSvc := newTransientDbSvc()
-	cmdRepo := newNoopCmdRepo()
-	settings := newStandardSettings()
-	settings.MaxEntries, _ = tkValueObject.NewHoneypotMaxEntries(100)
-	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
-		transientDbSvc,
-	)
-
-	middleware := NewHoneypotMiddleware(
-		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
-	)
-	defer middleware.Stop()
+	honeypotCmdRepo, _ := newHoneypotRepos(transientDbSvc)
 
 	var waitGroup sync.WaitGroup
+	var writeMu sync.Mutex
 	waitGroup.Add(20)
 
+	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 	for goroutineIndex := range 20 {
 		go func(index int) {
 			defer waitGroup.Done()
-			middleware.incrementHitCount(
-				"1.2.3.4", "/.env",
+			writeMu.Lock()
+			defer writeMu.Unlock()
+			tkUseCase.CreateHoneypotHit(
+				honeypotCmdRepo, existentIp,
+				"/.env", 100,
 			)
 		}(goroutineIndex)
 	}
@@ -2544,29 +2550,21 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 
 func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 	transientDbSvc := newTransientDbSvc()
-	cmdRepo := newNoopCmdRepo()
-	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
-		transientDbSvc,
-	)
-
-	settings := newStandardSettings()
-	settings.StatsInterval, _ = tkValueObject.NewHoneypotStatsInterval(
-		"50ms",
-	)
-
-	middleware := NewHoneypotMiddleware(
-		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
-	)
-	defer middleware.Stop()
+	honeypotCmdRepo, _ := newHoneypotRepos(transientDbSvc)
 
 	var waitGroup sync.WaitGroup
+	var writeMu sync.Mutex
 	waitGroup.Add(10)
 
+	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 	for goroutineIndex := range 10 {
 		go func(index int) {
 			defer waitGroup.Done()
-			middleware.incrementHitCount(
-				"1.2.3.4", "/.env",
+			writeMu.Lock()
+			defer writeMu.Unlock()
+			tkUseCase.CreateHoneypotHit(
+				honeypotCmdRepo, existentIp,
+				"/.env", 5000,
 			)
 		}(goroutineIndex)
 	}
