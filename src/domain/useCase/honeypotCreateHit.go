@@ -11,7 +11,7 @@ func CreateHoneypotHit(
 	cmdRepo tkRepository.HoneypotCmdRepo,
 	requesterIp tkValueObject.IpAddress,
 	interceptPath string,
-	maxEntries int,
+	maxEntries tkValueObject.HoneypotMaxEntries,
 ) {
 	if cmdRepo == nil {
 		return
@@ -20,6 +20,6 @@ func CreateHoneypotHit(
 	cmdRepo.IncrementHit(requesterIp, interceptPath)
 
 	if rand.Float64() < 0.02 {
-		cmdRepo.EnforceMaxEntries(maxEntries)
+		cmdRepo.EnforceMaxEntries(maxEntries.Int())
 	}
 }

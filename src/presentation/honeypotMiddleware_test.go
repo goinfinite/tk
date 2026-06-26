@@ -1,11 +1,14 @@
 package tkPresentation
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -60,9 +63,23 @@ func newNoopCmdRepo() mockActivityRecordCmdRepo {
 	}
 }
 
+func mustNewHoneypotBanDuration(
+	rawValue any,
+) tkValueObject.HoneypotBanDuration {
+	banDuration, _ := tkValueObject.NewHoneypotBanDuration(rawValue)
+	return banDuration
+}
+
+func mustNewHoneypotMaxEntries(
+	rawValue any,
+) tkValueObject.HoneypotMaxEntries {
+	maxEntries, _ := tkValueObject.NewHoneypotMaxEntries(rawValue)
+	return maxEntries
+}
+
 func newStandardSettings() HoneypotMiddlewareSettings {
 	return HoneypotMiddlewareSettings{
-		BanDuration: 24 * time.Hour,
+		BanDuration: mustNewHoneypotBanDuration(24 * time.Hour),
 		RedirectUrl: newDefaultRedirectUrl(),
 	}
 }
@@ -135,7 +152,7 @@ func TestHoneypotMiddlewareCreation(t *testing.T) {
 		settings HoneypotMiddlewareSettings
 	}{
 		{"WithBanDuration", HoneypotMiddlewareSettings{
-			BanDuration: 24 * time.Hour,
+			BanDuration: mustNewHoneypotBanDuration(24 * time.Hour),
 		}},
 		{"WithEmptySettings", HoneypotMiddlewareSettings{}},
 	}
@@ -1611,7 +1628,7 @@ func TestMaintenanceWatchdogCleansExpiredEntries(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	var remaining []tkInfraDb.KeyValueModel
 	transientDbSvc.Handler.Find(&remaining)
@@ -1637,7 +1654,7 @@ func TestMaintenanceWatchdogPreservesActiveEntries(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if transientDbSvc.Count() == 0 {
 		t.Errorf("ActiveEntriesShouldBePreserved")
@@ -1696,14 +1713,14 @@ func TestStatsReportIncludesCorrectBannedIpCount(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
 	}
 
-	detailsMap, ok := capturedRecord.RecordDetails.(map[string]string)
-	if !ok {
+	detailsMap, assertOk := capturedRecord.RecordDetails.(map[string]string)
+	if !assertOk {
 		t.Fatalf("RecordDetailsTypeMismatch")
 	}
 
@@ -1741,7 +1758,7 @@ func TestStatsReportIncludesTopOffenders(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1780,7 +1797,7 @@ func TestStatsReportIncludesTopEndpoints(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1819,7 +1836,7 @@ func TestStatsReportJsonMatchesExpectedSchema(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1862,7 +1879,7 @@ func TestStatsReportUsesHoneypotPeriodicReportRecordCode(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1897,7 +1914,7 @@ func TestStatsReportUsesSecurityRecordLevel(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -1931,7 +1948,7 @@ func TestEmptyTransientDbSkipsStatsReport(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if recordCreated {
 		t.Errorf("EmptyDbShouldSkipStatsReport")
@@ -1963,7 +1980,7 @@ func TestCleanupRunsBeforeStatsInSameTick(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Errorf("StatsShouldBeProducedAfterCleanup")
@@ -1996,7 +2013,7 @@ func TestStatsProducedRegardlessOfCleanupVolume(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if statsCount == 0 {
 		t.Errorf("StatsShouldBeProducedEvenWithNoCleanup")
@@ -2045,7 +2062,7 @@ func TestWatchdogReadsBanDurationAsTTL(t *testing.T) {
 	testIpAddr, _ := tkValueObject.NewIpAddress(testIp)
 	tier, _ := tkUseCase.ReadHoneypotBanDecision(
 		honeypotQueryRepo, testIpAddr,
-		24*time.Hour,
+		mustNewHoneypotBanDuration(24*time.Hour),
 		tkValueObject.HoneypotAggressivenessModeBalanced,
 	)
 	if tier != 0 {
@@ -2084,7 +2101,7 @@ func TestProbabilisticEnforcementTriggersOnWrite(t *testing.T) {
 		existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 		tkUseCase.CreateHoneypotHit(
 			honeypotCmdRepo, existentIp,
-			"/.env", settings.MaxEntries.Int(),
+			"/.env", settings.MaxEntries,
 		)
 	}
 
@@ -2113,7 +2130,7 @@ func TestProbabilisticEnforcementNotAlwaysTriggered(t *testing.T) {
 	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 	tkUseCase.CreateHoneypotHit(
 		honeypotCmdRepo, existentIp,
-		"/.env", settings.MaxEntries.Int(),
+		"/.env", settings.MaxEntries,
 	)
 	countAfter := transientDbSvc.Count()
 
@@ -2126,7 +2143,7 @@ func TestGraduatedBanTransientDbReadErrorHandled(t *testing.T) {
 	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 	tier, _ := tkUseCase.ReadHoneypotBanDecision(
 		nil, existentIp,
-		24*time.Hour,
+		mustNewHoneypotBanDuration(24*time.Hour),
 		tkValueObject.HoneypotAggressivenessModeBalanced,
 	)
 	if tier != 0 {
@@ -2144,7 +2161,7 @@ func TestTransientDbReadErrorHandled(t *testing.T) {
 	)
 	tier, _ := tkUseCase.ReadHoneypotBanDecision(
 		honeypotQueryRepo, existentIp,
-		24*time.Hour,
+		mustNewHoneypotBanDuration(24*time.Hour),
 		tkValueObject.HoneypotAggressivenessModeBalanced,
 	)
 	if tier != 0 {
@@ -2155,7 +2172,8 @@ func TestTransientDbReadErrorHandled(t *testing.T) {
 func TestProbabilisticEnforcementHandlesMaxEntriesError(t *testing.T) {
 	existentIp, _ := tkValueObject.NewIpAddress("1.2.3.4")
 	tkUseCase.CreateHoneypotHit(
-		nil, existentIp, "/.env", 5000,
+		nil, existentIp, "/.env",
+		mustNewHoneypotMaxEntries(5000),
 	)
 }
 
@@ -2177,7 +2195,7 @@ func TestMaintenanceWatchdogHandlesNilCmdRepo(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 }
 
 func TestMaintenanceWatchdogRecoversFromPanicInTick(t *testing.T) {
@@ -2218,7 +2236,7 @@ func TestTransientDbReadAllErrorDuringStatsSkipsReport(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if recordCreated {
 		t.Errorf("NilTransientDbShouldSkipStatsReport")
@@ -2251,7 +2269,7 @@ func TestAggressivenessModeObserveReportsZeroBannedIps(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
 
 	if capturedRecord == nil {
 		t.Fatalf("StatsRecordNotCreated")
@@ -2273,7 +2291,9 @@ func TestWatchdogUsesStatsIntervalFromSettings(t *testing.T) {
 	settings.StatsInterval, _ = tkValueObject.NewHoneypotStatsInterval(
 		"100ms",
 	)
-	settings.BanDuration = 72 * time.Hour
+	settings.BanDuration = mustNewHoneypotBanDuration(
+		72 * time.Hour,
+	)
 
 	transientDbSvc := newTransientDbSvc()
 	testIp := newUniqueTestIp()
@@ -2299,8 +2319,8 @@ func TestWatchdogUsesStatsIntervalFromSettings(t *testing.T) {
 	)
 	defer middleware.Stop()
 
-	middleware.maintenanceRunner()
-	middleware.maintenanceRunner()
+	middleware.runMaintenance()
+	middleware.runMaintenance()
 
 	if statsCount < 2 {
 		t.Errorf("WatchdogShouldTickMultipleTimes: got=%d",
@@ -2377,7 +2397,8 @@ func TestConcurrentHitsCountCorrectly(t *testing.T) {
 			defer writeMu.Unlock()
 			tkUseCase.CreateHoneypotHit(
 				honeypotCmdRepo, existentIp,
-				"/.env", 5000,
+				"/.env",
+				mustNewHoneypotMaxEntries(5000),
 			)
 		}(goroutineIndex)
 	}
@@ -2536,7 +2557,8 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 			defer writeMu.Unlock()
 			tkUseCase.CreateHoneypotHit(
 				honeypotCmdRepo, existentIp,
-				"/.env", 100,
+				"/.env",
+				mustNewHoneypotMaxEntries(100),
 			)
 		}(goroutineIndex)
 	}
@@ -2545,6 +2567,35 @@ func TestProbabilisticEnforcementConcurrentWithNormalWrites(
 
 	if transientDbSvc.Count() == 0 {
 		t.Errorf("EntriesShouldExistAfterConcurrentWrites")
+	}
+}
+
+func TestSettingsParserInvalidEnvVarUsesDefault(t *testing.T) {
+	t.Setenv("HONEYPOT_MAX_ENTRIES", "abc")
+	t.Setenv("HONEYPOT_STATS_INTERVAL", "xyz")
+
+	emptySettings := HoneypotMiddlewareSettings{}
+	resolvedSettings := honeypotSettingsParser{}.Parse(
+		emptySettings, 25,
+	)
+
+	expectedMaxEntries := mustNewHoneypotMaxEntries(5000)
+	if resolvedSettings.MaxEntries.Int() != expectedMaxEntries.Int() {
+		t.Errorf(
+			"MaxEntriesDefaultMismatch: got=%d, want=%d",
+			resolvedSettings.MaxEntries.Int(),
+			expectedMaxEntries.Int(),
+		)
+	}
+
+	expectedStatsInterval, _ := tkValueObject.NewHoneypotStatsInterval("")
+	actualInterval := resolvedSettings.StatsInterval.Duration()
+	if actualInterval != expectedStatsInterval.Duration() {
+		t.Errorf(
+			"StatsIntervalDefaultMismatch: got=%v, want=%v",
+			actualInterval,
+			expectedStatsInterval.Duration(),
+		)
 	}
 }
 
@@ -2564,7 +2615,8 @@ func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 			defer writeMu.Unlock()
 			tkUseCase.CreateHoneypotHit(
 				honeypotCmdRepo, existentIp,
-				"/.env", 5000,
+				"/.env",
+				mustNewHoneypotMaxEntries(5000),
 			)
 		}(goroutineIndex)
 	}
@@ -2584,5 +2636,181 @@ func TestConcurrentHitsAndMaintenanceCycleNoDataLoss(t *testing.T) {
 	if hitData.Count < 1 {
 		t.Errorf("ConcurrentHitsShouldBeCounted: got=%d",
 			hitData.Count)
+	}
+}
+func TestZeroElseKeywordsInMiddleware(t *testing.T) {
+	middlewareFile, readErr := os.ReadFile("honeypotMiddleware.go")
+	if readErr != nil {
+		t.Fatalf("MiddlewareFileReadFailed: %v", readErr)
+	}
+	elsePattern := regexp.MustCompile(`\belse\b`)
+	matchCount := len(elsePattern.FindAll(
+		middlewareFile, -1,
+	))
+	if matchCount != 0 {
+		t.Errorf("MiddlewareElseCountMismatch: got=%d, want=0",
+			matchCount)
+	}
+}
+func TestMiddlewareUnderThreeHundredLoc(t *testing.T) {
+	middlewareFile, readErr := os.ReadFile("honeypotMiddleware.go")
+	if readErr != nil {
+		t.Fatalf("MiddlewareFileReadFailed: %v", readErr)
+	}
+	lineCount := len(strings.Split(
+		string(middlewareFile), "\n",
+	))
+	if lineCount >= 300 {
+		t.Errorf("MiddlewareLocExceeded: got=%d, want<300",
+			lineCount)
+	}
+}
+func TestConstructorUnderFiftyLoc(t *testing.T) {
+	middlewareFile, readErr := os.ReadFile("honeypotMiddleware.go")
+	if readErr != nil {
+		t.Fatalf("MiddlewareFileReadFailed: %v", readErr)
+	}
+	fileContent := string(middlewareFile)
+	constructorStart := strings.Index(
+		fileContent, "func NewHoneypotMiddleware(",
+	)
+	if constructorStart == -1 {
+		t.Fatalf("ConstructorNotFound")
+	}
+	openBraceIdx := strings.Index(
+		fileContent[constructorStart:], "{",
+	)
+	if openBraceIdx == -1 {
+		t.Fatalf("ConstructorOpenBraceNotFound")
+	}
+	braceDepth := 0
+	constructorEnd := -1
+	bodyStart := constructorStart + openBraceIdx + 1
+	for charIdx := bodyStart; charIdx < len(fileContent); charIdx++ {
+		if fileContent[charIdx] == '{' {
+			braceDepth++
+		}
+		if fileContent[charIdx] == '}' {
+			braceDepth--
+			if braceDepth == 0 {
+				constructorEnd = charIdx
+				break
+			}
+		}
+	}
+	if constructorEnd == -1 {
+		t.Fatalf("ConstructorCloseBraceNotFound")
+	}
+	constructorBody := fileContent[bodyStart:constructorEnd]
+	lineCount := len(strings.Split(constructorBody, "\n"))
+	if lineCount > 50 {
+		t.Errorf("ConstructorLocExceeded: got=%d, want<=50",
+			lineCount)
+	}
+}
+func TestMethodOrderingCalleesAboveCallers(t *testing.T) {
+	middlewareFile, readErr := os.ReadFile("honeypotMiddleware.go")
+	if readErr != nil {
+		t.Fatalf("MiddlewareFileReadFailed: %v", readErr)
+	}
+	fileContent := string(middlewareFile)
+	methodPattern := regexp.MustCompile(`(?m)^func.*?\) (\w+)\(`)
+	methodPositions := make(map[string]int)
+	for _, match := range methodPattern.FindAllStringSubmatchIndex(fileContent, -1) {
+		methodName := fileContent[match[2]:match[3]]
+		methodPositions[methodName] = match[0]
+	}
+	testCaseStructs := []struct {
+		callee   string
+		caller   string
+	}{
+		{"lookupHoneypotPath", "Execute"},
+		{"Execute", "Start"},
+		{"runMaintenance", "honeypotMaintenanceWatchdog"},
+	}
+	for _, testCase := range testCaseStructs {
+		calleePos, calleeExists := methodPositions[testCase.callee]
+		if !calleeExists {
+			t.Errorf("CalleeMethodNotFound: %s", testCase.callee)
+			continue
+		}
+		callerPos, callerExists := methodPositions[testCase.caller]
+		if !callerExists {
+			t.Errorf("CallerMethodNotFound: %s", testCase.caller)
+			continue
+		}
+		if calleePos >= callerPos {
+			t.Errorf("MethodOrderingViolation: %s(pos=%d) should be before %s(pos=%d)",
+				testCase.callee, calleePos,
+				testCase.caller, callerPos)
+		}
+	}
+}
+func TestMaxNestingDepthIsThree(t *testing.T) {
+	middlewareFile, readErr := os.ReadFile("honeypotMiddleware.go")
+	if readErr != nil {
+		t.Fatalf("MiddlewareFileReadFailed: %v", readErr)
+	}
+	scanner := bufio.NewScanner(strings.NewReader(string(middlewareFile)))
+	executeStart := -1
+	lineNumber := 0
+	for scanner.Scan() {
+		lineNumber++
+		executeSig := "func (middleware *HoneypotMiddleware) Execute("
+		if strings.Contains(scanner.Text(), executeSig) {
+			executeStart = lineNumber
+			break
+		}
+	}
+	if executeStart == -1 {
+		t.Fatalf("ExecuteMethodNotFound")
+	}
+	maxDepth := 0
+	currentDepth := 0
+	inExecute := false
+	scanner = bufio.NewScanner(strings.NewReader(string(middlewareFile)))
+	lineNumber = 0
+	for scanner.Scan() {
+		lineNumber++
+		if lineNumber < executeStart {
+			continue
+		}
+		trimmedLine := strings.TrimSpace(scanner.Text())
+		isNextMethod := strings.HasPrefix(trimmedLine, "func ")
+		if inExecute && isNextMethod && lineNumber > executeStart {
+			break
+		}
+		inExecute = true
+		for _, char := range scanner.Text() {
+			if char == '{' {
+				currentDepth++
+				if currentDepth > maxDepth {
+					maxDepth = currentDepth
+				}
+			}
+			if char == '}' {
+				currentDepth--
+			}
+		}
+	}
+	if maxDepth > 3 {
+		t.Errorf("MaxNestingDepthExceeded: got=%d, want<=3",
+			maxDepth)
+	}
+}
+func TestInfraErrorsLoggedWithSlogError(t *testing.T) {
+	fileNames := []string{
+		"honeypotMiddleware.go",
+		"honeypotSettingsParser.go",
+	}
+	for _, fileName := range fileNames {
+		fileContent, readErr := os.ReadFile(fileName)
+		if readErr != nil {
+			t.Fatalf("FileReadFailed: file=%s, err=%v",
+				fileName, readErr)
+		}
+		if strings.Contains(string(fileContent), "slog.Debug") {
+			t.Errorf("SlogDebugFoundInFile: %s", fileName)
+		}
 	}
 }

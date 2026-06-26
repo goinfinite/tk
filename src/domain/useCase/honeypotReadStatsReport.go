@@ -1,8 +1,6 @@
 package tkUseCase
 
 import (
-	"time"
-
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -10,7 +8,7 @@ import (
 
 func ReadHoneypotStatsReport(
 	queryRepo tkRepository.HoneypotQueryRepo,
-	banDuration time.Duration,
+	banDuration tkValueObject.HoneypotBanDuration,
 	aggressivenessMode tkValueObject.HoneypotAggressivenessMode,
 ) (tkDto.HoneypotStatsReport, error) {
 	if queryRepo == nil {
@@ -18,6 +16,6 @@ func ReadHoneypotStatsReport(
 	}
 
 	return queryRepo.ReadReport(
-		banDuration, aggressivenessMode,
+		banDuration.Duration(), aggressivenessMode,
 	)
 }

@@ -3,7 +3,6 @@ package tkUseCase
 import (
 	"encoding/json"
 	"log/slog"
-	"time"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
@@ -14,15 +13,15 @@ func RunHoneypotMaintenance(
 	cmdRepo tkRepository.HoneypotCmdRepo,
 	queryRepo tkRepository.HoneypotQueryRepo,
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
-	banDuration time.Duration,
-	maxEntries int,
-	aggressivenessMode tkValueObject.HoneypotAggressivenessMode,
-	recordCode tkValueObject.ActivityRecordCode,
-	recordLevel tkValueObject.ActivityRecordLevel,
+	request tkDto.RunHoneypotMaintenanceRequest,
 ) {
 	if cmdRepo != nil {
-		cmdRepo.CleanExpiredEntries(banDuration)
-		cmdRepo.EnforceMaxEntries(maxEntries)
+		cmdRepo.CleanExpiredEntries(
+			request.BanDuration.Duration(),
+		)
+		cmdRepo.EnforceMaxEntries(
+			request.MaxEntries.Int(),
+		)
 	}
 
 	if queryRepo == nil || activityRecordCmdRepo == nil {
@@ -34,24 +33,26 @@ func RunHoneypotMaintenance(
 	}
 
 	statsReport, reportErr := ReadHoneypotStatsReport(
-		queryRepo, banDuration, aggressivenessMode,
+		queryRepo,
+		request.BanDuration,
+		request.AggressivenessMode,
 	)
 	if reportErr != nil {
-		slog.Debug("HoneypotStatsReadReportFailed",
+		slog.Error("HoneypotStatsReadReportFailed",
 			slog.String("err", reportErr.Error()))
 		return
 	}
 
 	reportJson, marshalErr := json.Marshal(statsReport)
 	if marshalErr != nil {
-		slog.Debug("HoneypotStatsMarshalFailed",
+		slog.Error("HoneypotStatsMarshalFailed",
 			slog.String("err", marshalErr.Error()))
 		return
 	}
 
 	createRequest := tkDto.CreateActivityRecord{
-		RecordLevel: recordLevel,
-		RecordCode:  recordCode,
+		RecordLevel: request.StatsRecordLevel,
+		RecordCode:  request.StatsRecordCode,
 		AffectedResources: []tkValueObject.SystemResourceIdentifier{},
 		RecordDetails: map[string]string{
 			"statsReport": string(reportJson),
@@ -60,7 +61,7 @@ func RunHoneypotMaintenance(
 
 	createErr := activityRecordCmdRepo.Create(createRequest)
 	if createErr != nil {
-		slog.Debug("HoneypotStatsReportCreationFailed",
+		slog.Error("HoneypotStatsReportCreationFailed",
 			slog.String("err", createErr.Error()))
 	}
 }

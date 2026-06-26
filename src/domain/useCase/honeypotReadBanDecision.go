@@ -1,7 +1,6 @@
 package tkUseCase
 
 import (
-	"errors"
 	"time"
 
 	tkRepository "github.com/goinfinite/tk/src/domain/repository"
@@ -11,11 +10,11 @@ import (
 func ReadHoneypotBanDecision(
 	queryRepo tkRepository.HoneypotQueryRepo,
 	requesterIp tkValueObject.IpAddress,
-	banDuration time.Duration,
+	banDuration tkValueObject.HoneypotBanDuration,
 	aggressivenessMode tkValueObject.HoneypotAggressivenessMode,
 ) (int, error) {
 	if queryRepo == nil {
-		return 0, errors.New("NilQueryRepo")
+		return 0, ErrNilHoneypotQueryRepo
 	}
 
 	existentHitData, readErr := queryRepo.ReadHitRecord(
@@ -32,7 +31,7 @@ func ReadHoneypotBanDecision(
 		return 0, timeParseErr
 	}
 
-	if time.Since(firstHitAt) > banDuration {
+	if time.Since(firstHitAt) > banDuration.Duration() {
 		return 0, nil
 	}
 

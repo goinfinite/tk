@@ -106,12 +106,26 @@ func newTestIpAddress(value string) tkValueObject.IpAddress {
 	return ipAddr
 }
 
+func mustNewHoneypotBanDuration(
+	rawValue any,
+) tkValueObject.HoneypotBanDuration {
+	banDuration, _ := tkValueObject.NewHoneypotBanDuration(rawValue)
+	return banDuration
+}
+
+func mustNewHoneypotMaxEntries(
+	rawValue any,
+) tkValueObject.HoneypotMaxEntries {
+	maxEntries, _ := tkValueObject.NewHoneypotMaxEntries(rawValue)
+	return maxEntries
+}
+
 func TestReadHoneypotBanDecision(t *testing.T) {
 	testCaseStructs := []struct {
 		name        string
 		queryRepo   tkRepository.HoneypotQueryRepo
 		requesterIp tkValueObject.IpAddress
-		banDuration time.Duration
+		banDuration tkValueObject.HoneypotBanDuration
 		mode        tkValueObject.HoneypotAggressivenessMode
 		expectedTier int
 		expectError bool
@@ -129,7 +143,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			1, false,
 		},
@@ -146,7 +160,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			2, false,
 		},
@@ -163,7 +177,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			3, false,
 		},
@@ -180,7 +194,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeImmediate,
 			3, false,
 		},
@@ -197,7 +211,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeTolerant,
 			1, false,
 		},
@@ -214,7 +228,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeObserve,
 			1, false,
 		},
@@ -233,7 +247,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			0, false,
 		},
@@ -250,7 +264,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			0, false,
 		},
@@ -267,7 +281,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeImmediate,
 			0, false,
 		},
@@ -284,15 +298,15 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeTolerant,
 			2, false,
 		},
 		{
-			"NilQueryRepoReturnsError",
+			"NilQueryRepoReturnsSentinelError",
 			nil,
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			0, true,
 		},
@@ -307,7 +321,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			0, true,
 		},
@@ -324,7 +338,7 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 				},
 			},
 			newTestIpAddress("1.2.3.4"),
-			24 * time.Hour,
+			mustNewHoneypotBanDuration(24 * time.Hour),
 			tkValueObject.HoneypotAggressivenessModeBalanced,
 			0, true,
 		},
@@ -342,6 +356,11 @@ func TestReadHoneypotBanDecision(t *testing.T) {
 			if testCase.expectError {
 				if resolveErr == nil {
 					t.Errorf("MissingExpectedError")
+				}
+				if testCase.queryRepo == nil &&
+					!errors.Is(resolveErr, ErrNilHoneypotQueryRepo) {
+					t.Errorf("ExpectedSentinelError: got=%v",
+						resolveErr)
 				}
 				return
 			}
@@ -364,14 +383,14 @@ func TestCreateHoneypotHit(t *testing.T) {
 		cmdRepo            tkRepository.HoneypotCmdRepo
 		requesterIp        tkValueObject.IpAddress
 		interceptPath      string
-		maxEntries         int
+		maxEntries         tkValueObject.HoneypotMaxEntries
 		expectIncrement    bool
 	}{
 		{
 			"NilCmdRepoIsNoop",
 			nil,
 			newTestIpAddress("1.2.3.4"),
-			"/.env", 5000,
+			"/.env", mustNewHoneypotMaxEntries(5000),
 			false,
 		},
 		{
@@ -383,7 +402,7 @@ func TestCreateHoneypotHit(t *testing.T) {
 				) {},
 			},
 			newTestIpAddress("1.2.3.4"),
-			"/.env", 5000,
+			"/.env", mustNewHoneypotMaxEntries(5000),
 			true,
 		},
 	}
@@ -477,7 +496,7 @@ func TestReadHoneypotStatsReport(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			report, reportErr := ReadHoneypotStatsReport(
 				testCase.queryRepo,
-				24*time.Hour,
+				mustNewHoneypotBanDuration(24*time.Hour),
 				tkValueObject.HoneypotAggressivenessModeBalanced,
 			)
 
@@ -662,9 +681,15 @@ func TestRunHoneypotMaintenance(t *testing.T) {
 				existentCmdRepo,
 				testCase.queryRepo,
 				existentActivityRepo,
-				24*time.Hour, 5000,
-				balancedMode,
-				testRecordCode, testRecordLevel,
+				tkDto.RunHoneypotMaintenanceRequest{
+					BanDuration: mustNewHoneypotBanDuration(
+						24 * time.Hour,
+					),
+					MaxEntries: mustNewHoneypotMaxEntries(5000),
+					AggressivenessMode: balancedMode,
+					StatsRecordCode:    testRecordCode,
+					StatsRecordLevel:   testRecordLevel,
+				},
 			)
 
 			if testCase.expectCleanup && !cleanupCalled {
@@ -724,9 +749,15 @@ func TestRunHoneypotMaintenanceStatsReportContent(t *testing.T) {
 	RunHoneypotMaintenance(
 		mockHoneypotCmdRepo{},
 		queryRepo, activityRepo,
-		24*time.Hour, 5000,
-		tkValueObject.HoneypotAggressivenessModeBalanced,
-		testRecordCode, testRecordLevel,
+		tkDto.RunHoneypotMaintenanceRequest{
+			BanDuration: mustNewHoneypotBanDuration(
+				24 * time.Hour,
+			),
+			MaxEntries: mustNewHoneypotMaxEntries(5000),
+			AggressivenessMode: tkValueObject.HoneypotAggressivenessModeBalanced,
+			StatsRecordCode:    testRecordCode,
+			StatsRecordLevel:   testRecordLevel,
+		},
 	)
 
 	if capturedRecord == nil {
@@ -743,8 +774,8 @@ func TestRunHoneypotMaintenanceStatsReportContent(t *testing.T) {
 			capturedRecord.RecordLevel.String())
 	}
 
-	detailsMap, isMap := capturedRecord.RecordDetails.(map[string]string)
-	if !isMap {
+	detailsMap, assertOk := capturedRecord.RecordDetails.(map[string]string)
+	if !assertOk {
 		t.Fatalf("RecordDetailsTypeMismatch")
 	}
 
@@ -790,9 +821,15 @@ func TestRunHoneypotMaintenanceReportErrorLoggedNotPropagated(t *testing.T) {
 	RunHoneypotMaintenance(
 		mockHoneypotCmdRepo{},
 		queryRepo, activityRepo,
-		24*time.Hour, 5000,
-		tkValueObject.HoneypotAggressivenessModeBalanced,
-		testRecordCode, testRecordLevel,
+		tkDto.RunHoneypotMaintenanceRequest{
+			BanDuration: mustNewHoneypotBanDuration(
+				24 * time.Hour,
+			),
+			MaxEntries: mustNewHoneypotMaxEntries(5000),
+			AggressivenessMode: tkValueObject.HoneypotAggressivenessModeBalanced,
+			StatsRecordCode:    testRecordCode,
+			StatsRecordLevel:   testRecordLevel,
+		},
 	)
 
 	if recordCreated {
@@ -829,9 +866,15 @@ func TestRunHoneypotMaintenanceCreateErrorLoggedNotPropagated(t *testing.T) {
 	RunHoneypotMaintenance(
 		mockHoneypotCmdRepo{},
 		queryRepo, activityRepo,
-		24*time.Hour, 5000,
-		tkValueObject.HoneypotAggressivenessModeBalanced,
-		testRecordCode, testRecordLevel,
+		tkDto.RunHoneypotMaintenanceRequest{
+			BanDuration: mustNewHoneypotBanDuration(
+				24 * time.Hour,
+			),
+			MaxEntries: mustNewHoneypotMaxEntries(5000),
+			AggressivenessMode: tkValueObject.HoneypotAggressivenessModeBalanced,
+			StatsRecordCode:    testRecordCode,
+			StatsRecordLevel:   testRecordLevel,
+		},
 	)
 }
 
@@ -852,7 +895,7 @@ func TestReadHoneypotBanDecisionTtlBoundary(t *testing.T) {
 	resolvedTier, resolveErr := ReadHoneypotBanDecision(
 		queryRepo,
 		newTestIpAddress("1.2.3.4"),
-		24*time.Hour,
+		mustNewHoneypotBanDuration(24*time.Hour),
 		tkValueObject.HoneypotAggressivenessModeBalanced,
 	)
 
@@ -879,7 +922,10 @@ func TestCreateHoneypotHitProbabilisticEnforcement(t *testing.T) {
 
 	testIp := newTestIpAddress("1.2.3.4")
 	for range 1000 {
-		CreateHoneypotHit(cmdRepo, testIp, "/.env", 5000)
+		CreateHoneypotHit(
+			cmdRepo, testIp, "/.env",
+			mustNewHoneypotMaxEntries(5000),
+		)
 	}
 
 	if enforceCallCount == 0 {
@@ -900,8 +946,14 @@ func TestRunHoneypotMaintenanceAllNilRepos(t *testing.T) {
 
 	RunHoneypotMaintenance(
 		nil, nil, nil,
-		24*time.Hour, 5000,
-		tkValueObject.HoneypotAggressivenessModeBalanced,
-		testRecordCode, testRecordLevel,
+		tkDto.RunHoneypotMaintenanceRequest{
+			BanDuration: mustNewHoneypotBanDuration(
+				24 * time.Hour,
+			),
+			MaxEntries: mustNewHoneypotMaxEntries(5000),
+			AggressivenessMode: tkValueObject.HoneypotAggressivenessModeBalanced,
+			StatsRecordCode:    testRecordCode,
+			StatsRecordLevel:   testRecordLevel,
+		},
 	)
 }
