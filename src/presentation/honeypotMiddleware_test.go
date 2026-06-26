@@ -99,7 +99,7 @@ func mustNewHoneypotMaxStreamSizeBytes(
 
 func newStandardSettings() HoneypotMiddlewareSettings {
 	return HoneypotMiddlewareSettings{
-		ActivePathCount: mustNewHoneypotActivePathCount(100),
+		ActivePathCount: mustNewHoneypotActivePathCount(200),
 		BanDuration:     mustNewHoneypotBanDuration(24 * time.Hour),
 		RedirectUrl:     newDefaultRedirectUrl(),
 	}
@@ -167,6 +167,18 @@ func populateTransientDbWithOldHits(
 	)
 }
 
+func findActivePathOfClass(
+	middleware *HoneypotMiddleware,
+	targetClass HoneypotPathClass,
+) string {
+	for activePath, pathClass := range middleware.activePathClasses {
+		if pathClass == targetClass {
+			return activePath
+		}
+	}
+	return ""
+}
+
 func TestHoneypotMiddlewareCreation(t *testing.T) {
 	testCaseStructs := []struct {
 		name     string
@@ -216,8 +228,15 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		echoInstance := echo.New()
 		echoInstance.Use(middleware.MiddlewareFunc())
 
+		activeStatic := findActivePathOfClass(
+			middleware, HoneypotPathClassStaticVuln,
+		)
+		if activeStatic == "" {
+			t.Fatalf("NoActiveStaticPath")
+		}
+
 		httpRequest := httptest.NewRequest(
-			http.MethodGet, "/.env", nil,
+			http.MethodGet, activeStatic, nil,
 		)
 		httpRequest.RemoteAddr = "1.2.3.4:1234"
 		httpRecorder := httptest.NewRecorder()
@@ -314,8 +333,15 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		echoInstance := echo.New()
 		echoInstance.Use(middleware.MiddlewareFunc())
 
+		activeStatic := findActivePathOfClass(
+			middleware, HoneypotPathClassStaticVuln,
+		)
+		if activeStatic == "" {
+			t.Fatalf("NoActiveStaticPath")
+		}
+
 		firstRequest := httptest.NewRequest(
-			http.MethodGet, "/.env", nil,
+			http.MethodGet, activeStatic, nil,
 		)
 		firstRequest.RemoteAddr = "1.2.3.4:1234"
 		firstRecorder := httptest.NewRecorder()
@@ -358,8 +384,15 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		echoInstance := echo.New()
 		echoInstance.Use(middleware.MiddlewareFunc())
 
+		activeStatic := findActivePathOfClass(
+			middleware, HoneypotPathClassStaticVuln,
+		)
+		if activeStatic == "" {
+			t.Fatalf("NoActiveStaticPath")
+		}
+
 		httpRequest := httptest.NewRequest(
-			http.MethodGet, "/.env", nil,
+			http.MethodGet, activeStatic, nil,
 		)
 		httpRequest.RemoteAddr = "1.2.3.4:1234"
 		httpRecorder := httptest.NewRecorder()
@@ -440,21 +473,13 @@ func TestAllHoneypotPathsReturnPayloads(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
-	honeypotPaths := []string{
-		"/.env", "/wp-config.php", "/wp-config.php.bak",
-		"/config.php", "/backup.sql", "/backup.zip",
-		"/.git/config", "/.aws/credentials",
-		"/actuator/env", "/actuator/configprops",
-		"/server-status", "/phpmyadmin/index.php",
-		"/admin.php", "/administrator/index.php",
-		"/login.php", "/shell.php", "/cmd.php",
-		"/test.php", "/.htaccess", "/web.config",
-		"/robots.txt", "/sitemap.xml", "/debug.php",
-		"/info.php", "/console",
+	honeypotPaths := make([]string, 0)
+	for activePath := range middleware.activePathClasses {
+		honeypotPaths = append(honeypotPaths, activePath)
 	}
 
 	for _, honeypotPath := range honeypotPaths {
-		t.Run(honeypotPath[1:], func(t *testing.T) {
+		t.Run(strings.TrimPrefix(honeypotPath, "/"), func(t *testing.T) {
 			httpRequest := httptest.NewRequest(
 				http.MethodGet, honeypotPath, nil,
 			)
@@ -497,9 +522,9 @@ func TestHoneypotFailOpenBehavior(t *testing.T) {
 		echoInstance := echo.New()
 		echoInstance.Use(middleware.MiddlewareFunc())
 		echoInstance.GET("/api/health", func(
-			c echo.Context,
+			echoCtx echo.Context,
 		) error {
-			return c.String(http.StatusOK, "OK")
+			return echoCtx.String(http.StatusOK, "OK")
 		})
 
 		httpRequest := httptest.NewRequest(
@@ -524,9 +549,9 @@ func TestHoneypotFailOpenBehavior(t *testing.T) {
 		echoInstance := echo.New()
 		echoInstance.Use(middleware.MiddlewareFunc())
 		echoInstance.GET("/api/health", func(
-			c echo.Context,
+			echoCtx echo.Context,
 		) error {
-			return c.String(http.StatusOK, "OK")
+			return echoCtx.String(http.StatusOK, "OK")
 		})
 
 		httpRequest := httptest.NewRequest(
@@ -642,19 +667,7 @@ func TestBurpScanFloodsHoneypot(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
-	honeypotPaths := []string{
-		"/.env", "/wp-config.php", "/wp-config.php.bak",
-		"/config.php", "/backup.sql", "/backup.zip",
-		"/.git/config", "/.aws/credentials",
-		"/actuator/env", "/actuator/configprops",
-		"/server-status", "/phpmyadmin/index.php",
-		"/admin.php", "/administrator/index.php",
-		"/login.php", "/shell.php", "/cmd.php",
-		"/test.php", "/.htaccess", "/web.config",
-		"/robots.txt", "/sitemap.xml", "/debug.php",
-		"/info.php", "/console",
-	}
-
+	honeypotPaths := extractStaticPathKeys()
 	scanIterationCount := 2
 	for range scanIterationCount {
 		for _, honeypotPath := range honeypotPaths {
@@ -727,8 +740,9 @@ func TestCustomExtraPathRoutesReturnPayload(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
 			honeypotSettings := HoneypotMiddlewareSettings{
-				ActivePathCount: mustNewHoneypotActivePathCount(100),
+				ActivePathCount: mustNewHoneypotActivePathCount(200),
 				ExtraPathRoutes: testCase.extraPathRoutes,
+				RandomSeed:      1,
 			}
 
 			honeypotMiddleware := NewHoneypotMiddleware(
@@ -798,8 +812,15 @@ func TestXForwardedForSpoofingAttempt(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	activeStatic := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if activeStatic == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	httpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, activeStatic, nil,
 	)
 	httpRequest.RemoteAddr = "203.0.113.50:1234"
 	httpRequest.Header.Set("X-Forwarded-For", "10.0.0.1")
@@ -832,9 +853,9 @@ func TestGraduatedBanTierZeroNormalTraffic(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 	echoInstance.GET("/api/health", func(
-		c echo.Context,
+		echoCtx echo.Context,
 	) error {
-		return c.String(http.StatusOK, "OK")
+		return echoCtx.String(http.StatusOK, "OK")
 	})
 
 	httpRequest := httptest.NewRequest(
@@ -866,9 +887,9 @@ func TestGraduatedBanTierOneServesPayloadNoBan(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 	echoInstance.GET("/api/health", func(
-		c echo.Context,
+		echoCtx echo.Context,
 	) error {
-		return c.String(http.StatusOK, "OK")
+		return echoCtx.String(http.StatusOK, "OK")
 	})
 
 	legitRequest := httptest.NewRequest(
@@ -883,8 +904,15 @@ func TestGraduatedBanTierOneServesPayloadNoBan(t *testing.T) {
 			legitRecorder.Code)
 	}
 
+	honeypotPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if honeypotPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	honeypotRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, honeypotPath, nil,
 	)
 	honeypotRequest.RemoteAddr = "1.2.3.4:1234"
 	honeypotRecorder := httptest.NewRecorder()
@@ -912,8 +940,15 @@ func TestGraduatedBanTierOneIncrementsHitCount(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	honeypotPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if honeypotPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	httpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, honeypotPath, nil,
 	)
 	httpRequest.RemoteAddr = "1.2.3.4:1234"
 	httpRecorder := httptest.NewRecorder()
@@ -948,8 +983,15 @@ func TestGraduatedBanTierTwoBannedOnHoneypotPaths(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	honeypotPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if honeypotPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	httpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, honeypotPath, nil,
 	)
 	httpRequest.RemoteAddr = "1.2.3.4:1234"
 	httpRecorder := httptest.NewRecorder()
@@ -1022,9 +1064,9 @@ func TestHoneypotHitCountResetsAfterTTL(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 	echoInstance.GET("/api/health", func(
-		c echo.Context,
+		echoCtx echo.Context,
 	) error {
-		return c.String(http.StatusOK, "OK")
+		return echoCtx.String(http.StatusOK, "OK")
 	})
 
 	httpRequest := httptest.NewRequest(
@@ -1158,7 +1200,21 @@ func TestEndpointHitCountTrackedInValueJson(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
-	paths := []string{"/.env", "/.env", "/wp-config.php"}
+	activeStatic := make([]string, 0)
+	for activePath, pathClass := range middleware.activePathClasses {
+		if pathClass == HoneypotPathClassStaticVuln {
+			activeStatic = append(activeStatic, activePath)
+			if len(activeStatic) >= 2 {
+				break
+			}
+		}
+	}
+	if len(activeStatic) < 2 {
+		t.Fatalf("NotEnoughActiveStaticPaths")
+	}
+	paths := []string{
+		activeStatic[0], activeStatic[0], activeStatic[1],
+	}
 	for _, honeypotPath := range paths {
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, honeypotPath, nil,
@@ -1177,14 +1233,14 @@ func TestEndpointHitCountTrackedInValueJson(t *testing.T) {
 			hitData.Count)
 	}
 
-	if hitData.Endpoints["/.env"] != 2 {
-		t.Errorf("EnvEndpointCountMismatch: got=%d, want=2",
-			hitData.Endpoints["/.env"])
+	if hitData.Endpoints[activeStatic[0]] != 2 {
+		t.Errorf("FirstEndpointCountMismatch: got=%d, want=2",
+			hitData.Endpoints[activeStatic[0]])
 	}
 
-	if hitData.Endpoints["/wp-config.php"] != 1 {
-		t.Errorf("WpConfigEndpointCountMismatch: got=%d, want=1",
-			hitData.Endpoints["/wp-config.php"])
+	if hitData.Endpoints[activeStatic[1]] != 1 {
+		t.Errorf("SecondEndpointCountMismatch: got=%d, want=1",
+			hitData.Endpoints[activeStatic[1]])
 	}
 }
 
@@ -1385,8 +1441,16 @@ func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 			echoInstance := echo.New()
 			echoInstance.Use(middleware.MiddlewareFunc())
 
+			activeStatic := findActivePathOfClass(
+				middleware,
+				HoneypotPathClassStaticVuln,
+			)
+			if activeStatic == "" {
+				t.Fatalf("NoActiveStaticPath")
+			}
+
 			httpRequest := httptest.NewRequest(
-				http.MethodGet, "/.env", nil,
+				http.MethodGet, activeStatic, nil,
 			)
 			httpRequest.RemoteAddr = "1.2.3.4:1234"
 			httpRecorder := httptest.NewRecorder()
@@ -1407,32 +1471,32 @@ func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 
 func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 	testCaseStructs := []struct {
-		name     string
-		hitCount int
-		path     string
-		wantCode int
-		ipSuffix string
-		isMixed  bool
+		name       string
+		hitCount   int
+		isHoneypot bool
+		wantCode   int
+		ipSuffix   string
+		isMixed    bool
 	}{
 		{
 			"OneHitPassesAll", 1,
-			"/api/health", http.StatusOK, "1", false,
+			false, http.StatusOK, "1", false,
 		},
 		{
 			"TwoHitsPassesLegit", 2,
-			"/api/health", http.StatusOK, "2", false,
+			false, http.StatusOK, "2", false,
 		},
 		{
 			"TwoHitsServesPayloadTierOne", 2,
-			"/.env", http.StatusOK, "3", false,
+			true, http.StatusOK, "3", false,
 		},
 		{
 			"FiveHitsMixedOnHoneypot", 5,
-			"/.env", 0, "4", true,
+			true, 0, "4", true,
 		},
 		{
 			"FiveHitsPassesLegitTierTwo", 5,
-			"/api/health", http.StatusOK, "5", false,
+			false, http.StatusOK, "5", false,
 		},
 	}
 
@@ -1459,14 +1523,26 @@ func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 
 			echoInstance := echo.New()
 			echoInstance.Use(middleware.MiddlewareFunc())
-			echoInstance.GET("/api/health", func(
-				c echo.Context,
-			) error {
-				return c.String(http.StatusOK, "OK")
-			})
+		echoInstance.GET("/api/health", func(
+			echoCtx echo.Context,
+		) error {
+			return echoCtx.String(http.StatusOK, "OK")
+		})
+
+			requestPath := "/api/health"
+			if testCase.isHoneypot {
+				activeStatic := findActivePathOfClass(
+					middleware,
+					HoneypotPathClassStaticVuln,
+				)
+				if activeStatic == "" {
+					t.Fatalf("NoActiveStaticPath")
+				}
+				requestPath = activeStatic
+			}
 
 			httpRequest := httptest.NewRequest(
-				http.MethodGet, testCase.path, nil,
+				http.MethodGet, requestPath, nil,
 			)
 			httpRequest.RemoteAddr = testIp + ":1234"
 			httpRecorder := httptest.NewRecorder()
@@ -1538,8 +1614,15 @@ func TestAggressivenessObserveAlwaysServesPayloads(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	activeStaticPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if activeStaticPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	httpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, activeStaticPath, nil,
 	)
 	httpRequest.RemoteAddr = "1.2.3.4:1234"
 	httpRecorder := httptest.NewRecorder()
@@ -2366,8 +2449,14 @@ func TestScannerFloodTriggersTierEscalation(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
-	honeypotPaths := []string{
-		"/.env", "/wp-config.php", "/config.php",
+	honeypotPaths := make([]string, 0, 3)
+	for activePath, pathClass := range middleware.activePathClasses {
+		if pathClass == HoneypotPathClassStaticVuln {
+			honeypotPaths = append(honeypotPaths, activePath)
+			if len(honeypotPaths) >= 3 {
+				break
+			}
+		}
 	}
 
 	for _, honeypotPath := range honeypotPaths {
@@ -2462,8 +2551,15 @@ func TestPhaseOneCoreBehaviorPreservedAfterPhaseThree(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	activeStaticPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if activeStaticPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	httpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, activeStaticPath, nil,
 	)
 	httpRequest.RemoteAddr = "1.2.3.4:1234"
 	httpRecorder := httptest.NewRecorder()
@@ -2533,9 +2629,9 @@ func TestAggressivenessObserveGathersIntelWithoutInterference(
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 	echoInstance.GET("/api/health", func(
-		c echo.Context,
+		echoCtx echo.Context,
 	) error {
-		return c.String(http.StatusOK, "OK")
+		return echoCtx.String(http.StatusOK, "OK")
 	})
 
 	for range 5 {
@@ -3212,8 +3308,15 @@ func TestTierTwoMixedOnHoneypotPathsOnly(t *testing.T) {
 		return echoCtx.String(http.StatusOK, "OK")
 	})
 
+	hpPath := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if hpPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	hpRequest := httptest.NewRequest(
-		http.MethodGet, "/.env", nil,
+		http.MethodGet, hpPath, nil,
 	)
 	hpRequest.RemoteAddr = "1.2.3.4:1234"
 	hpRecorder := httptest.NewRecorder()
@@ -3310,9 +3413,16 @@ func TestObserveModeNeverReturnsMixedResponses(
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 
+	activeStatic := findActivePathOfClass(
+		middleware, HoneypotPathClassStaticVuln,
+	)
+	if activeStatic == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+
 	for range 5 {
 		httpRequest := httptest.NewRequest(
-			http.MethodGet, "/.env", nil,
+			http.MethodGet, activeStatic, nil,
 		)
 		httpRequest.RemoteAddr = "1.2.3.4:1234"
 		httpRecorder := httptest.NewRecorder()
@@ -3751,18 +3861,6 @@ func TestDormantPathReturnsNextHandler(t *testing.T) {
 	if !dormantPathFound {
 		t.Errorf("NoDormantPathsFoundWithSeed42")
 	}
-}
-
-func findActivePathOfClass(
-	middleware *HoneypotMiddleware,
-	targetClass HoneypotPathClass,
-) string {
-	for activePath, pathClass := range middleware.activePathClasses {
-		if pathClass == targetClass {
-			return activePath
-		}
-	}
-	return ""
 }
 
 func TestSelectedBandwidthExhaustPathStreamsGarbage(t *testing.T) {
@@ -4545,7 +4643,7 @@ func TestAllExistingPathsReturnDecodedPayloads(t *testing.T) {
 		transientDbSvc,
 	)
 	settings := newStandardSettings()
-	settings.ActivePathCount = mustNewHoneypotActivePathCount(100)
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(200)
 	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
 	middleware := NewHoneypotMiddleware(
 		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
@@ -4554,6 +4652,10 @@ func TestAllExistingPathsReturnDecodedPayloads(t *testing.T) {
 	echoInstance := echo.New()
 	echoInstance.Use(middleware.MiddlewareFunc())
 	for _, spec := range honeypotPayloadSpecs {
+		if _, isActive :=
+			middleware.activePathClasses[spec.urlPath]; !isActive {
+			continue
+		}
 		t.Run(spec.urlPath, func(t *testing.T) {
 			httpRequest := httptest.NewRequest(
 				http.MethodGet, spec.urlPath, nil,
@@ -4666,28 +4768,22 @@ func TestRandomActivationStillWorksAfterPhaseSix(t *testing.T) {
 }
 
 func TestPathMappingTableHasCorrectEntries(t *testing.T) {
-	expectedPaths := []string{
-		"/.env", "/wp-config.php", "/wp-config.php.bak",
-		"/config.php", "/backup.sql", "/backup.zip",
-		"/.git/config", "/.aws/credentials",
-		"/actuator/env", "/actuator/configprops",
-		"/server-status", "/phpmyadmin/index.php",
-		"/admin.php", "/administrator/index.php",
-		"/login.php", "/shell.php", "/cmd.php",
-		"/test.php", "/.htaccess", "/web.config",
-		"/robots.txt", "/sitemap.xml", "/debug.php",
-		"/info.php", "/console",
+	if len(honeypotPayloadSpecs) < 90 {
+		t.Errorf("SpecCountMismatch: got=%d, want>=90",
+			len(honeypotPayloadSpecs))
 	}
-	if len(honeypotPayloadSpecs) != len(expectedPaths) {
-		t.Errorf("SpecCountMismatch: got=%d, want=%d",
-			len(honeypotPayloadSpecs),
-			len(expectedPaths))
-	}
-	for _, expectedPath := range expectedPaths {
-		spec := findPayloadSpec(expectedPath)
-		if spec == nil {
-			t.Errorf("SpecNotFound: path=%s",
-				expectedPath)
+	for _, spec := range honeypotPayloadSpecs {
+		if !strings.HasSuffix(spec.binFileName, ".bin") {
+			t.Errorf("BinSuffixMissing: file=%s",
+				spec.binFileName)
+		}
+		if spec.urlPath == "" {
+			t.Errorf("EmptyUrlPath: file=%s",
+				spec.binFileName)
+		}
+		if spec.mimeType == "" {
+			t.Errorf("EmptyMimeType: file=%s",
+				spec.binFileName)
 		}
 	}
 }
@@ -4905,5 +5001,521 @@ func TestEncodedBinFilesNotFlaggedByStaticAnalysis(t *testing.T) {
 				)
 			}
 		}
+	}
+}
+
+func TestStaticPoolHasNinetyCandidates(t *testing.T) {
+	staticCount := len(honeypotPayloadSpecs)
+	if staticCount < 90 {
+		t.Errorf("StaticPoolBelowFloor: got=%d, want>=90",
+			staticCount)
+	}
+}
+
+func TestBandwidthPoolHasTenCandidates(t *testing.T) {
+	if len(bandwidthExhaustCandidatePaths) != 10 {
+		t.Errorf("BandwidthPoolCountMismatch: got=%d, want=10",
+			len(bandwidthExhaustCandidatePaths))
+	}
+}
+
+func TestAITrapPoolHasTenCandidates(t *testing.T) {
+	if len(aiTrapCandidatePaths) != 10 {
+		t.Errorf("AITrapPoolCountMismatch: got=%d, want=10",
+			len(aiTrapCandidatePaths))
+	}
+}
+
+func TestAutoRatioSelectsStaticCountFromNinety(t *testing.T) {
+	staticPaths := extractStaticPathKeys()
+	totalPoolSize := len(staticPaths) +
+		len(bandwidthExhaustCandidatePaths) +
+		len(aiTrapCandidatePaths)
+	selection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	staticCount := 0
+	bandwidthCount := 0
+	aiTrapCount := 0
+	for _, pathClass := range selection {
+		switch pathClass {
+		case HoneypotPathClassStaticVuln:
+			staticCount++
+		case HoneypotPathClassBandwidthExhaust:
+			bandwidthCount++
+		case HoneypotPathClassAITrap:
+			aiTrapCount++
+		}
+	}
+	if staticCount != 20 {
+		t.Errorf("StaticCountMismatch: got=%d, want=20",
+			staticCount)
+	}
+	if totalPoolSize < 90 {
+		t.Errorf("TotalPoolBelowFloor: got=%d, want>=90",
+			totalPoolSize)
+	}
+}
+
+func TestSelectedStaticPathsVaryAcrossRestarts(t *testing.T) {
+	staticPaths := extractStaticPathKeys()
+	seenPaths := make(map[string]bool)
+	for range 5 {
+		selection := selectActivePaths(
+			staticPaths,
+			bandwidthExhaustCandidatePaths,
+			aiTrapCandidatePaths,
+			30, 0,
+		)
+		for selectedPath, pathClass := range selection {
+			if pathClass == HoneypotPathClassStaticVuln {
+				seenPaths[selectedPath] = true
+			}
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if len(seenPaths) < 15 {
+		t.Errorf("InsufficientPathVariation: got=%d distinct, want>=15",
+			len(seenPaths))
+	}
+}
+
+func TestDormantStaticPathPassesThrough(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+	allStaticPaths := extractStaticPathKeys()
+	dormantPathFound := false
+	for _, staticPath := range allStaticPaths {
+		if _, pathIsActive :=
+			middleware.activePathClasses[staticPath]; pathIsActive {
+			continue
+		}
+		dormantPathFound = true
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, staticPath, nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+		if httpRecorder.Code == http.StatusOK {
+			payloadContentType := httpRecorder.Header().Get(
+				"Content-Type",
+			)
+			if payloadContentType != "" &&
+				payloadContentType != "text/plain; charset=UTF-8" {
+				t.Errorf("DormantPathShouldNotServePayload: path=%s",
+					staticPath)
+			}
+		}
+	}
+	if !dormantPathFound {
+		t.Errorf("NoDormantPathsFoundWithSeed42")
+	}
+}
+
+func TestAllSelectedPathsReturnValidResponses(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	for activePath := range middleware.activePathClasses {
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, activePath, nil,
+		)
+		httpRequest.RemoteAddr = "5.6.7.8:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+		if httpRecorder.Code != http.StatusOK {
+			t.Errorf("ActivePathNon200: path=%s, got=%d",
+				activePath, httpRecorder.Code)
+		}
+	}
+}
+
+func TestNewPathCategoriesPresentInStaticPool(t *testing.T) {
+	allPaths := extractStaticPathKeys()
+	pathSet := make(map[string]bool)
+	for _, staticPath := range allPaths {
+		pathSet[staticPath] = true
+	}
+	testCaseStructs := []struct {
+		category    string
+		samplePath  string
+	}{
+		{"EnvVariants", "/.env.local"},
+		{"WordPress", "/wp-config.txt"},
+		{"GitSVN", "/.git/"},
+		{"PackageManagers", "/package.json"},
+		{"ConfigFiles", "/config.json"},
+		{"BackupArchive", "/backup.tar.gz"},
+		{"InfoDebug", "/phpinfo.php"},
+		{"UploadsTemp", "/uploads/admin.php"},
+		{"AdminLogin", "/admin"},
+		{"ApiDebug", "/api/"},
+		{"WebCrossdomain", "/crossdomain.xml"},
+		{"Webhooks", "/webhook"},
+		{"Logs", "/access.log"},
+		{"CloudStorage", "/s3/"},
+		{"BuildArtifacts", "/dist/main.js"},
+		{"PathTraversal", "/etc/passwd"},
+		{"Other", "/Dockerfile"},
+	}
+	for _, testCase := range testCaseStructs {
+		if !pathSet[testCase.samplePath] {
+			t.Errorf("CategoryMissing: category=%s, sample=%s",
+				testCase.category, testCase.samplePath)
+		}
+	}
+}
+
+func TestAllNewPathsHaveBinFilesAndMapping(t *testing.T) {
+	newPaths := []string{
+		"/.env.local", "/.env.test", "/.env.bak",
+		"/.env.example", "/.env.production",
+		"/wp-config.txt", "/wp-config.php.orig",
+		"/wp-admin/", "/wp-login.php",
+		"/.git/", "/.git/index", "/.git/HEAD",
+		"/.svn/", "/.svn/entries",
+		"/package.json", "/package-lock.json",
+		"/yarn.lock", "/pnpm-lock.yaml",
+		"/composer.json", "/composer.lock",
+	}
+	for _, pathStr := range newPaths {
+		spec := findPayloadSpec(pathStr)
+		if spec == nil {
+			t.Errorf("MappingMissing: path=%s", pathStr)
+			continue
+		}
+		_, readErr := honeypotPayloadsFs.ReadFile(
+			"honeypot/payloads/" + spec.binFileName,
+		)
+		if readErr != nil {
+			t.Errorf("BinFileMissing: path=%s, file=%s",
+				pathStr, spec.binFileName)
+		}
+	}
+}
+
+func TestActivePathCountCeilingCalculatedAtConstructionTime(
+	t *testing.T,
+) {
+	totalPoolSize := len(honeypotPayloadSpecs) +
+		len(bandwidthExhaustCandidatePaths) +
+		len(aiTrapCandidatePaths)
+	settings := HoneypotMiddlewareSettings{
+		ActivePathCount: mustNewHoneypotActivePathCount(200),
+	}
+	middleware := NewHoneypotMiddleware(
+		settings, nil, nil, nil,
+	)
+	defer middleware.Stop()
+	resolvedCount := len(middleware.activePathClasses)
+	if resolvedCount > totalPoolSize {
+		t.Errorf("CeilingExceeded: activePaths=%d, pool=%d",
+			resolvedCount, totalPoolSize)
+	}
+}
+
+func TestActivePathCountRespectsCeiling(t *testing.T) {
+	totalPoolSize := len(honeypotPayloadSpecs) +
+		len(bandwidthExhaustCandidatePaths) +
+		len(aiTrapCandidatePaths)
+	settings := HoneypotMiddlewareSettings{
+		ActivePathCount: mustNewHoneypotActivePathCount(200),
+	}
+	resolvedSettings := honeypotSettingsParser{}.Parse(
+		settings, totalPoolSize,
+	)
+	if resolvedSettings.ActivePathCount.Int() > totalPoolSize {
+		t.Errorf("CeilingNotRespected: got=%d, want<=%d",
+			resolvedSettings.ActivePathCount.Int(),
+			totalPoolSize)
+	}
+}
+
+func TestNonExistentHoneypotPathPassesThrough(t *testing.T) {
+	cmdRepo := newNoopCmdRepo()
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/*", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+	httpRequest := httptest.NewRequest(
+		http.MethodGet,
+		"/this/path/does/not/exist/at/all", nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("NonExistentPathShouldPassThrough: got=%d",
+			httpRecorder.Code)
+	}
+	if httpRecorder.Body.String() != "OK" {
+		t.Errorf("BodyMismatch: got=%s, want=OK",
+			httpRecorder.Body.String())
+	}
+}
+
+func TestEmptyCandidatePoolHandledGracefully(t *testing.T) {
+	emptySelection := selectActivePaths(
+		nil, nil, nil, 0, 42,
+	)
+	if len(emptySelection) != 0 {
+		t.Errorf("EmptyPoolShouldReturnEmpty: got=%d",
+			len(emptySelection))
+	}
+	middleware := NewHoneypotMiddleware(
+		HoneypotMiddlewareSettings{}, nil, nil, nil,
+	)
+	defer middleware.Stop()
+	if middleware == nil {
+		t.Errorf("MiddlewareIsNil")
+	}
+}
+
+func TestSeedZeroProducesTimeBasedPool(t *testing.T) {
+	staticPaths := extractStaticPathKeys()
+	selection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 0,
+	)
+	if len(selection) == 0 {
+		t.Errorf("TimeBasedSeedShouldProduceNonEmpty")
+	}
+}
+
+func TestNewBinFileDecodeFailureSkipsAndReplaces(t *testing.T) {
+	activePathMap := map[string]HoneypotPathClass{
+		"/.env.local": HoneypotPathClassStaticVuln,
+	}
+	payloadMap := make(map[string]HoneypotPathMapping)
+	failedPaths := []string{"/.env.local"}
+	resolveDecodeFailures(
+		activePathMap, payloadMap, failedPaths,
+	)
+	if _, exists := activePathMap["/.env.local"]; exists {
+		t.Errorf("FailedPathNotRemovedFromActiveMap")
+	}
+	if len(payloadMap) != 1 {
+		t.Fatalf("ExpectedOneReplacement: got=%d",
+			len(payloadMap))
+	}
+	var replacementPath string
+	for pathKey := range payloadMap {
+		replacementPath = pathKey
+	}
+	if replacementPath == "/.env.local" {
+		t.Errorf("ReplacementShouldDifferFromFailedPath")
+	}
+}
+
+func TestCustomActivePathCountChangesStaticSelection(t *testing.T) {
+	staticPaths := extractStaticPathKeys()
+	selection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		60, 42,
+	)
+	staticCount := 0
+	bandwidthCount := 0
+	aiTrapCount := 0
+	for _, pathClass := range selection {
+		switch pathClass {
+		case HoneypotPathClassStaticVuln:
+			staticCount++
+		case HoneypotPathClassBandwidthExhaust:
+			bandwidthCount++
+		case HoneypotPathClassAITrap:
+			aiTrapCount++
+		}
+	}
+	if staticCount != 40 {
+		t.Errorf("StaticCountMismatch: got=%d, want=40",
+			staticCount)
+	}
+	if bandwidthCount != 10 {
+		t.Errorf("BandwidthCountMismatch: got=%d, want=10",
+			bandwidthCount)
+	}
+	if aiTrapCount != 10 {
+		t.Errorf("AiTrapCountMismatch: got=%d, want=10",
+			aiTrapCount)
+	}
+}
+
+func TestExpandedPoolScannerBurstEscalatesBan(t *testing.T) {
+	testIp := newUniqueTestIp()
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(transientDbSvc, testIp, 3)
+	cmdRepo := newNoopCmdRepo()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	middleware := NewHoneypotMiddleware(
+		settings,
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+	staticPath := ""
+	for activePath, pathClass := range middleware.activePathClasses {
+		if pathClass == HoneypotPathClassStaticVuln {
+			staticPath = activePath
+			break
+		}
+	}
+	if staticPath == "" {
+		t.Fatalf("NoActiveStaticPath")
+	}
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, staticPath, nil,
+	)
+	httpRequest.RemoteAddr = testIp + ":1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("TierThreeHoneypotExpectedMixed: got=%d",
+			httpRecorder.Code)
+	}
+	legitRequest := httptest.NewRequest(
+		http.MethodGet, "/api/health", nil,
+	)
+	legitRequest.RemoteAddr = testIp + ":1234"
+	legitRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(legitRecorder, legitRequest)
+	if !isMixedResponseStatusCode(legitRecorder.Code) {
+		t.Errorf("TierThreeLegitExpectedMixed: got=%d",
+			legitRecorder.Code)
+	}
+}
+
+func TestPoolExpansionDoesNotBreakPhaseSixDecoding(t *testing.T) {
+	for _, spec := range honeypotPayloadSpecs {
+		mapping, decodeErr := decodePayloadSpec(spec)
+		if decodeErr != nil {
+			t.Errorf("DecodeFailed: path=%s, err=%v",
+				spec.urlPath, decodeErr)
+			continue
+		}
+		if len(mapping.Body) == 0 {
+			t.Errorf("DecodedBodyEmpty: path=%s",
+				spec.urlPath)
+		}
+	}
+}
+
+func TestAllExpandedPathsHaveValidBinFiles(t *testing.T) {
+	payloadDir := "honeypot/payloads"
+	dirEntries, readErr := os.ReadDir(payloadDir)
+	if readErr != nil {
+		t.Fatalf("PayloadDirReadFailed: %v", readErr)
+	}
+	for _, dirEntry := range dirEntries {
+		if dirEntry.IsDir() {
+			continue
+		}
+		filePath := filepath.Join(payloadDir, dirEntry.Name())
+		fileContent, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			t.Fatalf("BinFileReadFailed: file=%s, err=%v",
+				dirEntry.Name(), readErr)
+		}
+		_, decodeErr := base64.StdEncoding.DecodeString(
+			string(fileContent),
+		)
+		if decodeErr != nil {
+			t.Errorf("InvalidBase64: file=%s, err=%v",
+				dirEntry.Name(), decodeErr)
+		}
+	}
+}
+
+func TestExpandedPoolStatsAggregationIncludesNewEndpoints(
+	t *testing.T,
+) {
+	var capturedRecord *tkDto.CreateActivityRecord
+	cmdRepo := mockActivityRecordCmdRepo{
+		createFunc: func(
+			dto tkDto.CreateActivityRecord,
+		) error {
+			capturedRecord = &dto
+			return nil
+		},
+	}
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(transientDbSvc, "1.1.1.1", 1)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+	settings := newStandardSettings()
+	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
+	middleware := NewHoneypotMiddleware(
+		settings,
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
+	)
+	defer middleware.Stop()
+	middleware.runMaintenance()
+	if capturedRecord == nil {
+		t.Fatalf("StatsRecordNotCreated")
+	}
+	detailsMap := capturedRecord.RecordDetails.(map[string]string)
+	var statsReport map[string]any
+	json.Unmarshal(
+		[]byte(detailsMap["statsReport"]), &statsReport,
+	)
+	topEndpoints := statsReport["topEndpoints"].([]any)
+	if len(topEndpoints) == 0 {
+		t.Errorf("TopEndpointsEmpty")
 	}
 }

@@ -68,6 +68,14 @@ func (parser honeypotSettingsParser) parseActivePathCount(
 				NewHoneypotActivePathCount("", poolCeiling)
 			return activePathCount
 		}
+		if poolCeiling > 0 &&
+			settings.ActivePathCount.Int() > poolCeiling {
+			clamped, _ := tkValueObject.
+				NewHoneypotActivePathCount(
+					poolCeiling, poolCeiling,
+				)
+			return clamped
+		}
 		return settings.ActivePathCount
 	}
 

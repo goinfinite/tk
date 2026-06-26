@@ -2,6 +2,7 @@
 
 ```log
 0.2.8 - 2026/06/26
+feat: expand honeypot static candidate pool to 114 paths with 89 new .bin payloads, pool ceiling clamping, and Phase 7 tests
 feat: add three-class honeypot path system with auto-ratio random activation, bandwidth exhaust streaming, and AI trap streaming with prompt injection
 feat: add weighted random mixed responses with rotating law enforcement redirect pool and rotating security-themed query strings
 
