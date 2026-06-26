@@ -2,11 +2,13 @@ package tkPresentation
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -711,8 +713,8 @@ func TestCustomExtraPathRoutesReturnPayload(t *testing.T) {
 					MimeType: fakeAdminMimeType,
 				},
 				{
-					UrlPath: fakeApiKeysUrlPath,
-					Body:    `{"api_key":"fake-key-12345"}`,
+					UrlPath:  fakeApiKeysUrlPath,
+					Body:     `{"api_key":"fake-key-12345"}`,
 					MimeType: fakeApiKeysMimeType,
 				},
 			},
@@ -1245,8 +1247,8 @@ func TestEnforceMaxEntriesDeletesOldestEntries(t *testing.T) {
 
 	for entryIndex := range 5 {
 		entry := tkInfraDb.KeyValueModel{
-			Key:       "key:" + string(rune('a'+entryIndex)),
-			Value:     "val",
+			Key:   "key:" + string(rune('a'+entryIndex)),
+			Value: "val",
 			CreatedAt: time.Now().Add(
 				time.Duration(entryIndex) * time.Minute,
 			),
@@ -1270,8 +1272,8 @@ func TestEnforceMaxEntriesFloorRespected(t *testing.T) {
 
 	for entryIndex := range 3 {
 		entry := tkInfraDb.KeyValueModel{
-			Key:       "key:" + string(rune('a'+entryIndex)),
-			Value:     "val",
+			Key:   "key:" + string(rune('a'+entryIndex)),
+			Value: "val",
 			CreatedAt: time.Now().Add(
 				time.Duration(entryIndex) * time.Minute,
 			),
@@ -1294,8 +1296,8 @@ func TestEnforceMaxEntriesCeilingRespected(t *testing.T) {
 
 	for entryIndex := range 10 {
 		entry := tkInfraDb.KeyValueModel{
-			Key: "key:" + string(rune('a'+entryIndex)),
-			Value:     "val",
+			Key:   "key:" + string(rune('a'+entryIndex)),
+			Value: "val",
 			CreatedAt: time.Now().Add(
 				time.Duration(entryIndex) * time.Minute,
 			),
@@ -1347,9 +1349,9 @@ func TestAggressivenessImmediateFirstHitBans(t *testing.T) {
 
 func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 	testCaseStructs := []struct {
-		name             string
-		hitCount         int
-		expectedMixed    bool
+		name          string
+		hitCount      int
+		expectedMixed bool
 	}{
 		{"ZeroHitsPasses", 0, false},
 		{"OneHitServesPayload", 1, false},
@@ -2095,8 +2097,8 @@ func TestProbabilisticEnforcementTriggersOnWrite(t *testing.T) {
 
 	for entryIndex := range 200 {
 		entry := tkInfraDb.KeyValueModel{
-			Key: "key:" + string(rune(entryIndex)),
-			Value:     "val",
+			Key:   "key:" + string(rune(entryIndex)),
+			Value: "val",
 			CreatedAt: time.Now().Add(
 				time.Duration(entryIndex) * time.Millisecond,
 			),
@@ -2740,8 +2742,8 @@ func TestMethodOrderingCalleesAboveCallers(t *testing.T) {
 		methodPositions[methodName] = match[0]
 	}
 	testCaseStructs := []struct {
-		callee   string
-		caller   string
+		callee string
+		caller string
 	}{
 		{"lookupActivePathClass", "Execute"},
 		{"Execute", "Start"},
@@ -3602,7 +3604,7 @@ func TestAutoRatioFloorGuaranteesMinOnePerClass(t *testing.T) {
 }
 
 func TestRandomSelectionIsDeterministicWithSeed(t *testing.T) {
-	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPaths := extractStaticPathKeys()
 	firstSelection := selectActivePaths(
 		staticPaths,
 		bandwidthExhaustCandidatePaths,
@@ -3635,7 +3637,7 @@ func TestRandomSelectionIsDeterministicWithSeed(t *testing.T) {
 }
 
 func TestRandomSelectionDiffersWithDifferentSeeds(t *testing.T) {
-	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPaths := extractStaticPathKeys()
 	firstSelection := selectActivePaths(
 		staticPaths,
 		bandwidthExhaustCandidatePaths,
@@ -3669,7 +3671,7 @@ func TestRandomSelectionDiffersWithDifferentSeeds(t *testing.T) {
 }
 
 func TestRandomSelectionDiffersAcrossRestarts(t *testing.T) {
-	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPaths := extractStaticPathKeys()
 	selections := make([]map[string]HoneypotPathClass, 5)
 	for runIdx := range 5 {
 		selections[runIdx] = selectActivePaths(
@@ -3721,9 +3723,7 @@ func TestDormantPathReturnsNextHandler(t *testing.T) {
 	) error {
 		return echoCtx.String(http.StatusOK, "OK")
 	})
-	allStaticPaths := extractStaticPathKeys(
-		honeypotPayloadEntries,
-	)
+	allStaticPaths := extractStaticPathKeys()
 	dormantPathFound := false
 	for _, staticPath := range allStaticPaths {
 		if _, pathIsActive :=
@@ -4305,7 +4305,7 @@ func TestFlusherUnavailableReturnsGracefulJson(t *testing.T) {
 }
 
 func TestInvalidRandomSeedStillProducesValidSelection(t *testing.T) {
-	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPaths := extractStaticPathKeys()
 	selection := selectActivePaths(
 		staticPaths,
 		bandwidthExhaustCandidatePaths,
@@ -4419,7 +4419,7 @@ func TestMaxStreamSizeBytesCustomValueUsed(t *testing.T) {
 }
 
 func TestActivePathCountCustomValueChangesCounts(t *testing.T) {
-	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPaths := extractStaticPathKeys()
 	selectionThirty := selectActivePaths(
 		staticPaths,
 		bandwidthExhaustCandidatePaths,
@@ -4513,7 +4513,13 @@ func TestAITrapSlowReaderDoesNotExhaustGoroutines(t *testing.T) {
 }
 
 func TestPhaseOneAndFiveEmbedFsPreserved(t *testing.T) {
-	payloadMap := buildHoneypotPayloadMap(nil)
+	testActivePathMap := map[string]HoneypotPathClass{
+		"/.env":          HoneypotPathClassStaticVuln,
+		"/wp-config.php": HoneypotPathClassStaticVuln,
+	}
+	payloadMap := buildHoneypotPayloadMap(
+		testActivePathMap, nil,
+	)
 	if len(payloadMap) == 0 {
 		t.Errorf("EmbedFsPayloadMapEmpty")
 	}
@@ -4529,5 +4535,375 @@ func TestPhaseOneAndFiveEmbedFsPreserved(t *testing.T) {
 	defer middleware.Stop()
 	if len(middleware.activePathClasses) == 0 {
 		t.Errorf("ActivePathClassesEmpty")
+	}
+}
+
+func TestAllExistingPathsReturnDecodedPayloads(t *testing.T) {
+	cmdRepo := newNoopCmdRepo()
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(100)
+	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	for _, spec := range honeypotPayloadSpecs {
+		t.Run(spec.urlPath, func(t *testing.T) {
+			httpRequest := httptest.NewRequest(
+				http.MethodGet, spec.urlPath, nil,
+			)
+			httpRequest.RemoteAddr = "5.6.7.8:1234"
+			httpRecorder := httptest.NewRecorder()
+			echoInstance.ServeHTTP(
+				httpRecorder, httpRequest,
+			)
+			if httpRecorder.Code != http.StatusOK {
+				t.Errorf(
+					"PathReturnNon200: path=%s, code=%d",
+					spec.urlPath, httpRecorder.Code,
+				)
+			}
+			contentType := httpRecorder.Header().Get(
+				"Content-Type",
+			)
+			if contentType == "" {
+				t.Errorf("ContentTypeMissing: path=%s",
+					spec.urlPath)
+			}
+			if httpRecorder.Body.Len() == 0 {
+				t.Errorf("BodyEmpty: path=%s",
+					spec.urlPath)
+			}
+		})
+	}
+}
+
+func TestDecodedContentMatchesPreEncodedOriginal(t *testing.T) {
+	for _, spec := range honeypotPayloadSpecs {
+		t.Run(spec.urlPath, func(t *testing.T) {
+			mapping, decodeErr := decodePayloadSpec(spec)
+			if decodeErr != nil {
+				t.Fatalf(
+					"DecodeFailed: path=%s, err=%v",
+					spec.urlPath, decodeErr,
+				)
+			}
+			if len(mapping.Body) == 0 {
+				t.Errorf("DecodedBodyEmpty: path=%s",
+					spec.urlPath)
+			}
+		})
+	}
+}
+
+func TestPayloadDirectoryContainsOnlyBinFiles(t *testing.T) {
+	dirEntries, readErr := os.ReadDir(
+		"honeypot/payloads",
+	)
+	if readErr != nil {
+		t.Fatalf("PayloadDirReadFailed: %v", readErr)
+	}
+	for _, dirEntry := range dirEntries {
+		if !strings.HasSuffix(dirEntry.Name(), ".bin") {
+			t.Errorf("NonBinFileFound: %s",
+				dirEntry.Name())
+		}
+	}
+}
+
+func TestEmbedDirectivePointsToBinGlob(t *testing.T) {
+	fileContent, readErr := os.ReadFile(
+		"honeypotPathSelector.go",
+	)
+	if readErr != nil {
+		t.Fatalf("SelectorFileReadFailed: %v", readErr)
+	}
+	expectedDirective := "//go:embed honeypot/payloads/*.bin"
+	if !strings.Contains(
+		string(fileContent), expectedDirective,
+	) {
+		t.Errorf("EmbedDirectiveMissing: want=%s",
+			expectedDirective)
+	}
+}
+
+func TestRandomActivationStillWorksAfterPhaseSix(t *testing.T) {
+	staticPaths := extractStaticPathKeys()
+	selection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	staticCount := 0
+	bandwidthCount := 0
+	aiTrapCount := 0
+	for _, pathClass := range selection {
+		switch pathClass {
+		case HoneypotPathClassStaticVuln:
+			staticCount++
+		case HoneypotPathClassBandwidthExhaust:
+			bandwidthCount++
+		case HoneypotPathClassAITrap:
+			aiTrapCount++
+		}
+	}
+	totalCount := staticCount + bandwidthCount + aiTrapCount
+	if totalCount != 30 {
+		t.Errorf("TotalCountMismatch: got=%d, want=30",
+			totalCount)
+	}
+	if staticCount != 20 {
+		t.Errorf("StaticCountMismatch: got=%d, want=20",
+			staticCount)
+	}
+}
+
+func TestPathMappingTableHasCorrectEntries(t *testing.T) {
+	expectedPaths := []string{
+		"/.env", "/wp-config.php", "/wp-config.php.bak",
+		"/config.php", "/backup.sql", "/backup.zip",
+		"/.git/config", "/.aws/credentials",
+		"/actuator/env", "/actuator/configprops",
+		"/server-status", "/phpmyadmin/index.php",
+		"/admin.php", "/administrator/index.php",
+		"/login.php", "/shell.php", "/cmd.php",
+		"/test.php", "/.htaccess", "/web.config",
+		"/robots.txt", "/sitemap.xml", "/debug.php",
+		"/info.php", "/console",
+	}
+	if len(honeypotPayloadSpecs) != len(expectedPaths) {
+		t.Errorf("SpecCountMismatch: got=%d, want=%d",
+			len(honeypotPayloadSpecs),
+			len(expectedPaths))
+	}
+	for _, expectedPath := range expectedPaths {
+		spec := findPayloadSpec(expectedPath)
+		if spec == nil {
+			t.Errorf("SpecNotFound: path=%s",
+				expectedPath)
+		}
+	}
+}
+
+func TestPathMappingFilenameEndsInBin(t *testing.T) {
+	for _, spec := range honeypotPayloadSpecs {
+		if !strings.HasSuffix(spec.binFileName, ".bin") {
+			t.Errorf("BinSuffixMissing: file=%s",
+				spec.binFileName)
+		}
+	}
+}
+
+func TestCorruptedBase64PayloadSkipsPathAndSelectsReplacement(t *testing.T) {
+	activePathMap := map[string]HoneypotPathClass{
+		"/.env": HoneypotPathClassStaticVuln,
+	}
+	payloadMap := make(map[string]HoneypotPathMapping)
+	failedPaths := []string{"/.env"}
+
+	resolveDecodeFailures(
+		activePathMap, payloadMap, failedPaths,
+	)
+
+	if _, exists := activePathMap["/.env"]; exists {
+		t.Errorf("FailedPathNotRemovedFromActiveMap")
+	}
+
+	if len(payloadMap) != 1 {
+		t.Fatalf("ExpectedOneReplacement: got=%d",
+			len(payloadMap))
+	}
+
+	if len(activePathMap) != 1 {
+		t.Fatalf("ExpectedOneActiveReplacement: got=%d",
+			len(activePathMap))
+	}
+
+	var replacementPath string
+	for pathKey := range payloadMap {
+		replacementPath = pathKey
+	}
+
+	if replacementPath == "/.env" {
+		t.Errorf("ReplacementShouldDifferFromFailedPath")
+	}
+
+	replacementMapping, mapOk := payloadMap[replacementPath]
+	if !mapOk {
+		t.Fatalf("ReplacementPayloadMissing")
+	}
+
+	if len(replacementMapping.Body) == 0 {
+		t.Errorf("ReplacementBodyEmpty")
+	}
+
+	replacementClass, classOk := activePathMap[replacementPath]
+	if !classOk {
+		t.Errorf("ReplacementNotInActiveMap")
+	}
+
+	if replacementClass != HoneypotPathClassStaticVuln {
+		t.Errorf("ReplacementClassMismatch: got=%d, want=%d",
+			replacementClass,
+			HoneypotPathClassStaticVuln)
+	}
+}
+
+func TestAllBinFilesDecodeFailureProceedsWithDegradedCount(t *testing.T) {
+	activePathMap := map[string]HoneypotPathClass{
+		"/api/v1/docs": HoneypotPathClassAITrap,
+	}
+	payloadMap := buildHoneypotPayloadMap(
+		activePathMap, nil,
+	)
+	if len(payloadMap) != 0 {
+		t.Errorf("ExpectedEmptyPayloadMap: got=%d",
+			len(payloadMap))
+	}
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(), nil, nil, nil,
+	)
+	defer middleware.Stop()
+	if len(middleware.activePathClasses) == 0 {
+		t.Errorf("ActivePathClassesEmpty")
+	}
+}
+
+func TestNonExistentPathNotInMappingPassesThrough(t *testing.T) {
+	cmdRepo := newNoopCmdRepo()
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, cmdRepo,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, "/api/health", nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("PassThroughFailed: got=%d, want=%d",
+			httpRecorder.Code, http.StatusOK)
+	}
+	if httpRecorder.Body.String() != "OK" {
+		t.Errorf("BodyMismatch: got=%s, want=OK",
+			httpRecorder.Body.String())
+	}
+}
+
+func TestBinFilesContainNoPlaintextSecrets(t *testing.T) {
+	credentialPatterns := []string{
+		"password", "secret", "api_key",
+		"aws_access_key", "DB_PASSWORD",
+	}
+	for _, spec := range honeypotPayloadSpecs {
+		t.Run(spec.urlPath, func(t *testing.T) {
+			binContent, readErr := honeypotPayloadsFs.ReadFile(
+				"honeypot/payloads/" + spec.binFileName,
+			)
+			if readErr != nil {
+				t.Fatalf("BinFileReadFailed: %v",
+					readErr)
+			}
+			rawContent := string(binContent)
+			for _, pattern := range credentialPatterns {
+				if strings.Contains(
+					strings.ToLower(rawContent),
+					pattern,
+				) {
+					t.Errorf(
+						"PlaintextSecretFound: pattern=%s, file=%s",
+						pattern,
+						spec.binFileName,
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestBinFilesOnlyContainValidBase64(t *testing.T) {
+	for _, spec := range honeypotPayloadSpecs {
+		t.Run(spec.urlPath, func(t *testing.T) {
+			binContent, readErr := honeypotPayloadsFs.ReadFile(
+				"honeypot/payloads/" + spec.binFileName,
+			)
+			if readErr != nil {
+				t.Fatalf("BinFileReadFailed: %v",
+					readErr)
+			}
+			_, decodeErr := base64.StdEncoding.DecodeString(
+				string(binContent),
+			)
+			if decodeErr != nil {
+				t.Errorf("InvalidBase64: file=%s, err=%v",
+					spec.binFileName, decodeErr)
+			}
+		})
+	}
+}
+
+func TestNoHoneypotPayloadDecoderFileExists(t *testing.T) {
+	decoderFileNames := []string{
+		"honeypotPayloadDecoder.go",
+		"honeypotDecoder.go",
+		"honeypotBase64Decoder.go",
+	}
+	for _, fileName := range decoderFileNames {
+		if _, statErr := os.Stat(fileName); statErr == nil {
+			t.Errorf("DecoderFileExists: %s", fileName)
+		}
+	}
+}
+
+func TestEncodedBinFilesNotFlaggedByStaticAnalysis(t *testing.T) {
+	vulnSignatures := []string{
+		"phpinfo()", "CREATE TABLE", "INSERT INTO",
+		"<?php", "system($_", "DB_PASSWORD",
+		"aws_access_key_id", "AKIAIOSFODNN",
+	}
+	payloadDir := "honeypot/payloads"
+	dirEntries, readErr := os.ReadDir(payloadDir)
+	if readErr != nil {
+		t.Fatalf("PayloadDirReadFailed: %v", readErr)
+	}
+	for _, dirEntry := range dirEntries {
+		if dirEntry.IsDir() {
+			continue
+		}
+		filePath := filepath.Join(payloadDir, dirEntry.Name())
+		fileContent, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			t.Fatalf("FileReadFailed: file=%s, err=%v",
+				dirEntry.Name(), readErr)
+		}
+		rawContent := string(fileContent)
+		for _, signature := range vulnSignatures {
+			if strings.Contains(rawContent, signature) {
+				t.Errorf(
+					"VulnSignatureFound: sig=%s, file=%s",
+					signature, dirEntry.Name(),
+				)
+			}
+		}
 	}
 }

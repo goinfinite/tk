@@ -2,6 +2,7 @@ package tkPresentation
 
 import (
 	"embed"
+	"encoding/base64"
 	"log/slog"
 	"math/rand"
 	"time"
@@ -9,36 +10,8 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-//go:embed honeypot/payloads/*
+//go:embed honeypot/payloads/*.bin
 var honeypotPayloadsFs embed.FS
-
-var honeypotPayloadEntries = []string{
-	"/.env", "env", "text/plain",
-	"/wp-config.php", "wp-config.php", "application/x-httpd-php",
-	"/wp-config.php.bak", "wp-config.php.bak", "application/x-httpd-php",
-	"/config.php", "config.php", "application/x-httpd-php",
-	"/backup.sql", "backup.sql", "application/sql",
-	"/backup.zip", "backup.zip", "application/zip",
-	"/.git/config", "git-config", "text/plain",
-	"/.aws/credentials", "aws-credentials", "text/plain",
-	"/actuator/env", "actuator-env.json", "application/json",
-	"/actuator/configprops", "actuator-configprops.json", "application/json",
-	"/server-status", "server-status.html", "text/html",
-	"/phpmyadmin/index.php", "phpmyadmin-index.php", "text/html",
-	"/admin.php", "admin.php", "text/html",
-	"/administrator/index.php", "administrator-index.php", "text/html",
-	"/login.php", "login.php", "text/html",
-	"/shell.php", "shell.php", "application/x-httpd-php",
-	"/cmd.php", "cmd.php", "application/x-httpd-php",
-	"/test.php", "test.php", "application/x-httpd-php",
-	"/.htaccess", "htaccess", "text/plain",
-	"/web.config", "web.config", "text/xml",
-	"/robots.txt", "robots.txt", "text/plain",
-	"/sitemap.xml", "sitemap.xml", "application/xml",
-	"/debug.php", "debug.php", "application/x-httpd-php",
-	"/info.php", "info.php", "application/x-httpd-php",
-	"/console", "console.html", "text/html",
-}
 
 type HoneypotPathClass int
 
@@ -74,61 +47,140 @@ var aiTrapCandidatePaths = []string{
 	"/api/status",
 }
 
+func decodePayloadSpec(
+	spec honeypotPayloadSpec,
+) (HoneypotPathMapping, error) {
+	binContent, readErr := honeypotPayloadsFs.ReadFile(
+		"honeypot/payloads/" + spec.binFileName,
+	)
+	if readErr != nil {
+		return HoneypotPathMapping{}, readErr
+	}
+	decodedBytes, decodeErr := base64.StdEncoding.DecodeString(
+		string(binContent),
+	)
+	if decodeErr != nil {
+		return HoneypotPathMapping{}, decodeErr
+	}
+	urlPath, pathErr := tkValueObject.NewUrlPath(
+		spec.urlPath,
+	)
+	if pathErr != nil {
+		return HoneypotPathMapping{}, pathErr
+	}
+	mimeType, mimeErr := tkValueObject.NewMimeType(
+		spec.mimeType,
+	)
+	if mimeErr != nil {
+		return HoneypotPathMapping{}, mimeErr
+	}
+	return HoneypotPathMapping{
+		Body:     string(decodedBytes),
+		MimeType: mimeType,
+		UrlPath:  urlPath,
+	}, nil
+}
+
+func extractStaticPathKeys() []string {
+	staticPathKeys := make(
+		[]string, 0, len(honeypotPayloadSpecs),
+	)
+	for _, spec := range honeypotPayloadSpecs {
+		staticPathKeys = append(
+			staticPathKeys, spec.urlPath,
+		)
+	}
+	return staticPathKeys
+}
+
 func buildHoneypotPayloadMap(
+	activePathMap map[string]HoneypotPathClass,
 	extraRoutes []HoneypotPathMapping,
 ) map[string]HoneypotPathMapping {
 	payloadMap := make(map[string]HoneypotPathMapping)
-	for entryIdx := 0; entryIdx < len(honeypotPayloadEntries); entryIdx += 3 {
-		interceptPath := honeypotPayloadEntries[entryIdx]
-		payloadContent, readErr := honeypotPayloadsFs.ReadFile(
-			"honeypot/payloads/" + honeypotPayloadEntries[entryIdx+1],
-		)
-		if readErr != nil {
-			slog.Error("HoneypotPayloadReadFailed",
-				slog.String("path",
-					honeypotPayloadEntries[entryIdx+1]),
-				slog.String("err", readErr.Error()))
+	failedPaths := make([]string, 0)
+	for activePath, pathClass := range activePathMap {
+		if pathClass != HoneypotPathClassStaticVuln {
 			continue
 		}
-		urlPath, pathErr := tkValueObject.NewUrlPath(interceptPath)
-		if pathErr != nil {
-			slog.Error("HoneypotPathConstructionFailed",
-				slog.String("path", interceptPath),
-				slog.String("err", pathErr.Error()))
+		spec := findPayloadSpec(activePath)
+		if spec == nil {
 			continue
 		}
-		mimeType, mimeErr := tkValueObject.NewMimeType(
-			honeypotPayloadEntries[entryIdx+2],
-		)
-		if mimeErr != nil {
-			slog.Error("HoneypotMimeConstructionFailed",
-				slog.String("err", mimeErr.Error()))
+		mapping, decodeErr := decodePayloadSpec(*spec)
+		if decodeErr != nil {
+			slog.Error(
+				"HoneypotPayloadDecodeFailed",
+				slog.String("path", activePath),
+				slog.String("err",
+					decodeErr.Error()),
+			)
+			failedPaths = append(
+				failedPaths, activePath,
+			)
 			continue
 		}
-		payloadMap[interceptPath] = HoneypotPathMapping{
-			Body: string(payloadContent),
-			MimeType: mimeType,
-			UrlPath: urlPath,
-		}
+		payloadMap[activePath] = mapping
 	}
+	resolveDecodeFailures(
+		activePathMap, payloadMap, failedPaths,
+	)
 	for _, extraRoute := range extraRoutes {
-		payloadMap[extraRoute.UrlPath.String()] = extraRoute
+		payloadMap[extraRoute.UrlPath.String()] =
+			extraRoute
 	}
 	return payloadMap
 }
 
-func extractStaticPathKeys(
-	payloadEntries []string,
-) []string {
-	staticPathKeys := make(
-		[]string, 0, len(payloadEntries)/3,
-	)
-	for entryIdx := 0; entryIdx < len(payloadEntries); entryIdx += 3 {
-		staticPathKeys = append(
-			staticPathKeys, payloadEntries[entryIdx],
-		)
+func resolveDecodeFailures(
+	activePathMap map[string]HoneypotPathClass,
+	payloadMap map[string]HoneypotPathMapping,
+	failedPaths []string,
+) {
+	dormantPaths := make([]string, 0)
+	for _, spec := range honeypotPayloadSpecs {
+		if _, isActive := activePathMap[spec.urlPath]; !isActive {
+			dormantPaths = append(
+				dormantPaths, spec.urlPath,
+			)
+		}
 	}
-	return staticPathKeys
+	replacementIdx := 0
+	for _, failedPath := range failedPaths {
+		delete(activePathMap, failedPath)
+		replacementFound := false
+		for replacementIdx < len(dormantPaths) {
+			replacementPath := dormantPaths[replacementIdx]
+			replacementIdx++
+			spec := findPayloadSpec(replacementPath)
+			if spec == nil {
+				continue
+			}
+			mapping, decodeErr := decodePayloadSpec(*spec)
+			if decodeErr != nil {
+				slog.Error(
+					"HoneypotPayloadDecodeFailed",
+					slog.String("path",
+						replacementPath),
+					slog.String("err",
+						decodeErr.Error()),
+				)
+				continue
+			}
+			activePathMap[replacementPath] =
+				HoneypotPathClassStaticVuln
+			payloadMap[replacementPath] = mapping
+			replacementFound = true
+			break
+		}
+		if !replacementFound {
+			slog.Error(
+				"HoneypotReplacementExhausted",
+				slog.String("failedPath",
+					failedPath),
+			)
+		}
+	}
 }
 
 func computeAutoRatio(

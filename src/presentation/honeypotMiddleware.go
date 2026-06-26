@@ -43,6 +43,7 @@ type HoneypotMiddleware struct {
 	settings              HoneypotMiddlewareSettings
 	writeMu               sync.Mutex
 }
+
 func (middleware *HoneypotMiddleware) lookupActivePathClass(
 	interceptPath string,
 ) (HoneypotPathClass, bool) {
@@ -211,14 +212,13 @@ func NewHoneypotMiddleware(
 	honeypotQueryRepo tkRepository.HoneypotQueryRepo,
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
 ) *HoneypotMiddleware {
-	payloadMap := buildHoneypotPayloadMap(settings.ExtraPathRoutes)
-	totalPoolSize := len(payloadMap) +
+	totalPoolSize := len(honeypotPayloadSpecs) +
 		len(bandwidthExhaustCandidatePaths) +
 		len(aiTrapCandidatePaths)
 	resolvedSettings := honeypotSettingsParser{}.Parse(
 		settings, totalPoolSize,
 	)
-	staticPathKeys := extractStaticPathKeys(honeypotPayloadEntries)
+	staticPathKeys := extractStaticPathKeys()
 	for _, extraRoute := range settings.ExtraPathRoutes {
 		staticPathKeys = append(
 			staticPathKeys, extraRoute.UrlPath.String(),
@@ -230,6 +230,9 @@ func NewHoneypotMiddleware(
 		aiTrapCandidatePaths,
 		resolvedSettings.ActivePathCount.Int(),
 		resolvedSettings.RandomSeed,
+	)
+	payloadMap := buildHoneypotPayloadMap(
+		activePathMap, settings.ExtraPathRoutes,
 	)
 	honeypotRecordCode, codeErr :=
 		tkValueObject.NewActivityRecordCode("HoneypotHit")
