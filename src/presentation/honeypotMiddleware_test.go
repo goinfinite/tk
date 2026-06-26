@@ -259,15 +259,9 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-		if httpRecorder.Code != http.StatusFound {
-			t.Errorf("StatusCodeMismatch: got=%d, want=%d",
-				httpRecorder.Code, http.StatusFound)
-		}
-
-		location := httpRecorder.Header().Get("Location")
-		if location != "https://xkcd.com/" {
-			t.Errorf("LocationMismatch: got=%s, want=https://xkcd.com/",
-				location)
+		if !isMixedResponseStatusCode(httpRecorder.Code) {
+			t.Errorf("ExpectedMixedResponse: got=%d",
+				httpRecorder.Code)
 		}
 	})
 
@@ -350,9 +344,9 @@ func TestHoneypotBanBehavior(t *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-		if httpRecorder.Code != http.StatusFound {
-			t.Errorf("StatusCodeMismatch: got=%d, want=%d",
-				httpRecorder.Code, http.StatusFound)
+		if !isMixedResponseStatusCode(httpRecorder.Code) {
+			t.Errorf("ExpectedMixedResponse: got=%d",
+				httpRecorder.Code)
 		}
 
 		if recordCreated {
@@ -397,15 +391,11 @@ func TestAllRequestsCheckedAgainstBanList(t *testing.T) {
 			httpRecorder := httptest.NewRecorder()
 			echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-			if httpRecorder.Code != http.StatusFound {
-				t.Errorf("StatusCodeMismatch: got=%d, want=%d",
-					httpRecorder.Code, http.StatusFound)
-			}
-
-			location := httpRecorder.Header().Get("Location")
-			if location != "https://xkcd.com/" {
-				t.Errorf("LocationMismatch: got=%s, want=https://xkcd.com/",
-					location)
+			if !isMixedResponseStatusCode(
+				httpRecorder.Code,
+			) {
+				t.Errorf("ExpectedMixedResponse: path=%s, got=%d",
+					testCase.path, httpRecorder.Code)
 			}
 		})
 	}
@@ -567,15 +557,9 @@ func TestEmptySettingsUsesDefaults(t *testing.T) {
 	httpRecorder := httptest.NewRecorder()
 	echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-	if httpRecorder.Code != http.StatusFound {
-		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
-			httpRecorder.Code, http.StatusFound)
-	}
-
-	location := httpRecorder.Header().Get("Location")
-	if location != "https://xkcd.com/" {
-		t.Errorf("LocationMismatch: got=%s, want=https://xkcd.com/",
-			location)
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("ExpectedMixedResponse: got=%d",
+			httpRecorder.Code)
 	}
 }
 
@@ -605,9 +589,9 @@ func TestSharedNATBlocksLegitimateUsers(t *testing.T) {
 	secondRecorder := httptest.NewRecorder()
 	echoInstance.ServeHTTP(secondRecorder, secondRequest)
 
-	if secondRecorder.Code != http.StatusFound {
-		t.Errorf("SecondUserShouldBeBlocked: got=%d, want=%d",
-			secondRecorder.Code, http.StatusFound)
+	if !isMixedResponseStatusCode(secondRecorder.Code) {
+		t.Errorf("ExpectedMixedResponseForSharedNAT: got=%d",
+			secondRecorder.Code)
 	}
 }
 
@@ -949,8 +933,8 @@ func TestGraduatedBanTierTwoBannedOnHoneypotPaths(t *testing.T) {
 	httpRecorder := httptest.NewRecorder()
 	echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-	if httpRecorder.Code != http.StatusFound {
-		t.Errorf("TierTwoHoneypotPathShouldRedirect: got=%d",
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("TierTwoHoneypotPathExpectedMixed: got=%d",
 			httpRecorder.Code)
 	}
 }
@@ -988,8 +972,10 @@ func TestGraduatedBanTierThreeFullBan(t *testing.T) {
 			httpRecorder := httptest.NewRecorder()
 			echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-			if httpRecorder.Code != http.StatusFound {
-				t.Errorf("TierThreeShouldRedirectAll: path=%s, got=%d",
+			if !isMixedResponseStatusCode(
+				httpRecorder.Code,
+			) {
+				t.Errorf("TierThreeExpectedMixed: path=%s, got=%d",
 					testCase.path, httpRecorder.Code)
 			}
 		})
@@ -1333,7 +1319,7 @@ func TestAggressivenessImmediateFirstHitBans(t *testing.T) {
 	httpRecorder := httptest.NewRecorder()
 	echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-	if httpRecorder.Code != http.StatusFound {
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
 		t.Errorf("ImmediateShouldBanAfterOneHit: got=%d",
 			httpRecorder.Code)
 	}
@@ -1343,12 +1329,12 @@ func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 	testCaseStructs := []struct {
 		name             string
 		hitCount         int
-		expectedRedirect bool
+		expectedMixed    bool
 	}{
 		{"ZeroHitsPasses", 0, false},
 		{"OneHitServesPayload", 1, false},
-		{"TwoHitsRedirectsHoneypot", 2, true},
-		{"ThreeHitsFullBan", 3, true},
+		{"TwoHitsMixedOnHoneypot", 2, true},
+		{"ThreeHitsFullMixed", 3, true},
 	}
 
 	for _, testCase := range testCaseStructs {
@@ -1384,12 +1370,14 @@ func TestAggressivenessBalancedGraduatedTiers(t *testing.T) {
 			httpRecorder := httptest.NewRecorder()
 			echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-			isRedirect := httpRecorder.Code == http.StatusFound
-			if isRedirect != testCase.expectedRedirect {
-				t.Errorf("RedirectMismatch: hits=%d, got=%d, wantRedirect=%v",
+			isMixed := isMixedResponseStatusCode(
+				httpRecorder.Code,
+			)
+			if isMixed != testCase.expectedMixed {
+				t.Errorf("MixedMismatch: hits=%d, got=%d, wantMixed=%v",
 					testCase.hitCount,
 					httpRecorder.Code,
-					testCase.expectedRedirect)
+					testCase.expectedMixed)
 			}
 		})
 	}
@@ -1402,26 +1390,27 @@ func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 		path     string
 		wantCode int
 		ipSuffix string
+		isMixed  bool
 	}{
 		{
 			"OneHitPassesAll", 1,
-			"/api/health", http.StatusOK, "1",
+			"/api/health", http.StatusOK, "1", false,
 		},
 		{
 			"TwoHitsPassesLegit", 2,
-			"/api/health", http.StatusOK, "2",
+			"/api/health", http.StatusOK, "2", false,
 		},
 		{
 			"TwoHitsServesPayloadTierOne", 2,
-			"/.env", http.StatusOK, "3",
+			"/.env", http.StatusOK, "3", false,
 		},
 		{
-			"FiveHitsRedirectsHoneypot", 5,
-			"/.env", http.StatusFound, "4",
+			"FiveHitsMixedOnHoneypot", 5,
+			"/.env", 0, "4", true,
 		},
 		{
 			"FiveHitsPassesLegitTierTwo", 5,
-			"/api/health", http.StatusOK, "5",
+			"/api/health", http.StatusOK, "5", false,
 		},
 	}
 
@@ -1460,6 +1449,16 @@ func TestAggressivenessTolerantGraduatedTiers(t *testing.T) {
 			httpRequest.RemoteAddr = testIp + ":1234"
 			httpRecorder := httptest.NewRecorder()
 			echoInstance.ServeHTTP(httpRecorder, httpRequest)
+
+			if testCase.isMixed {
+				if !isMixedResponseStatusCode(
+					httpRecorder.Code,
+				) {
+					t.Errorf("ExpectedMixedResponse: got=%d",
+						httpRecorder.Code)
+				}
+				return
+			}
 
 			if httpRecorder.Code != testCase.wantCode {
 				t.Errorf("StatusCodeMismatch: got=%d, want=%d",
@@ -2485,7 +2484,7 @@ func TestAggressivenessImmediateAutoBansScannerOnFirstProbe(
 	httpRecorder := httptest.NewRecorder()
 	echoInstance.ServeHTTP(httpRecorder, httpRequest)
 
-	if httpRecorder.Code != http.StatusFound {
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
 		t.Errorf("ImmediateShouldBanOnFirstProbe: got=%d",
 			httpRecorder.Code)
 	}
@@ -2801,6 +2800,7 @@ func TestMaxNestingDepthIsThree(t *testing.T) {
 func TestInfraErrorsLoggedWithSlogError(t *testing.T) {
 	fileNames := []string{
 		"honeypotMiddleware.go",
+		"honeypotMixedResponse.go",
 		"honeypotSettingsParser.go",
 	}
 	for _, fileName := range fileNames {
@@ -2812,5 +2812,678 @@ func TestInfraErrorsLoggedWithSlogError(t *testing.T) {
 		if strings.Contains(string(fileContent), "slog.Debug") {
 			t.Errorf("SlogDebugFoundInFile: %s", fileName)
 		}
+	}
+}
+
+func newTestEchoContext() (
+	echo.Context, *httptest.ResponseRecorder,
+) {
+	echoInstance := echo.New()
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, "/test", nil,
+	)
+	recorder := httptest.NewRecorder()
+	return echoInstance.NewContext(
+		httpRequest, recorder,
+	), recorder
+}
+
+func newMixedResponseMiddleware() *HoneypotMiddleware {
+	return NewHoneypotMiddleware(
+		newStandardSettings(), nil, nil, nil,
+	)
+}
+
+func TestMixedResponseIncludesAllFourTypes(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	hasRedirect := false
+	hasServiceUnavailable := false
+	hasBadGateway := false
+	hasTooManyRequests := false
+
+	for range 100 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveMixedResponse(echoContext)
+		switch recorder.Code {
+		case http.StatusFound,
+			http.StatusTemporaryRedirect:
+			hasRedirect = true
+		case http.StatusServiceUnavailable:
+			hasServiceUnavailable = true
+		case http.StatusBadGateway:
+			hasBadGateway = true
+		case http.StatusTooManyRequests:
+			hasTooManyRequests = true
+		}
+	}
+
+	if !hasRedirect {
+		t.Errorf("RedirectTypeMissing")
+	}
+	if !hasServiceUnavailable {
+		t.Errorf("Fake503TypeMissing")
+	}
+	if !hasBadGateway {
+		t.Errorf("Fake502TypeMissing")
+	}
+	if !hasTooManyRequests {
+		t.Errorf("Fake429TypeMissing")
+	}
+}
+
+func TestMixedResponseApproximateWeights(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	redirectCount := 0
+	serviceUnavailableCount := 0
+	badGatewayCount := 0
+	tooManyRequestsCount := 0
+
+	for range 1000 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveMixedResponse(echoContext)
+		switch recorder.Code {
+		case http.StatusFound,
+			http.StatusTemporaryRedirect:
+			redirectCount++
+		case http.StatusServiceUnavailable:
+			serviceUnavailableCount++
+		case http.StatusBadGateway:
+			badGatewayCount++
+		case http.StatusTooManyRequests:
+			tooManyRequestsCount++
+		}
+	}
+
+	if redirectCount < 300 || redirectCount > 500 {
+		t.Errorf(
+			"RedirectWeightOutOfRange: got=%d",
+			redirectCount,
+		)
+	}
+	if serviceUnavailableCount < 200 ||
+		serviceUnavailableCount > 400 {
+		t.Errorf(
+			"Fake503WeightOutOfRange: got=%d",
+			serviceUnavailableCount,
+		)
+	}
+	if badGatewayCount < 100 || badGatewayCount > 300 {
+		t.Errorf(
+			"Fake502WeightOutOfRange: got=%d",
+			badGatewayCount,
+		)
+	}
+	if tooManyRequestsCount < 50 ||
+		tooManyRequestsCount > 150 {
+		t.Errorf(
+			"Fake429WeightOutOfRange: got=%d",
+			tooManyRequestsCount,
+		)
+	}
+}
+
+func TestFake503BodyLooksLikeNginx(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	echoContext, recorder := newTestEchoContext()
+	middleware.serveFake503(echoContext)
+
+	bodyStr := recorder.Body.String()
+	if !strings.Contains(bodyStr, "503") {
+		t.Errorf("BodyMissing503Status")
+	}
+	if !strings.Contains(bodyStr, "nginx") {
+		t.Errorf("BodyMissingNginxSignature")
+	}
+	if !strings.Contains(bodyStr, "<html>") {
+		t.Errorf("BodyMissingHtmlTag")
+	}
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			recorder.Code,
+			http.StatusServiceUnavailable)
+	}
+}
+
+func TestFake502BodyLooksLikeNginx(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	echoContext, recorder := newTestEchoContext()
+	middleware.serveFake502(echoContext)
+
+	bodyStr := recorder.Body.String()
+	if !strings.Contains(bodyStr, "502") {
+		t.Errorf("BodyMissing502Status")
+	}
+	if !strings.Contains(bodyStr, "nginx") {
+		t.Errorf("BodyMissingNginxSignature")
+	}
+	if !strings.Contains(bodyStr, "<html>") {
+		t.Errorf("BodyMissingHtmlTag")
+	}
+	if recorder.Code != http.StatusBadGateway {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			recorder.Code, http.StatusBadGateway)
+	}
+}
+
+func TestFake429BodyIsValidJsonWithRetryAfter(
+	t *testing.T,
+) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	echoContext, recorder := newTestEchoContext()
+	middleware.serveFake429(echoContext)
+
+	var jsonBody map[string]any
+	jsonErr := json.Unmarshal(
+		recorder.Body.Bytes(), &jsonBody,
+	)
+	if jsonErr != nil {
+		t.Fatalf("BodyIsNotValidJson: %v", jsonErr)
+	}
+	if _, hasError := jsonBody["error"]; !hasError {
+		t.Errorf("JsonMissingErrorField")
+	}
+	retryAfter := recorder.Header().Get("Retry-After")
+	if retryAfter == "" {
+		t.Errorf("RetryAfterHeaderMissing")
+	}
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			recorder.Code,
+			http.StatusTooManyRequests)
+	}
+}
+
+func TestRedirectRotatesLawEnforcementUrls(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	seenBaseUrls := make(map[string]bool)
+	for range 100 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveLawEnforcementRedirect(
+			echoContext,
+		)
+		location := recorder.Header().Get("Location")
+		queryIdx := strings.Index(location, "?")
+		baseUrl := location
+		if queryIdx >= 0 {
+			baseUrl = location[:queryIdx]
+		}
+		seenBaseUrls[baseUrl] = true
+	}
+
+	for _, expectedUrl := range lawEnforcementRedirectUrls {
+		if !seenBaseUrls[expectedUrl] {
+			t.Errorf(
+				"LawEnforcementUrlNeverSeen: %s",
+				expectedUrl,
+			)
+		}
+	}
+}
+
+func TestRedirectAppendsRotatingQueryString(
+	t *testing.T,
+) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	seenQueryStrings := make(map[string]bool)
+	for range 50 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveLawEnforcementRedirect(
+			echoContext,
+		)
+		location := recorder.Header().Get("Location")
+		queryIdx := strings.Index(location, "?")
+		if queryIdx < 0 {
+			continue
+		}
+		queryString := location[queryIdx:]
+		seenQueryStrings[queryString] = true
+	}
+
+	for _, expectedQs := range securityQueryStringPool {
+		if !seenQueryStrings[expectedQs] {
+			t.Errorf(
+				"QueryStringNeverSeen: %s",
+				expectedQs,
+			)
+		}
+	}
+}
+
+func TestRedirectQueryStringRotatesAmongPool(
+	t *testing.T,
+) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	seenQueryStrings := make(map[string]bool)
+	for range 50 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveLawEnforcementRedirect(
+			echoContext,
+		)
+		location := recorder.Header().Get("Location")
+		queryIdx := strings.Index(location, "?")
+		if queryIdx < 0 {
+			continue
+		}
+		seenQueryStrings[location[queryIdx:]] = true
+	}
+
+	if len(seenQueryStrings) < 3 {
+		t.Errorf(
+			"InsufficientQueryRotation: got=%d, want>=3",
+			len(seenQueryStrings),
+		)
+	}
+
+	for queryString := range seenQueryStrings {
+		isInPool := false
+		for _, poolEntry := range securityQueryStringPool {
+			if poolEntry == queryString {
+				isInPool = true
+				break
+			}
+		}
+		if !isInPool {
+			t.Errorf(
+				"QueryStringNotInPool: %s",
+				queryString,
+			)
+		}
+	}
+}
+
+func TestRedirectStatusCodeMixed302And307(t *testing.T) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	hasStatusFound := false
+	hasStatusTempRedirect := false
+
+	for range 100 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveLawEnforcementRedirect(
+			echoContext,
+		)
+		switch recorder.Code {
+		case http.StatusFound:
+			hasStatusFound = true
+		case http.StatusTemporaryRedirect:
+			hasStatusTempRedirect = true
+		}
+	}
+
+	if !hasStatusFound {
+		t.Errorf("Status302NeverSeen")
+	}
+	if !hasStatusTempRedirect {
+		t.Errorf("Status307NeverSeen")
+	}
+}
+
+func TestCustomRedirectUrlOverridesPool(t *testing.T) {
+	customUrl, _ := tkValueObject.NewUrl(
+		"https://custom.example.com/",
+	)
+	settings := newStandardSettings()
+	settings.RedirectUrl = customUrl
+	middleware := NewHoneypotMiddleware(
+		settings, nil, nil, nil,
+	)
+	defer middleware.Stop()
+
+	for range 50 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveLawEnforcementRedirect(
+			echoContext,
+		)
+		location := recorder.Header().Get("Location")
+		if location != "https://custom.example.com/" {
+			t.Errorf(
+				"CustomUrlNotUsed: got=%s",
+				location,
+			)
+		}
+		if strings.Contains(location, "?") {
+			t.Errorf("QueryStringShouldNotBeAppended")
+		}
+	}
+}
+
+func TestTierTwoMixedOnHoneypotPathsOnly(t *testing.T) {
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 2,
+	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+
+	hpRequest := httptest.NewRequest(
+		http.MethodGet, "/.env", nil,
+	)
+	hpRequest.RemoteAddr = "1.2.3.4:1234"
+	hpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(hpRecorder, hpRequest)
+
+	if !isMixedResponseStatusCode(hpRecorder.Code) {
+		t.Errorf("HoneypotPathExpectedMixed: got=%d",
+			hpRecorder.Code)
+	}
+
+	legitRequest := httptest.NewRequest(
+		http.MethodGet, "/api/health", nil,
+	)
+	legitRequest.RemoteAddr = "1.2.3.4:1234"
+	legitRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(legitRecorder, legitRequest)
+
+	if legitRecorder.Code != http.StatusOK {
+		t.Errorf("LegitPathShouldPassThrough: got=%d",
+			legitRecorder.Code)
+	}
+}
+
+func TestTierThreeMixedOnAllPaths(t *testing.T) {
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 3,
+	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+
+	testCaseStructs := []struct {
+		name string
+		path string
+	}{
+		{"HoneypotPath", "/.env"},
+		{"LegitPath", "/api/health"},
+		{"StaticFile", "/static/app.js"},
+	}
+
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpRequest := httptest.NewRequest(
+				http.MethodGet, testCase.path, nil,
+			)
+			httpRequest.RemoteAddr = "1.2.3.4:1234"
+			httpRecorder := httptest.NewRecorder()
+			echoInstance.ServeHTTP(
+				httpRecorder, httpRequest,
+			)
+			if !isMixedResponseStatusCode(
+				httpRecorder.Code,
+			) {
+				t.Errorf(
+					"TierThreeExpectedMixed: path=%s, got=%d",
+					testCase.path,
+					httpRecorder.Code,
+				)
+			}
+		})
+	}
+}
+
+func TestObserveModeNeverReturnsMixedResponses(
+	t *testing.T,
+) {
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 50,
+	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+
+	settings := newStandardSettings()
+	settings.AggressivenessMode = tkValueObject.HoneypotAggressivenessModeObserve
+
+	middleware := NewHoneypotMiddleware(
+		settings,
+		honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+
+	for range 5 {
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, "/.env", nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+
+		if isMixedResponseStatusCode(
+			httpRecorder.Code,
+		) {
+			t.Errorf(
+				"ObserveModeShouldNotReturnMixed: got=%d",
+				httpRecorder.Code,
+			)
+		}
+		if httpRecorder.Code != http.StatusOK {
+			t.Errorf(
+				"ObserveModeShouldServePayload: got=%d",
+				httpRecorder.Code,
+			)
+		}
+	}
+}
+
+func TestTierTwoLegitimatePathAlwaysPassesThrough(
+	t *testing.T,
+) {
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 2,
+	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+
+	for reqIdx := range 50 {
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, "/api/health", nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+
+		if httpRecorder.Code != http.StatusOK {
+			t.Errorf(
+				"LegitPathShouldAlwaysPass: req=%d, got=%d",
+				reqIdx, httpRecorder.Code,
+			)
+		}
+	}
+}
+
+func TestTierThreeLegitimatePathAlwaysReturnsMixed(
+	t *testing.T,
+) {
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 3,
+	)
+	honeypotCmdRepo, honeypotQueryRepo := newHoneypotRepos(
+		transientDbSvc,
+	)
+
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(),
+		honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+
+	for reqIdx := range 50 {
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, "/api/health", nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+
+		if !isMixedResponseStatusCode(
+			httpRecorder.Code,
+		) {
+			t.Errorf(
+				"TierThreeLegitPathExpectedMixed: req=%d, got=%d",
+				reqIdx, httpRecorder.Code,
+			)
+		}
+	}
+}
+
+func TestMixedResponseWithCustomRedirectOnlyRedirects(
+	t *testing.T,
+) {
+	customUrl, _ := tkValueObject.NewUrl(
+		"https://custom.example.com/",
+	)
+	settings := newStandardSettings()
+	settings.RedirectUrl = customUrl
+
+	middleware := NewHoneypotMiddleware(
+		settings, nil, nil, nil,
+	)
+	defer middleware.Stop()
+
+	for range 100 {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveMixedResponse(echoContext)
+
+		if recorder.Code != http.StatusFound {
+			t.Errorf(
+				"CustomRedirectShouldAlways302: got=%d",
+				recorder.Code,
+			)
+		}
+		location := recorder.Header().Get("Location")
+		if location != "https://custom.example.com/" {
+			t.Errorf(
+				"CustomRedirectUrlMismatch: got=%s",
+				location,
+			)
+		}
+	}
+}
+
+func TestMixedResponseDistributionStableOverThousandsOfRequests(
+	t *testing.T,
+) {
+	middleware := newMixedResponseMiddleware()
+	defer middleware.Stop()
+
+	redirectCount := 0
+	serviceUnavailableCount := 0
+	badGatewayCount := 0
+	tooManyRequestsCount := 0
+	totalRequests := 5000
+
+	for range totalRequests {
+		echoContext, recorder := newTestEchoContext()
+		middleware.serveMixedResponse(echoContext)
+		switch recorder.Code {
+		case http.StatusFound,
+			http.StatusTemporaryRedirect:
+			redirectCount++
+		case http.StatusServiceUnavailable:
+			serviceUnavailableCount++
+		case http.StatusBadGateway:
+			badGatewayCount++
+		case http.StatusTooManyRequests:
+			tooManyRequestsCount++
+		}
+	}
+
+	redirectPct := float64(redirectCount) /
+		float64(totalRequests) * 100
+	svcUnavPct := float64(serviceUnavailableCount) /
+		float64(totalRequests) * 100
+	badGwPct := float64(badGatewayCount) /
+		float64(totalRequests) * 100
+	tooManyPct := float64(tooManyRequestsCount) /
+		float64(totalRequests) * 100
+
+	if redirectPct < 35 || redirectPct > 45 {
+		t.Errorf(
+			"RedirectPctOutOfRange: %.1f%%",
+			redirectPct,
+		)
+	}
+	if svcUnavPct < 25 || svcUnavPct > 35 {
+		t.Errorf(
+			"Fake503PctOutOfRange: %.1f%%",
+			svcUnavPct,
+		)
+	}
+	if badGwPct < 15 || badGwPct > 25 {
+		t.Errorf(
+			"Fake502PctOutOfRange: %.1f%%",
+			badGwPct,
+		)
+	}
+	if tooManyPct < 5 || tooManyPct > 15 {
+		t.Errorf(
+			"Fake429PctOutOfRange: %.1f%%",
+			tooManyPct,
+		)
 	}
 }

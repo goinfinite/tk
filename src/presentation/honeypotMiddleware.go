@@ -128,13 +128,6 @@ func (middleware *HoneypotMiddleware) serveHoneypotPayload(
 	)
 	return echoContext.String(http.StatusOK, matchedPayload.Body)
 }
-func (middleware *HoneypotMiddleware) serveBanRedirect(
-	echoContext echo.Context,
-) error {
-	return echoContext.Redirect(
-		http.StatusFound, middleware.settings.RedirectUrl.String(),
-	)
-}
 func (middleware *HoneypotMiddleware) recordHoneypotHit(
 	requesterIp tkValueObject.IpAddress,
 	interceptPath string,
@@ -175,7 +168,7 @@ func (middleware *HoneypotMiddleware) Execute(
 			middleware.settings.AggressivenessMode,
 		)
 		if banTier >= 3 {
-			return middleware.serveBanRedirect(echoContext)
+			return middleware.serveMixedResponse(echoContext)
 		}
 		matchedPayload, existentHoneypotPath :=
 			middleware.lookupHoneypotPath(httpRequest.URL.Path)
@@ -183,7 +176,7 @@ func (middleware *HoneypotMiddleware) Execute(
 			return next(echoContext)
 		}
 		if banTier >= 2 {
-			return middleware.serveBanRedirect(echoContext)
+			return middleware.serveMixedResponse(echoContext)
 		}
 		middleware.writeMu.Lock()
 		tkUseCase.CreateHoneypotHit(
