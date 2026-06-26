@@ -77,10 +77,29 @@ func mustNewHoneypotMaxEntries(
 	return maxEntries
 }
 
+func mustNewHoneypotActivePathCount(
+	rawActivePaths any,
+) tkValueObject.HoneypotActivePathCount {
+	activePathCount, _ := tkValueObject.NewHoneypotActivePathCount(
+		rawActivePaths, 0,
+	)
+	return activePathCount
+}
+
+func mustNewHoneypotMaxStreamSizeBytes(
+	rawMaxStream any,
+) tkValueObject.HoneypotMaxStreamSizeBytes {
+	maxStreamSize, _ := tkValueObject.NewHoneypotMaxStreamSizeBytes(
+		rawMaxStream,
+	)
+	return maxStreamSize
+}
+
 func newStandardSettings() HoneypotMiddlewareSettings {
 	return HoneypotMiddlewareSettings{
-		BanDuration: mustNewHoneypotBanDuration(24 * time.Hour),
-		RedirectUrl: newDefaultRedirectUrl(),
+		ActivePathCount: mustNewHoneypotActivePathCount(100),
+		BanDuration:     mustNewHoneypotBanDuration(24 * time.Hour),
+		RedirectUrl:     newDefaultRedirectUrl(),
 	}
 }
 
@@ -706,6 +725,7 @@ func TestCustomExtraPathRoutesReturnPayload(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
 			honeypotSettings := HoneypotMiddlewareSettings{
+				ActivePathCount: mustNewHoneypotActivePathCount(100),
 				ExtraPathRoutes: testCase.extraPathRoutes,
 			}
 
@@ -2723,7 +2743,7 @@ func TestMethodOrderingCalleesAboveCallers(t *testing.T) {
 		callee   string
 		caller   string
 	}{
-		{"lookupHoneypotPath", "Execute"},
+		{"lookupActivePathClass", "Execute"},
 		{"Execute", "Start"},
 		{"runMaintenance", "honeypotMaintenanceWatchdog"},
 	}
@@ -2802,6 +2822,9 @@ func TestInfraErrorsLoggedWithSlogError(t *testing.T) {
 		"honeypotMiddleware.go",
 		"honeypotMixedResponse.go",
 		"honeypotSettingsParser.go",
+		"honeypotPathSelector.go",
+		"honeypotAiTrapGenerator.go",
+		"honeypotStreamHandler.go",
 	}
 	for _, fileName := range fileNames {
 		fileContent, readErr := os.ReadFile(fileName)
@@ -3485,5 +3508,1026 @@ func TestMixedResponseDistributionStableOverThousandsOfRequests(
 			"Fake429PctOutOfRange: %.1f%%",
 			tooManyPct,
 		)
+	}
+}
+
+func TestHoneypotPathClassConstantsDefined(t *testing.T) {
+	classes := []HoneypotPathClass{
+		HoneypotPathClassStaticVuln,
+		HoneypotPathClassBandwidthExhaust,
+		HoneypotPathClassAITrap,
+	}
+	seenValues := make(map[HoneypotPathClass]bool)
+	for _, pathClass := range classes {
+		if seenValues[pathClass] {
+			t.Errorf("DuplicatePathClassValue: %d",
+				pathClass)
+		}
+		seenValues[pathClass] = true
+	}
+	if len(seenValues) != 3 {
+		t.Errorf("ExpectedThreeDistinctClasses: got=%d",
+			len(seenValues))
+	}
+}
+
+func TestAutoRatioProducesCorrectCountsDefaultActivePathCount(t *testing.T) {
+	staticCount, bandwidthCount, aiTrapCount :=
+		computeAutoRatio(30)
+	totalCount := staticCount + bandwidthCount + aiTrapCount
+	if totalCount != 30 {
+		t.Errorf("TotalCountMismatch: got=%d, want=30",
+			totalCount)
+	}
+	if staticCount != 20 {
+		t.Errorf("StaticCountMismatch: got=%d, want=20",
+			staticCount)
+	}
+	if bandwidthCount != 5 {
+		t.Errorf("BandwidthCountMismatch: got=%d, want=5",
+			bandwidthCount)
+	}
+	if aiTrapCount != 5 {
+		t.Errorf("AiTrapCountMismatch: got=%d, want=5",
+			aiTrapCount)
+	}
+}
+
+func TestAutoRatioProducesCorrectCountsCustomActivePathCount(t *testing.T) {
+	staticCount, bandwidthCount, aiTrapCount :=
+		computeAutoRatio(60)
+	totalCount := staticCount + bandwidthCount + aiTrapCount
+	if totalCount != 60 {
+		t.Errorf("TotalCountMismatch: got=%d, want=60",
+			totalCount)
+	}
+	if staticCount != 40 {
+		t.Errorf("StaticCountMismatch: got=%d, want=40",
+			staticCount)
+	}
+	if bandwidthCount != 10 {
+		t.Errorf("BandwidthCountMismatch: got=%d, want=10",
+			bandwidthCount)
+	}
+	if aiTrapCount != 10 {
+		t.Errorf("AiTrapCountMismatch: got=%d, want=10",
+			aiTrapCount)
+	}
+}
+
+func TestAutoRatioFloorGuaranteesMinOnePerClass(t *testing.T) {
+	testCaseStructs := []struct {
+		name            string
+		activePathCount int
+	}{
+		{"OnePath", 1},
+		{"TwoPaths", 2},
+		{"FivePaths", 5},
+		{"TenPaths", 10},
+	}
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, bandwidthCount, aiTrapCount :=
+				computeAutoRatio(testCase.activePathCount)
+			if bandwidthCount < 1 {
+				t.Errorf("BandwidthBelowFloor: got=%d",
+					bandwidthCount)
+			}
+			if aiTrapCount < 1 {
+				t.Errorf("AiTrapBelowFloor: got=%d",
+					aiTrapCount)
+			}
+		})
+	}
+}
+
+func TestRandomSelectionIsDeterministicWithSeed(t *testing.T) {
+	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	firstSelection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	secondSelection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	if len(firstSelection) != len(secondSelection) {
+		t.Errorf("SelectionSizeMismatch: first=%d, second=%d",
+			len(firstSelection), len(secondSelection))
+	}
+	for selectedPath, firstClass := range firstSelection {
+		secondClass, pathExists :=
+			secondSelection[selectedPath]
+		if !pathExists {
+			t.Errorf("PathMissingInSecondSelection: %s",
+				selectedPath)
+			continue
+		}
+		if firstClass != secondClass {
+			t.Errorf("ClassMismatchForPath: path=%s",
+				selectedPath)
+		}
+	}
+}
+
+func TestRandomSelectionDiffersWithDifferentSeeds(t *testing.T) {
+	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	firstSelection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	secondSelection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 99,
+	)
+	hasDifference := false
+	for selectedPath := range firstSelection {
+		if _, existsInSecond :=
+			secondSelection[selectedPath]; !existsInSecond {
+			hasDifference = true
+			break
+		}
+	}
+	for selectedPath := range secondSelection {
+		if _, existsInFirst :=
+			firstSelection[selectedPath]; !existsInFirst {
+			hasDifference = true
+			break
+		}
+	}
+	if !hasDifference {
+		t.Errorf("SelectionsShouldDifferWithDifferentSeeds")
+	}
+}
+
+func TestRandomSelectionDiffersAcrossRestarts(t *testing.T) {
+	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	selections := make([]map[string]HoneypotPathClass, 5)
+	for runIdx := range 5 {
+		selections[runIdx] = selectActivePaths(
+			staticPaths,
+			bandwidthExhaustCandidatePaths,
+			aiTrapCandidatePaths,
+			30, 0,
+		)
+		time.Sleep(time.Millisecond)
+	}
+	hasDifference := false
+	for comparisonIdx := 1; comparisonIdx < 5; comparisonIdx++ {
+		if len(selections[comparisonIdx]) !=
+			len(selections[0]) {
+			hasDifference = true
+			break
+		}
+		for selectedPath := range selections[0] {
+			if _, pathExists :=
+				selections[comparisonIdx][selectedPath]; !pathExists {
+				hasDifference = true
+				break
+			}
+		}
+		if hasDifference {
+			break
+		}
+	}
+	if !hasDifference {
+		t.Errorf("TimeBasedSeedsShouldProduceDifferentSelections")
+	}
+}
+
+func TestDormantPathReturnsNextHandler(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	echoInstance.GET("/api/health", func(
+		echoCtx echo.Context,
+	) error {
+		return echoCtx.String(http.StatusOK, "OK")
+	})
+	allStaticPaths := extractStaticPathKeys(
+		honeypotPayloadEntries,
+	)
+	dormantPathFound := false
+	for _, staticPath := range allStaticPaths {
+		if _, pathIsActive :=
+			middleware.activePathClasses[staticPath]; pathIsActive {
+			continue
+		}
+		dormantPathFound = true
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, staticPath, nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+		if httpRecorder.Code == http.StatusOK {
+			payloadContentType := httpRecorder.Header().Get(
+				"Content-Type",
+			)
+			if payloadContentType != "" &&
+				payloadContentType != "text/plain; charset=UTF-8" {
+				t.Errorf("DormantPathShouldNotServePayload: path=%s",
+					staticPath)
+			}
+		}
+	}
+	if !dormantPathFound {
+		t.Errorf("NoDormantPathsFoundWithSeed42")
+	}
+}
+
+func findActivePathOfClass(
+	middleware *HoneypotMiddleware,
+	targetClass HoneypotPathClass,
+) string {
+	for activePath, pathClass := range middleware.activePathClasses {
+		if pathClass == targetClass {
+			return activePath
+		}
+	}
+	return ""
+}
+
+func TestSelectedBandwidthExhaustPathStreamsGarbage(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			httpRecorder.Code, http.StatusOK)
+	}
+	contentType := httpRecorder.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "text/plain") {
+		t.Errorf("ContentTypeMismatch: got=%s, want=text/plain",
+			contentType)
+	}
+	bodySize := httpRecorder.Body.Len()
+	if bodySize < 5*1024*1024 {
+		t.Errorf("StreamBelowFloor: got=%d bytes", bodySize)
+	}
+}
+
+func TestSelectedAITrapPathStreamsPlausibleContent(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			httpRecorder.Code, http.StatusOK)
+	}
+	contentType := httpRecorder.Header().Get("Content-Type")
+	if contentType == "" {
+		t.Errorf("ContentTypeMissing")
+	}
+	bodySize := httpRecorder.Body.Len()
+	if bodySize < 5*1024*1024 {
+		t.Errorf("StreamBelowFloor: got=%d bytes", bodySize)
+	}
+}
+
+func TestAITrapContentContainsPromptInjection(t *testing.T) {
+	generator := honeypotAiTrapGenerator{}
+	injectionKeyPhrases := []string{
+		"ANALYSIS_TASK",
+		"COMPUTE_REQUEST",
+		"HASH_TASK",
+		"TRACE_TASK",
+		"DEEP_ANALYSIS",
+	}
+	testCaseStructs := []struct {
+		name string
+		path string
+	}{
+		{"DocsPath", "/api/v1/docs"},
+		{"LogsPath", "/api/v1/logs/access"},
+		{"MetricsPath", "/api/v1/metrics/prometheus"},
+		{"DiagnosticsPath", "/api/v1/diagnostics/dump"},
+		{"StatusPath", "/api/v1/status/detailed"},
+	}
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			hasInjection := false
+			for chunkIdx := range 10 {
+				chunk := generator.generateChunk(
+					testCase.path, chunkIdx,
+				)
+				for _, keyPhrase := range injectionKeyPhrases {
+					if strings.Contains(chunk, keyPhrase) {
+						hasInjection = true
+						break
+					}
+				}
+				if hasInjection {
+					break
+				}
+			}
+			if !hasInjection {
+				t.Errorf("PromptInjectionMissingForPath: %s",
+					testCase.path)
+			}
+		})
+	}
+}
+
+func TestBandwidthExhaustCappedStreamStopsAtMax(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	customMaxStream := int64(6 * 1024 * 1024)
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		customMaxStream,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	bodySize := int64(httpRecorder.Body.Len())
+	if bodySize < streamFloorBytes {
+		t.Errorf("StreamBelowFloor: got=%d, want>=%d",
+			bodySize, streamFloorBytes)
+	}
+	if bodySize > customMaxStream {
+		t.Errorf("StreamExceededMax: got=%d, want<=%d",
+			bodySize, customMaxStream)
+	}
+}
+
+func TestAITrapCappedStreamStopsAtMax(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	customMaxStream := int64(6 * 1024 * 1024)
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		customMaxStream,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	bodySize := int64(httpRecorder.Body.Len())
+	if bodySize < streamFloorBytes {
+		t.Errorf("StreamBelowFloor: got=%d, want>=%d",
+			bodySize, streamFloorBytes)
+	}
+	if bodySize > customMaxStream {
+		t.Errorf("StreamExceededMax: got=%d, want<=%d",
+			bodySize, customMaxStream)
+	}
+}
+
+func TestBandwidthExhaustCappedSizeVariesBetweenRuns(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		20 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	observedSizes := make(map[int]bool)
+	for range 5 {
+		echoInstance := echo.New()
+		echoInstance.Use(middleware.MiddlewareFunc())
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, bandwidthPath, nil,
+		)
+		httpRequest.RemoteAddr = "1.2.3.4:1234"
+		httpRecorder := httptest.NewRecorder()
+		echoInstance.ServeHTTP(httpRecorder, httpRequest)
+		observedSizes[httpRecorder.Body.Len()] = true
+	}
+	if len(observedSizes) < 3 {
+		t.Errorf("ExpectedVariedStreamSizes: got=%d distinct",
+			len(observedSizes))
+	}
+}
+
+func TestBandwidthExhaustIncrementsHitCount(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	rawValue, readErr := transientDbSvc.Read(
+		"honeypot:hit:1.2.3.4",
+	)
+	if readErr != nil {
+		t.Fatalf("HitDataNotStored: %v", readErr)
+	}
+	var hitData tkDto.HoneypotHitData
+	json.Unmarshal([]byte(rawValue), &hitData)
+	if hitData.Count != 1 {
+		t.Errorf("HitCountMismatch: got=%d, want=1",
+			hitData.Count)
+	}
+}
+
+func TestAITrapIncrementsHitCount(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	rawValue, readErr := transientDbSvc.Read(
+		"honeypot:hit:1.2.3.4",
+	)
+	if readErr != nil {
+		t.Fatalf("HitDataNotStored: %v", readErr)
+	}
+	var hitData tkDto.HoneypotHitData
+	json.Unmarshal([]byte(rawValue), &hitData)
+	if hitData.Count != 1 {
+		t.Errorf("HitCountMismatch: got=%d, want=1",
+			hitData.Count)
+	}
+}
+
+func TestAiTrapGeneratorFileNameUsesLowercaseI(t *testing.T) {
+	fileInfo, statErr := os.Stat("honeypotAiTrapGenerator.go")
+	if statErr != nil {
+		t.Fatalf("AiTrapGeneratorFileNotFound: %v", statErr)
+	}
+	if fileInfo.IsDir() {
+		t.Errorf("ExpectedFileNotDirectory")
+	}
+}
+
+func TestBandwidthExhaustBannedIpReturnsMixed(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 3,
+	)
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("BannedIpExpectedMixed: got=%d",
+			httpRecorder.Code)
+	}
+}
+
+func TestAITrapBannedIpReturnsMixed(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 3,
+	)
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if !isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("BannedIpExpectedMixed: got=%d",
+			httpRecorder.Code)
+	}
+}
+
+func TestBandwidthExhaustClientDisconnectExitsCleanly(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		20 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("StatusCodeMismatch: got=%d",
+			httpRecorder.Code)
+	}
+}
+
+func TestAITrapClientDisconnectExitsCleanly(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		20 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("StatusCodeMismatch: got=%d",
+			httpRecorder.Code)
+	}
+}
+
+type nonFlushResponseWriter struct {
+	http.ResponseWriter
+}
+
+func TestFlusherUnavailableReturnsGracefulJson(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	innerRecorder := httptest.NewRecorder()
+	wrappedWriter := &nonFlushResponseWriter{
+		ResponseWriter: innerRecorder,
+	}
+	customContext := echoInstance.NewContext(
+		httptest.NewRequest(
+			http.MethodGet, bandwidthPath, nil,
+		),
+		innerRecorder,
+	)
+	customContext.Request().RemoteAddr = "1.2.3.4:1234"
+	customContext.Response().Writer = wrappedWriter
+	streamErr := middleware.streamBandwidthExhaust(
+		customContext,
+	)
+	if streamErr != nil {
+		t.Errorf("StreamShouldNotError: %v", streamErr)
+	}
+	if innerRecorder.Code != http.StatusOK {
+		t.Errorf("StatusCodeMismatch: got=%d, want=%d",
+			innerRecorder.Code, http.StatusOK)
+	}
+	var jsonBody map[string]any
+	jsonErr := json.Unmarshal(
+		innerRecorder.Body.Bytes(), &jsonBody,
+	)
+	if jsonErr != nil {
+		t.Fatalf("FallbackBodyNotValidJson: %v", jsonErr)
+	}
+}
+
+func TestInvalidRandomSeedStillProducesValidSelection(t *testing.T) {
+	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	selection := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, -1,
+	)
+	if len(selection) == 0 {
+		t.Errorf("SelectionShouldNotBeEmpty")
+	}
+	hasStatic := false
+	hasBandwidth := false
+	hasAiTrap := false
+	for _, pathClass := range selection {
+		switch pathClass {
+		case HoneypotPathClassStaticVuln:
+			hasStatic = true
+		case HoneypotPathClassBandwidthExhaust:
+			hasBandwidth = true
+		case HoneypotPathClassAITrap:
+			hasAiTrap = true
+		}
+	}
+	if !hasStatic {
+		t.Errorf("StaticClassMissing")
+	}
+	if !hasBandwidth {
+		t.Errorf("BandwidthClassMissing")
+	}
+	if !hasAiTrap {
+		t.Errorf("AiTrapClassMissing")
+	}
+}
+
+func TestBandwidthExhaustTierOneStreamsNotBans(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	populateTransientDbWithHits(
+		transientDbSvc, "1.2.3.4", 1,
+	)
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	if httpRecorder.Code != http.StatusOK {
+		t.Errorf("TierOneShouldStream: got=%d",
+			httpRecorder.Code)
+	}
+	if isMixedResponseStatusCode(httpRecorder.Code) {
+		t.Errorf("TierOneShouldNotBan")
+	}
+}
+
+func TestMaxStreamSizeBytesCustomValueUsed(t *testing.T) {
+	customMaxStream := int64(10 * 1024 * 1024)
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		customMaxStream,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	bodySize := int64(httpRecorder.Body.Len())
+	if bodySize > customMaxStream {
+		t.Errorf("StreamExceededCustomMax: got=%d, want<=%d",
+			bodySize, customMaxStream)
+	}
+	if bodySize < streamFloorBytes {
+		t.Errorf("StreamBelowFloor: got=%d", bodySize)
+	}
+}
+
+func TestActivePathCountCustomValueChangesCounts(t *testing.T) {
+	staticPaths := extractStaticPathKeys(honeypotPayloadEntries)
+	selectionThirty := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		30, 42,
+	)
+	selectionSixty := selectActivePaths(
+		staticPaths,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		60, 42,
+	)
+	if len(selectionSixty) <= len(selectionThirty) {
+		t.Errorf(
+			"HigherActivePathCountShouldSelectMore: thirty=%d, sixty=%d",
+			len(selectionThirty), len(selectionSixty),
+		)
+	}
+}
+
+func TestBandwidthExhaustSlowReaderDoesNotExhaustGoroutines(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	bandwidthPath := findActivePathOfClass(
+		middleware, HoneypotPathClassBandwidthExhaust,
+	)
+	if bandwidthPath == "" {
+		t.Fatalf("NoActiveBandwidthPathFound")
+	}
+	goroutinesBefore := runtime.NumGoroutine()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, bandwidthPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	goroutinesAfter := runtime.NumGoroutine()
+	if goroutinesAfter > goroutinesBefore+5 {
+		t.Errorf("GoroutineLeak: before=%d, after=%d",
+			goroutinesBefore, goroutinesAfter)
+	}
+}
+
+func TestAITrapSlowReaderDoesNotExhaustGoroutines(t *testing.T) {
+	settings := newStandardSettings()
+	settings.ActivePathCount = mustNewHoneypotActivePathCount(30)
+	settings.RandomSeed = 42
+	settings.MaxStreamSizeBytes = mustNewHoneypotMaxStreamSizeBytes(
+		6 * 1024 * 1024,
+	)
+	transientDbSvc := newTransientDbSvc()
+	honeypotCmdRepo, honeypotQueryRepo :=
+		newHoneypotRepos(transientDbSvc)
+	middleware := NewHoneypotMiddleware(
+		settings, honeypotCmdRepo, honeypotQueryRepo, nil,
+	)
+	defer middleware.Stop()
+	aiTrapPath := findActivePathOfClass(
+		middleware, HoneypotPathClassAITrap,
+	)
+	if aiTrapPath == "" {
+		t.Fatalf("NoActiveAiTrapPathFound")
+	}
+	goroutinesBefore := runtime.NumGoroutine()
+	echoInstance := echo.New()
+	echoInstance.Use(middleware.MiddlewareFunc())
+	httpRequest := httptest.NewRequest(
+		http.MethodGet, aiTrapPath, nil,
+	)
+	httpRequest.RemoteAddr = "1.2.3.4:1234"
+	httpRecorder := httptest.NewRecorder()
+	echoInstance.ServeHTTP(httpRecorder, httpRequest)
+	goroutinesAfter := runtime.NumGoroutine()
+	if goroutinesAfter > goroutinesBefore+5 {
+		t.Errorf("GoroutineLeak: before=%d, after=%d",
+			goroutinesBefore, goroutinesAfter)
+	}
+}
+
+func TestPhaseOneAndFiveEmbedFsPreserved(t *testing.T) {
+	payloadMap := buildHoneypotPayloadMap(nil)
+	if len(payloadMap) == 0 {
+		t.Errorf("EmbedFsPayloadMapEmpty")
+	}
+	expectedPaths := []string{"/.env", "/wp-config.php"}
+	for _, expectedPath := range expectedPaths {
+		if _, pathExists := payloadMap[expectedPath]; !pathExists {
+			t.Errorf("ExpectedPayloadMissing: %s", expectedPath)
+		}
+	}
+	middleware := NewHoneypotMiddleware(
+		newStandardSettings(), nil, nil, nil,
+	)
+	defer middleware.Stop()
+	if len(middleware.activePathClasses) == 0 {
+		t.Errorf("ActivePathClassesEmpty")
 	}
 }

@@ -9,26 +9,6 @@ import (
 
 type honeypotSettingsParser struct{}
 
-func (parser honeypotSettingsParser) Parse(
-	settings HoneypotMiddlewareSettings,
-	poolCeiling int,
-) HoneypotMiddlewareSettings {
-	settings.BanDuration = parser.parseBanDuration(settings)
-	settings.RedirectUrl = parser.parseRedirectUrl(settings)
-	settings.MaxEntries = parser.parseMaxEntries(settings)
-	settings.ActivePathCount = parser.parseActivePathCount(
-		settings, poolCeiling,
-	)
-	settings.MaxStreamSizeBytes = parser.parseMaxStreamSizeBytes(
-		settings,
-	)
-	settings.StatsInterval = parser.parseStatsInterval(settings)
-	settings.AggressivenessMode = parser.parseAggressivenessMode(
-		settings,
-	)
-	return settings
-}
-
 func (parser honeypotSettingsParser) parseBanDuration(
 	settings HoneypotMiddlewareSettings,
 ) tkValueObject.HoneypotBanDuration {
@@ -83,6 +63,11 @@ func (parser honeypotSettingsParser) parseActivePathCount(
 ) tkValueObject.HoneypotActivePathCount {
 	rawActivePaths := os.Getenv("HONEYPOT_ACTIVE_PATHS")
 	if rawActivePaths == "" {
+		if settings.ActivePathCount.Int() == 0 {
+			activePathCount, _ := tkValueObject.
+				NewHoneypotActivePathCount("", poolCeiling)
+			return activePathCount
+		}
 		return settings.ActivePathCount
 	}
 
@@ -173,4 +158,24 @@ func (parser honeypotSettingsParser) parseAggressivenessMode(
 			HoneypotAggressivenessModeBalanced
 	}
 	return resolvedMode
+}
+
+func (parser honeypotSettingsParser) Parse(
+	settings HoneypotMiddlewareSettings,
+	poolCeiling int,
+) HoneypotMiddlewareSettings {
+	settings.BanDuration = parser.parseBanDuration(settings)
+	settings.RedirectUrl = parser.parseRedirectUrl(settings)
+	settings.MaxEntries = parser.parseMaxEntries(settings)
+	settings.ActivePathCount = parser.parseActivePathCount(
+		settings, poolCeiling,
+	)
+	settings.MaxStreamSizeBytes = parser.parseMaxStreamSizeBytes(
+		settings,
+	)
+	settings.StatsInterval = parser.parseStatsInterval(settings)
+	settings.AggressivenessMode = parser.parseAggressivenessMode(
+		settings,
+	)
+	return settings
 }

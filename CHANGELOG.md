@@ -1,6 +1,10 @@
 # Changelog
 
 ```log
+0.2.8 - 2026/06/26
+feat: add three-class honeypot path system with auto-ratio random activation, bandwidth exhaust streaming, and AI trap streaming with prompt injection
+feat: add weighted random mixed responses with rotating law enforcement redirect pool and rotating security-themed query strings
+
 0.2.8 - 2026/06/25
 feat: add graduated ban tiers, maintenance watchdog, and persistent hit tracking to honeypot middleware
 refactor: extract honeypot repo interfaces and infra implementations from middleware

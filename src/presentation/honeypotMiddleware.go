@@ -2,7 +2,6 @@ package tkPresentation
 
 import (
 	"context"
-	"embed"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -14,9 +13,6 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"github.com/labstack/echo/v4"
 )
-
-//go:embed honeypot/payloads/*
-var honeypotPayloadsFs embed.FS
 
 type HoneypotPathMapping struct {
 	Body     string
@@ -30,11 +26,14 @@ type HoneypotMiddlewareSettings struct {
 	ExtraPathRoutes    []HoneypotPathMapping
 	MaxEntries         tkValueObject.HoneypotMaxEntries
 	MaxStreamSizeBytes tkValueObject.HoneypotMaxStreamSizeBytes
+	RandomSeed         int64
 	RedirectUrl        tkValueObject.Url
 	StatsInterval      tkValueObject.HoneypotStatsInterval
 }
 type HoneypotMiddleware struct {
+	activePathClasses     map[string]HoneypotPathClass
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo
+	cancelFunc            context.CancelFunc
 	honeypotCmdRepo       tkRepository.HoneypotCmdRepo
 	honeypotPayloads      map[string]HoneypotPathMapping
 	honeypotQueryRepo     tkRepository.HoneypotQueryRepo
@@ -43,81 +42,13 @@ type HoneypotMiddleware struct {
 	ipExtractor           RequesterIpExtractor
 	settings              HoneypotMiddlewareSettings
 	writeMu               sync.Mutex
-	cancelFunc            context.CancelFunc
 }
-var honeypotPayloadEntries = []string{
-	"/.env", "env", "text/plain",
-	"/wp-config.php", "wp-config.php", "application/x-httpd-php",
-	"/wp-config.php.bak", "wp-config.php.bak", "application/x-httpd-php",
-	"/config.php", "config.php", "application/x-httpd-php",
-	"/backup.sql", "backup.sql", "application/sql",
-	"/backup.zip", "backup.zip", "application/zip",
-	"/.git/config", "git-config", "text/plain",
-	"/.aws/credentials", "aws-credentials", "text/plain",
-	"/actuator/env", "actuator-env.json", "application/json",
-	"/actuator/configprops", "actuator-configprops.json", "application/json",
-	"/server-status", "server-status.html", "text/html",
-	"/phpmyadmin/index.php", "phpmyadmin-index.php", "text/html",
-	"/admin.php", "admin.php", "text/html",
-	"/administrator/index.php", "administrator-index.php", "text/html",
-	"/login.php", "login.php", "text/html",
-	"/shell.php", "shell.php", "application/x-httpd-php",
-	"/cmd.php", "cmd.php", "application/x-httpd-php",
-	"/test.php", "test.php", "application/x-httpd-php",
-	"/.htaccess", "htaccess", "text/plain",
-	"/web.config", "web.config", "text/xml",
-	"/robots.txt", "robots.txt", "text/plain",
-	"/sitemap.xml", "sitemap.xml", "application/xml",
-	"/debug.php", "debug.php", "application/x-httpd-php",
-	"/info.php", "info.php", "application/x-httpd-php",
-	"/console", "console.html", "text/html",
-}
-func buildHoneypotPayloadMap(
-	extraRoutes []HoneypotPathMapping,
-) map[string]HoneypotPathMapping {
-	payloadMap := make(map[string]HoneypotPathMapping)
-	for entryIdx := 0; entryIdx < len(honeypotPayloadEntries); entryIdx += 3 {
-		interceptPath := honeypotPayloadEntries[entryIdx]
-		payloadContent, readErr := honeypotPayloadsFs.ReadFile(
-			"honeypot/payloads/" + honeypotPayloadEntries[entryIdx+1],
-		)
-		if readErr != nil {
-			slog.Error("HoneypotPayloadReadFailed",
-				slog.String("path",
-					honeypotPayloadEntries[entryIdx+1]),
-				slog.String("err", readErr.Error()))
-			continue
-		}
-		urlPath, pathErr := tkValueObject.NewUrlPath(interceptPath)
-		if pathErr != nil {
-			slog.Error("HoneypotPathConstructionFailed",
-				slog.String("path", interceptPath),
-				slog.String("err", pathErr.Error()))
-			continue
-		}
-		mimeType, mimeErr := tkValueObject.NewMimeType(
-			honeypotPayloadEntries[entryIdx+2],
-		)
-		if mimeErr != nil {
-			slog.Error("HoneypotMimeConstructionFailed",
-				slog.String("err", mimeErr.Error()))
-			continue
-		}
-		payloadMap[interceptPath] = HoneypotPathMapping{
-			Body: string(payloadContent), MimeType: mimeType, UrlPath: urlPath,
-		}
-	}
-	for _, extraRoute := range extraRoutes {
-		payloadMap[extraRoute.UrlPath.String()] = extraRoute
-	}
-	return payloadMap
-}
-func (middleware *HoneypotMiddleware) lookupHoneypotPath(
+func (middleware *HoneypotMiddleware) lookupActivePathClass(
 	interceptPath string,
-) (HoneypotPathMapping, bool) {
-	matchedPayload, existentHoneypotPath :=
-		middleware.honeypotPayloads[interceptPath]
-	return matchedPayload, existentHoneypotPath
+) (HoneypotPathClass, bool) {
+	pathClass, pathIsActive :=
+		middleware.activePathClasses[interceptPath]
+	return pathClass, pathIsActive
 }
 func (middleware *HoneypotMiddleware) serveHoneypotPayload(
 	echoContext echo.Context,
@@ -128,6 +59,26 @@ func (middleware *HoneypotMiddleware) serveHoneypotPayload(
 	)
 	return echoContext.String(http.StatusOK, matchedPayload.Body)
 }
+func (middleware *HoneypotMiddleware) dispatchByPathClass(
+	echoContext echo.Context,
+	pathClass HoneypotPathClass,
+	interceptPath string,
+) error {
+	switch pathClass {
+	case HoneypotPathClassBandwidthExhaust:
+		return middleware.streamBandwidthExhaust(echoContext)
+	case HoneypotPathClassAITrap:
+		return middleware.streamAiTrap(
+			echoContext, interceptPath,
+		)
+	default:
+		matchedPayload :=
+			middleware.honeypotPayloads[interceptPath]
+		return middleware.serveHoneypotPayload(
+			echoContext, matchedPayload,
+		)
+	}
+}
 func (middleware *HoneypotMiddleware) recordHoneypotHit(
 	requesterIp tkValueObject.IpAddress,
 	interceptPath string,
@@ -136,11 +87,11 @@ func (middleware *HoneypotMiddleware) recordHoneypotHit(
 		return
 	}
 	honeypotHitCreateRequest := tkDto.CreateActivityRecord{
-		RecordLevel:         middleware.honeypotRecordLevel,
-		RecordCode:          middleware.honeypotRecordCode,
-		AffectedResources:   []tkValueObject.SystemResourceIdentifier{},
-		RecordDetails:       map[string]string{"path": interceptPath},
-		OperatorIpAddress:   &requesterIp,
+		RecordLevel:       middleware.honeypotRecordLevel,
+		RecordCode:        middleware.honeypotRecordCode,
+		AffectedResources: []tkValueObject.SystemResourceIdentifier{},
+		RecordDetails:     map[string]string{"path": interceptPath},
+		OperatorIpAddress: &requesterIp,
 	}
 	createErr := middleware.activityRecordCmdRepo.Create(
 		honeypotHitCreateRequest,
@@ -155,9 +106,8 @@ func (middleware *HoneypotMiddleware) Execute(
 ) echo.HandlerFunc {
 	return func(echoContext echo.Context) error {
 		httpRequest := echoContext.Request()
-		requesterIp, ipExtractionErr := middleware.ipExtractor.Execute(
-			httpRequest,
-		)
+		requesterIp, ipExtractionErr :=
+			middleware.ipExtractor.Execute(httpRequest)
 		if ipExtractionErr != nil {
 			return next(echoContext)
 		}
@@ -170,9 +120,11 @@ func (middleware *HoneypotMiddleware) Execute(
 		if banTier >= 3 {
 			return middleware.serveMixedResponse(echoContext)
 		}
-		matchedPayload, existentHoneypotPath :=
-			middleware.lookupHoneypotPath(httpRequest.URL.Path)
-		if !existentHoneypotPath {
+		pathClass, pathIsActive :=
+			middleware.lookupActivePathClass(
+				httpRequest.URL.Path,
+			)
+		if !pathIsActive {
 			return next(echoContext)
 		}
 		if banTier >= 2 {
@@ -186,9 +138,11 @@ func (middleware *HoneypotMiddleware) Execute(
 			middleware.settings.MaxEntries,
 		)
 		middleware.writeMu.Unlock()
-		middleware.recordHoneypotHit(requesterIp, httpRequest.URL.Path)
-		return middleware.serveHoneypotPayload(
-			echoContext, matchedPayload,
+		middleware.recordHoneypotHit(
+			requesterIp, httpRequest.URL.Path,
+		)
+		return middleware.dispatchByPathClass(
+			echoContext, pathClass, httpRequest.URL.Path,
 		)
 	}
 }
@@ -258,17 +212,33 @@ func NewHoneypotMiddleware(
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
 ) *HoneypotMiddleware {
 	payloadMap := buildHoneypotPayloadMap(settings.ExtraPathRoutes)
+	totalPoolSize := len(payloadMap) +
+		len(bandwidthExhaustCandidatePaths) +
+		len(aiTrapCandidatePaths)
 	resolvedSettings := honeypotSettingsParser{}.Parse(
-		settings, len(payloadMap),
+		settings, totalPoolSize,
 	)
-	honeypotRecordCode, codeErr := tkValueObject.NewActivityRecordCode(
-		"HoneypotHit",
+	staticPathKeys := extractStaticPathKeys(honeypotPayloadEntries)
+	for _, extraRoute := range settings.ExtraPathRoutes {
+		staticPathKeys = append(
+			staticPathKeys, extraRoute.UrlPath.String(),
+		)
+	}
+	activePathMap := selectActivePaths(
+		staticPathKeys,
+		bandwidthExhaustCandidatePaths,
+		aiTrapCandidatePaths,
+		resolvedSettings.ActivePathCount.Int(),
+		resolvedSettings.RandomSeed,
 	)
+	honeypotRecordCode, codeErr :=
+		tkValueObject.NewActivityRecordCode("HoneypotHit")
 	if codeErr != nil {
 		slog.Error("HoneypotCodeCreationFailed",
 			slog.String("err", codeErr.Error()))
 	}
 	middleware := &HoneypotMiddleware{
+		activePathClasses:     activePathMap,
 		activityRecordCmdRepo: activityRecordCmdRepo,
 		honeypotCmdRepo:       honeypotCmdRepo,
 		honeypotPayloads:      payloadMap,
