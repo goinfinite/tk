@@ -211,32 +211,193 @@ Catches panics, logs stack traces, and returns safe error responses.
 
 ## Honeypot IP Blocking
 
-Intercepts security scanner probes with fake-vulnerability payloads and graduated ban tiers. Three-class path system (static vulnerability, bandwidth exhaust streaming, AI trap with prompt injection) with auto-ratio random activation (default 30 paths: 20 static + 5 bandwidth + 5 AI trap). Hit counts tracked in transient DB with aggressiveness-mode-driven tier escalation (immediate/balanced/tolerant/observe). Maintenance watchdog cleans expired entries and produces periodic stats reports.
+Intercepts security scanner probes with a graduated ban escalation system controlled by
+`HONEYPOT_AGGRESSIVENESS` env var (immediate, balanced, tolerant, observe). Three-class
+honeypot paths (static vulnerability, bandwidth exhaust, AI trap with prompt injection)
+are randomly activated at startup — `ActivePathCount` paths (default 30, floor 30,
+ceiling at total candidate pool size) from ~110 candidate paths using an auto-ratio
+(1/6 bandwidth, 1/6 AI trap, remainder static — default 20 static vuln, 5 bandwidth
+exhaust, 5 AI trap) — rotating the active surface on each restart. Path selection uses
+`math/rand` for performance; seed is configurable via `RandomSeed`. At Tier 2, flagged
+IPs receive weighted random mixed responses (LE redirect with rotating security-themed
+query strings, fake 503/502/429) on honeypot paths only. At Tier 3, full ban applies
+to all paths. Hit-count tracking uses an in-memory SQLite transient database with 24h
+TTL enforced at two levels: `CreatedAt` (canonical, GORM-managed, used for batch cleanup)
+and `firstHitAt` (denormalized copy, used for hot-path read-side filtering). The transient
+DB exposes a `Count()` method and a `ReadAll()` method for stats aggregation. Domain repo
+interfaces (`HoneypotCmdRepo`, `HoneypotQueryRepo` in `src/domain/repository/`) are
+implemented in `src/infra/honeypot/` (package `tkInfraHoneypot`), each wrapping
+`*TransientDatabaseService`. All domain operations go through use cases
+(`ReadHoneypotBanDecision`, `CreateHoneypotHit`, `ReadHoneypotStatsReport`,
+`RunHoneypotMaintenance` in `src/domain/useCase/`) — the presentation layer delegates
+to use cases and never calls repos directly. The middleware calls these use cases as
+package-level functions directly from `Execute()` and `runMaintenance()` (no closure
+fields, no use case instances stored on the struct). Typed sentinel errors
+(`ErrNilHoneypotQueryRepo`, `ErrNilHoneypotCmdRepo` in `honeypotSentinels.go`) surface
+nil-repo failures. An internal `honeypotMaintenanceWatchdog` goroutine (started
+automatically by the constructor via `Start()`) calls the `RunHoneypotMaintenance` use
+case at each tick with a `RunHoneypotMaintenanceRequest` DTO, handling TTL cleanup,
+maxEntries enforcement (using GORM `WHERE created_at < ?`) and periodic ActivityRecord
+stats offload via `ReadAll()` at `StatsInterval` (default 30 minutes). A probabilistic
+enforcement check on the write path (~2% per honeypot hit, inside the
+`CreateHoneypotHit` use case, using `math/rand`) calls `EnforceMaxEntries` as a safety
+valve. The watchdog is stopped via `Stop()` (idempotent — Go's `context.CancelFunc` is
+safe to call multiple times). `NewHoneypotMiddleware` accepts
+`HoneypotMiddlewareSettings`, `HoneypotCmdRepo`, `HoneypotQueryRepo`, and
+`ActivityRecordCmdRepo` as constructor parameters and returns `*HoneypotMiddleware`
+exposing `MiddlewareFunc()`, `Start()`, and `Stop()`. Streaming endpoints are capped at
+`MaxStreamSizeBytes` (default 20MB, floor 5MB, env var `HONEYPOT_MAX_STREAM_SIZE`).
+All settings fields carrying constrained-domain values use value objects:
+`ActivePathCount HoneypotActivePathCount`, `MaxEntries HoneypotMaxEntries`,
+`MaxStreamSizeBytes HoneypotMaxStreamSizeBytes`, `StatsInterval HoneypotStatsInterval`,
+`BanDuration HoneypotBanDuration`, `RedirectUrl Url`. `HoneypotPathMapping` uses
+`UrlPath` and `MimeType` VOs plus a `Body string` field. Env var parsing is encapsulated
+in `honeypotSettingsParser` (separate file `honeypotSettingsParser.go`). The middleware
+file is under 300 LOC; the constructor is under 50 LOC; zero `else` keywords; zero
+`slog.Debug` in middleware (all infra errors use `slog.Error`); methods ordered
+callees-above-callers with the constructor last; `writeMu sync.Mutex` is a struct field.
+
+**Integration (one step):**
+
+Register the middleware — the watchdog starts automatically:
+```
+transientDbSvc, _ := tkInfraDb.NewTransientDatabaseService()
+honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(transientDbSvc)
+honeypotQueryRepo := tkInfraHoneypot.NewHoneypotQueryRepo(transientDbSvc)
+honeypotMw := NewHoneypotMiddleware(
+    settings, honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo,
+)
+echoInstance.Use(honeypotMw.MiddlewareFunc())
+// Graceful shutdown: honeypotMw.Stop() — safe to call multiple times
+```
 
 **Flow:**
 
-1. `src/presentation/honeypotMiddleware.go` — `*HoneypotMiddleware` struct; `NewHoneypotMiddleware(settings, honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo)` returns pointer; `MiddlewareFunc()` returns echo.MiddlewareFunc; `Stop()` cancels watchdog context (idempotent, nil-safe); `Execute()` calls `ReadHoneypotBanDecision` use case for tier check: tier 0 passes, tier 1 serves content + `CreateHoneypotHit`, tier 2 serves mixed response on active honeypot paths only, tier 3 serves mixed response on all paths; `lookupActivePathClass` checks `activePathClasses` map; `dispatchByPathClass` routes to static payload, bandwidth exhaust streaming, or AI trap streaming; `recordHoneypotHit` creates activity record for each hit; `honeypotMaintenanceWatchdog(ctx)` goroutine ticks at StatsInterval calling `runMaintenance` (wraps `RunHoneypotMaintenance`)
-1b. `src/presentation/honeypotPathSelector.go` — `HoneypotPathClass` type with constants (`StaticVuln`, `BandwidthExhaust`, `AITrap`); `//go:embed honeypot/payloads/*.bin` embed directive; `decodePayloadSpec` reads .bin from embed.FS and base64-decodes into `HoneypotPathMapping` with `UrlPath`/`MimeType` VOs; `buildHoneypotPayloadMap(activePathMap, extraRoutes)` decodes only active static paths at construction time, handles failures with replacement selection from dormant pool; candidate pools (10 bandwidth exhaust paths, 10 AI trap paths); `computeAutoRatio` splits active path count (bandwidth=1/6, aiTrap=1/6, static=remainder, floor 1 per class); `selectActivePaths` uses `math/rand` with configurable seed (0=time-based); `shuffleAndTake` selects random subset
-1bb. `src/presentation/honeypotPathMapping.go` — `honeypotPayloadSpec` struct and `honeypotPayloadSpecs` slice with 114 entries (25 original + 89 expanded) mapping URL paths to base64-encoded .bin filenames and MIME types across 17 vulnerability categories; `findPayloadSpec` lookup by URL path
-1c. `src/presentation/honeypotAiTrapGenerator.go` — generates plausible verbose content with embedded prompt injection instructions; content per path type (docs, logs, metrics, diagnostics, status); injection patterns hidden in JSON metadata fields
-1d. `src/presentation/honeypotStreamHandler.go` — `streamBandwidthExhaust` streams garbage text/plain via `http.Flusher`; `streamAiTrap` streams AI trap content; both capped between 5MB floor and `MaxStreamSizeBytes` with random continuous range; `serveStreamFallback` returns 200 + valid JSON when Flusher unavailable; client disconnect exits cleanly
-1e. `src/presentation/honeypotMixedResponse.go` — `serveMixedResponse` weighted random selector (40% LE redirect, 30% fake 503, 20% fake 502, 10% fake 429); LE redirect pool (FBI/NSA/Interpol URLs) with rotating security-themed query strings and mixed 302/307; custom redirect URL overrides pool with 100% redirect; fake error bodies (nginx HTML for 5xx, JSON with Retry-After for 429)
-2. `src/domain/useCase/honeypotReadBanDecision.go` — resolves ban tier from hit record with TTL check; returns (0, error) on nil repo, read error, or malformed timestamp
-3. `src/domain/useCase/honeypotCreateHit.go` — increments hit count via cmd repo and probabilistically (~2%) enforces max entries; no-op on nil repo
-4. `src/domain/useCase/honeypotReadStatsReport.go` — delegates to query repo's `ReadReport`; returns empty report on nil repo
-5. `src/domain/useCase/honeypotRunMaintenance.go` — cleans expired entries, enforces max entries, produces stats report as activity record with RecordCode "HoneypotPeriodicReport" and RecordLevel "SECURITY"; skips stats when DB empty or repos nil; errors logged via slog.Error
-6. `src/domain/valueObject/honeypotAggressivenessMode.go` — `HoneypotAggressivenessMode` VO with `ResolveTier(hitCount int) int`: immediate (1+=3), balanced (0=0,1=1,2=2,3+=3), tolerant (0-1=0,2-4=1,5+=2), observe (always 1)
-7. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store; `KeyValueModel{Key, Value, CreatedAt}`; methods: Has, Read, ReadAll, Set, Count
-8. `src/presentation/requesterIpExtractor.go` — extracts untrusted IP from headers or RemoteAddr
-9. Fake payloads: 114 base64-encoded .bin files embedded via `//go:embed honeypot/payloads/*.bin`, decoded at construction time for active paths only; total candidate pool = 114 static + 10 bandwidth + 10 AI trap = 134
-10. `src/infra/activityRecord/activityRecordCmdRepo.go` — creates ActivityRecord for hit tracking and stats reports
+ 1. `src/presentation/honeypotMiddleware.go` — `HoneypotMiddleware` struct
+    with fields for settings, repos (`honeypotCmdRepo`, `honeypotQueryRepo`,
+    `activityRecordCmdRepo`), `honeypotPayloads` map, `honeypotRecordCode`/
+    `honeypotRecordLevel` VOs, `ipExtractor`, `writeMu sync.Mutex`, and
+    `cancelFunc context.CancelFunc`. No closure fields. `HoneypotMiddlewareSettings`
+    struct (ActivePathCount HoneypotActivePathCount, AggressivenessMode
+    HoneypotAggressivenessMode, BanDuration HoneypotBanDuration, ExtraPathRoutes
+    []HoneypotPathMapping, MaxEntries HoneypotMaxEntries, MaxStreamSizeBytes
+    HoneypotMaxStreamSizeBytes, RedirectUrl Url, StatsInterval
+    HoneypotStatsInterval). `HoneypotPathMapping` has Body string, MimeType
+    MimeType, UrlPath UrlPath. `NewHoneypotMiddleware(settings,
+    honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo)` returns
+    `*HoneypotMiddleware` and calls `Start()` to launch the internal
+    `honeypotMaintenanceWatchdog` goroutine. `Execute()` calls
+    `tkUseCase.ReadHoneypotBanDecision` and `tkUseCase.CreateHoneypotHit`
+    directly (passing VO-typed settings fields); `runMaintenance()` builds a
+    `RunHoneypotMaintenanceRequest` DTO and calls
+    `tkUseCase.RunHoneypotMaintenance` directly. At construction: defines
+    candidate pools, calculates ActivePathCount ceiling from total candidate
+    pool size, calculates auto-ratio counts from ActivePathCount, randomly
+    selects active paths, decodes base64-encoded `.bin` payloads for selected
+    static vuln paths only, builds active-path lookup map.
 
-**Environment Variables:**
+ 2. `src/presentation/honeypotSettingsParser.go` — `honeypotSettingsParser`
+    struct with `Parse(settings, poolCeiling)` method that resolves env vars
+    into typed VOs. Sub-methods per setting. All infra errors logged via
+    `slog.Error`.
 
-- `HONEYPOT_AGGRESSIVENESS` — aggressiveness mode (immediate/balanced/tolerant/observe), default balanced
-- `HONEYPOT_ACTIVE_PATHS` — number of active honeypot paths, default 30, floor 30
-- `HONEYPOT_MAX_ENTRIES` — max transient DB entries, default 5000, floor 100, ceiling 50000
-- `HONEYPOT_MAX_STREAM_SIZE` — max stream size in bytes, default 20MB, floor 5MB
-- `HONEYPOT_STATS_INTERVAL` — stats aggregation interval, default 30m, floor 5m
+ 3. `src/domain/useCase/honeypotReadBanDecision.go` — `ReadHoneypotBanDecision`
+    use case: reads hit record, checks TTL via `firstHitAt`, resolves tier via
+    `HoneypotAggressivenessMode.ResolveTier`. Signature:
+    `(queryRepo, requesterIp, banDuration HoneypotBanDuration,
+    aggressivenessMode) (int, error)`. Returns `ErrNilHoneypotQueryRepo` on nil.
+    `src/domain/useCase/honeypotCreateHit.go` — `CreateHoneypotHit` use case:
+    increments hit count, with ~2% probability calls `EnforceMaxEntries`.
+    Signature: `(cmdRepo, requesterIp, interceptPath, maxEntries
+    HoneypotMaxEntries)`.
+    `src/domain/useCase/honeypotReadStatsReport.go` — `ReadHoneypotStatsReport`
+    use case: calls `HoneypotQueryRepo.ReadReport()`, returns
+    `(HoneypotStatsReport, error)`.
+    `src/domain/useCase/honeypotRunMaintenance.go` — `RunHoneypotMaintenance`
+    use case: cleanup (CleanExpiredEntries + EnforceMaxEntries) then stats
+    reporting (ReadHoneypotStatsReport → marshal → ActivityRecord create).
+    Signature: `(cmdRepo, queryRepo, activityRecordCmdRepo, request
+    RunHoneypotMaintenanceRequest)`.
+    `src/domain/useCase/honeypotSentinels.go` — `ErrNilHoneypotQueryRepo`,
+    `ErrNilHoneypotCmdRepo` typed sentinel errors.
+
+ 4. `src/domain/repository/honeypotCmdRepo.go` — interface `HoneypotCmdRepo` with
+    `IncrementHit`, `CleanExpiredEntries`, `EnforceMaxEntries` methods.
+    `src/domain/repository/honeypotQueryRepo.go` — interface `HoneypotQueryRepo` with
+    `ReadHitRecord`, `Count`, `ReadReport` methods.
+
+ 5. `src/infra/honeypot/honeypotCmdRepo.go` — package `tkInfraHoneypot`, type
+    `HoneypotCmdRepo` wrapping `*TransientDatabaseService`.
+    `src/infra/honeypot/honeypotQueryRepo.go` — package `tkInfraHoneypot`, type
+    `HoneypotQueryRepo` wrapping `*TransientDatabaseService`.
+
+ 6. `src/infra/db/transientDatabaseService.go` — in-memory SQLite key-value store.
+    `KeyValueModel` has `Key`, `Value`, `CreatedAt` fields. Methods: `Has(key) bool`,
+    `Read(key) (string, error)`, `ReadAll() ([]KeyValueModel, error)`,
+    `Set(key, value) error`, `Count() int64`.
+
+ 7. `src/domain/dto/honeypotMaintenance.go` — `RunHoneypotMaintenanceRequest` DTO
+    with 5 fields: AggressivenessMode, BanDuration (HoneypotBanDuration VO),
+    MaxEntries (HoneypotMaxEntries VO), StatsRecordCode, StatsRecordLevel.
+
+ 8. `src/domain/valueObject/honeypotBanDuration.go` — `HoneypotBanDuration` VO
+    wrapping `time.Duration`; accepts Duration/int64/string; zero/negative defaults
+    to 24h.
+
+ 9. `src/presentation/honeypot/payloads/*.bin` — base64-encoded payload files (~90
+    static vuln candidates) embedded via `//go:embed honeypot/payloads/*.bin`.
+    Static analysis tools see only opaque base64.
+
+10. `src/presentation/honeypotPathMapping.go` — explicit mapping table from
+    `UrlPath` to `.bin` embed filename and `MimeType` for all ~90 static vuln
+    candidate paths.
+
+11. Middleware intercepts honeypot paths via active path map lookup. Dormant
+    candidate paths pass through to next handler.
+
+12. Graduated ban escalation controlled by `HONEYPOT_AGGRESSIVENESS` (default
+    `balanced`; old names `standard`, `lenient`, `passive` fall back to
+    `balanced`):
+    - `immediate` — First hit = Tier 3 full ban.
+    - `balanced` — Tier 0/1/2/3 (0/1/2/3+ hits).
+    - `tolerant` — Tier 0-1/2-4/5+ (0-1/2-4/5+ hits).
+    - `observe` — Always serve payloads. Never ban. Pure intelligence gathering.
+
+13. Bandwidth exhaust endpoints (`bandwidthCount` selected from 10 candidates):
+    stream garbage text via `http.Flusher`, random cap between 5MB and
+    `MaxStreamSizeBytes`.
+
+14. AI trap endpoints (`aiTrapCount` selected from 10 candidates): stream
+    plausible content with embedded prompt injection via `http.Flusher`, same
+    cap.
+
+15. `src/presentation/honeypotAiTrapGenerator.go` — generates structured
+    plausible content with embedded prompt injection instructions.
+
+16. Redirect behavior: randomly selects {fbi.gov, nsa.gov, interpol.int} with a
+    randomly selected security-themed query string from the pool
+    (`?ref=suspicious-activity-investigate-ip`,
+    `?source=security-alert-botnet-suspect`,
+    `?utm=investigate-this-ip-threat`,
+    `?ref=botnet-activity-security-risk`,
+    `?source=ip-needs-investigation-suspicious`), mixed 302/307.
+
+17. Random selection: seed-based via `math/rand` for performance, each class
+    selects independently from its candidate pool. `RandomSeed` is configurable;
+    consumers requiring cryptographic randomness can set a `crypto/rand`-derived
+    seed.
+
+18. `honeypotMaintenanceWatchdog` (unexported) — internal method with ticker at
+    `StatsInterval` (default 30m). Calls `RunHoneypotMaintenance` use case at each
+    tick: cleanup via GORM `WHERE created_at < ?`, then stats aggregation via
+    `ReadAll()` to ActivityRecord on every tick. Defer+recover. Context-aware —
+    stops on cancellation. `Stop()` is idempotent via `context.CancelFunc`.
+
+19. `src/domain/valueObject/` — VOs enforcing domain constraints at construction:
+    `HoneypotActivePathCount` (int, floor 30, ceiling parameterized),
+    `HoneypotMaxEntries` (int, floor 100, ceiling 50000),
+    `HoneypotMaxStreamSizeBytes` (int64, floor 5MB),
+    `HoneypotStatsInterval` (time.Duration, floor 5m, default 30m),
+    `HoneypotBanDuration` (time.Duration, default 24h).
 
 ---

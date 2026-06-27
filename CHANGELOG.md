@@ -3,13 +3,18 @@
 ```log
 0.2.8 - 2026/06/26
 feat: expand honeypot static candidate pool to 114 paths with 89 new .bin payloads, pool ceiling clamping, and Phase 7 tests
+refactor: convert honeypot embedded payloads to base64-encoded .bin files with decode-at-construction for active paths only
 feat: add three-class honeypot path system with auto-ratio random activation, bandwidth exhaust streaming, and AI trap streaming with prompt injection
 feat: add weighted random mixed responses with rotating law enforcement redirect pool and rotating security-themed query strings
+refactor: replace ActivityRecord-based per-request hit tracking with in-memory transient database with dual TTL (CreatedAt + firstHitAt)
+feat: add honeypotMaintenanceWatchdog with StatsInterval, Stop() idempotency, probabilistic maxEntries enforcement, and ActivePathCount ceiling
 
 0.2.8 - 2026/06/25
 feat: add graduated ban tiers, maintenance watchdog, and persistent hit tracking to honeypot middleware
 refactor: extract honeypot repo interfaces and infra implementations from middleware
 refactor: consolidate honeypot DTOs into domain layer
+refactor: extract honeypot use cases (ReadHoneypotBanDecision, CreateHoneypotHit, ReadHoneypotStatsReport, RunHoneypotMaintenance) from middleware
+refactor: extract honeypotSettingsParser into separate file, eliminate else keywords, add HoneypotBanDuration VO, RunHoneypotMaintenanceRequest DTO, and honeypotSentinels
 
 0.2.8 - 2026/06/17
 feat: add in-memory transient database service for ephemeral key-value storage with Count(), ReadAll(), and CreatedAt support

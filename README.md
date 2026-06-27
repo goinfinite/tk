@@ -271,6 +271,54 @@ For web applications built with Echo:
   ipAddress, err := extractor.Execute(httpRequest)
   ```
 
+- **HoneypotMiddleware**: Intercept security scanner probes serving fake vulnerability
+  payloads, bandwidth-exhausting streams, and AI-trap content with embedded prompt
+  injection. Tracks hits via in-memory transient database with 24h TTL (enforced at
+  two levels: `CreatedAt` for batch cleanup, `firstHitAt` for hot-path filtering) and
+  graduated ban escalation controlled by `HONEYPOT_AGGRESSIVENESS`. All domain
+  operations go through use cases called directly as package-level functions (no
+  closure fields, no use case instances stored). Domain repo interfaces
+  (`HoneypotCmdRepo`, `HoneypotQueryRepo`) implemented in `src/infra/honeypot/`
+  (package `tkInfraHoneypot`) wrap `*TransientDatabaseService`. Env var parsing
+  encapsulated in `honeypotSettingsParser` (separate file). One-step integration —
+  register the middleware and the watchdog starts automatically via `Start()`. All
+  settings fields with constrained domains use value objects for type safety.
+
+    transientDbSvc, err := tkInfraDb.NewTransientDatabaseService()
+
+    honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(transientDbSvc)
+    honeypotQueryRepo := tkInfraHoneypot.NewHoneypotQueryRepo(transientDbSvc)
+
+    honeypotMw := NewHoneypotMiddleware(
+        settings, honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo,
+    )
+
+    echoInstance.Use(honeypotMw.MiddlewareFunc())
+    defer honeypotMw.Stop()
+
+  **Aggressiveness Modes** (`HONEYPOT_AGGRESSIVENESS`, default `balanced`):
+
+  | Mode | Behavior |
+  |------|----------|
+  | `immediate` | First hit = full ban. All paths return mixed responses. |
+  | `balanced` | Tier 0/1/2/3+ (0/1/2/3+ hits). General-purpose. |
+  | `tolerant` | Tier 0-1/2-4/5+ (0-1/2-4/5+ hits). Intelligence-gathering. |
+  | `observe` | Always serve payloads. Never ban. Pure intelligence gathering. |
+
+  **Auto-ratio:** `ActivePathCount` (default 30, floor 30, ceiling at pool size)
+  split as 1/6 bandwidth, 1/6 AI trap, remainder static vuln.
+
+  **Env vars:** `HONEYPOT_AGGRESSIVENESS`, `HONEYPOT_ACTIVE_PATHS`,
+  `HONEYPOT_MAX_ENTRIES` (default 5000, floor 100, ceiling 50000),
+  `HONEYPOT_MAX_STREAM_SIZE` (default 20MB, floor 5MB),
+  `HONEYPOT_STATS_INTERVAL` (default 30m, floor 5m).
+
+  Path selection uses `math/rand` (configurable `RandomSeed`). Rotating LE
+  redirect pool (FBI/NSA/Interpol) with 5 security-themed query strings.
+  Dual TTL: `CreatedAt` (canonical) + `firstHitAt` (hot-path). `Stop()` is
+  idempotent via `context.CancelFunc`. Probabilistic maxEntries enforcement
+  (~2% per hit via `math/rand`).
+
 ### Presentation Helpers
 
 - **EnvsInspector**: Inspect and validate environment variables from .env files loaded via `ENV_FILE_PATH` env var, supporting required and auto-fillable variables.
