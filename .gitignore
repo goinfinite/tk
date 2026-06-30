@@ -9,6 +9,8 @@ TODO.md
 CLAUDE.md
 AGENTS.md
 .claude
-.agents
 .agents/
 .memory/
+opencode.json
+.claude/
+.ignore
