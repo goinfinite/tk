@@ -18,7 +18,7 @@ Generated artifacts live in `tests/api/`, named after the spec's base filename:
 Ensure `.gitignore` includes the pattern:
 
 ```bash
-grep -q 'tests/api/\.\*\.env' .gitignore 2>/dev/null || echo 'tests/api/.*.env' >> .gitignore
+grep -qF 'tests/api/.*.env' .gitignore 2>/dev/null || echo 'tests/api/.*.env' >> .gitignore
 ```
 
 ### Config Format
@@ -51,7 +51,7 @@ If multiple specs are found, ask the user which one to test. If none, report and
 
 ### Phase 2: Parse the Spec
 
-Handle both Swagger 2.0 and OpenAPI 3.x field structures. The key structural differences:
+Handle both Swagger 2.0 and OpenAPI 3.x field structures:
 
 - **Schemas:** Swagger 2.0 → `definitions`; OpenAPI 3.x → `components.schemas`
 - **Security schemes:** Swagger 2.0 → `securityDefinitions`; OpenAPI 3.x → `components.securitySchemes`
@@ -76,7 +76,7 @@ If the test script exists, parse it to extract: which endpoints are already test
 - Each endpoint is a function named after `operationId` in camelCase (or camelCase of operation summary if `operationId` is absent).
 - Endpoint functions contain `curl` commands with the HTTP method, URL, headers, and body.
 - The main flow at the bottom of the script calls these functions in dependency order — it reveals which endpoints are tested and in what sequence.
-- Config values appear as `source "$(dirname "$0")/.<base>-test.env"` near the top.
+- Config values appear as `source "${scriptDir}/.<base>-test.env"` near the top.
 
 If the config file exists, read it. If not, generate a template derived from the auth endpoint's required parameters and ask the user to fill in values.
 
@@ -151,7 +151,7 @@ Build a request body from the schema. Respect `format`, `pattern`, `minLength`/`
 #### Handle Special Cases
 
 - **Pagination:** include pagination params with defaults (page 1, 20 items). Test page 1 only — verify structure and pagination fields. Report missing pagination docs in Spec Feedback.
-- **File uploads:** for `multipart/form-data`, use `curl -F "file=@${filePath}"`. Clean up after the test.
+- **File uploads:** for `multipart/form-data`, use `curl -F "<fieldName>=@${filePath}"` where `<fieldName>` comes from the spec's parameter name for the operation. Clean up after the test.
 - **Nested resources:** parent ID must come from a previous create or read.
 
 #### Execute and Validate
@@ -210,12 +210,19 @@ declare -a createdResourceIds=()
 cleanupResources() {
   if [ ${#createdResourceIds[@]} -eq 0 ]; then return; fi
   echo "Cleaning up ${#createdResourceIds[@]} created resources..." >&2
-  for ((i=${#createdResourceIds[@]}-1; i>=0; i--)); do
-    local resourceId="${createdResourceIds[$i]}"
-    curl ${curlInsecure} --connect-timeout 5 --max-time 10 -S -s \
-      -o /dev/null -w "" -X DELETE \
-      "${API_BASE_URL}/<resource-path>/${resourceId}" \
-      -H "Authorization: Bearer ${authToken}" 2>/dev/null || \
+  for resourceId in "${createdResourceIds[@]}"; do
+    local curlArgs=(
+      ${curlInsecure} --connect-timeout 5 --max-time 10 -S -s
+      -o /dev/null -w "" -X DELETE
+      "${API_BASE_URL}/<resource-path>/${resourceId}"
+    )
+    if [ -n "${authToken:-}" ]; then
+      curlArgs+=(-H "Authorization: Bearer ${authToken}")
+    fi
+    if [ -n "${apiKey:-}" ]; then
+      curlArgs+=(-H "X-API-Key: ${apiKey}")
+    fi
+    curl "${curlArgs[@]}" 2>/dev/null || \
       echo "WARN: failed to cleanup ${resourceId}" >&2
   done
 }
@@ -227,33 +234,32 @@ authenticate() { ... }
 # --- Helpers ---
 extractId() { jq -r '.id // .data.id // empty'; }
 
-passedCount=0 failedCount=0 skippedCount=0
+passedCount=0
+failedCount=0
+skippedCount=0
 validateResponseStatus() {
   local endpointName="$1" expectedStatus="$2" httpStatus="$3" responseBody="$4"
   if [ "$httpStatus" != "$expectedStatus" ]; then
     echo "FAIL: ${endpointName} — expected ${expectedStatus}, got ${httpStatus}" >&2
     echo "$responseBody" | head -c 500 >&2
-    ((failedCount++))
-    return
+    ((failedCount++)) || true
+    return 0
   fi
   echo "PASS: ${endpointName}" >&2
-  ((passedCount++))
+  ((passedCount++)) || true
 }
 validateResponseSchema() {
   local endpointName="$1" responseBody="$2" jqFilter="$3"
-  local schemaResult
-  schemaResult=$(echo "$responseBody" | jq -e "$jqFilter" 2>/dev/null)
-  if [ $? -ne 0 ]; then
+  if ! echo "$responseBody" | jq -e "$jqFilter" >/dev/null 2>&1; then
     echo "FAIL: ${endpointName} — schema validation failed (${jqFilter})" >&2
     echo "$responseBody" | head -c 500 >&2
-    ((failedCount++))
-    return
+    ((failedCount++)) || true
   fi
 }
 skipEndpoint() {
   local endpointName="$1" reason="$2"
   echo "SKIP: ${endpointName} — ${reason}" >&2
-  ((skippedCount++))
+  ((skippedCount++)) || true
 }
 
 # --- Endpoint functions (grouped by tag, ordered: reads, creates, updates) ---
@@ -270,14 +276,14 @@ createResource
 
 # --- Results ---
 echo "---" >&2
-echo "Passed: ${passedCount} | Failed: ${failedCount} | Skipped: ${skippedCount}" >&2
+echo "PASSED: ${passedCount} | FAILED: ${failedCount} | SKIPPED: ${skippedCount}" >&2
 ```
 
 Fill in each `...` block per the endpoint function rules below. Every endpoint function follows the same pattern — only the URL, method, headers, body, and expected status differ.
 
 Each endpoint function:
 
-- Named after `operationId` in camelCase (fall back to operation summary when `operationId` is absent)
+- Named after `operationId` in camelCase (fall back to operation summary when `operationId` is absent — use the first meaningful words, drop articles, camelCase: "Get all users" → `getAllUsers`)
 - Sources path and query params from variables or previous function outputs
 - Sends curl request, captures response
 - Validates status code
@@ -290,26 +296,24 @@ Every endpoint function follows this canonical pattern:
 endpointName() {
   local httpStatus responseBody
   httpStatus=$(curl ${curlInsecure} --connect-timeout 5 --max-time 30 -S -s \
-    -o responseBody.tmp -w "%{http_code}" [-X METHOD] \
-    [-H "Authorization: Bearer ${authToken}"] \
-    [-H "Content-Type: application/json"] \
-    [-d '<payload>' | -F "file=@${filePath}"] \
-    "${API_BASE_URL}/<path>[?params]")
+    -o responseBody.tmp -w "%{http_code}" \
+    -H "Authorization: Bearer ${authToken}" \
+    "${API_BASE_URL}/<path>")
   responseBody=$(cat responseBody.tmp)
   rm -f responseBody.tmp
-  validateResponseStatus "endpointName" "<expected>" "$httpStatus" "$responseBody"
-  [echo "$responseBody" | jq -r '<id-extraction>']  # if IDs needed downstream
+  validateResponseStatus "endpointName" "<expectedStatus>" "$httpStatus" "$responseBody"
 }
 ```
 
-Variations by method:
-- **GET** — no `-X`, no body. Extract IDs: `echo "$responseBody" | jq -r '.[].id // .data[].id // empty'`
-- **POST** — `-X POST`, `-d '<payload>'`. Capture new ID: `newResourceId=$(echo "$responseBody" | extractId)` and append to `createdResourceIds`
-- **PUT** — `-X PUT`, `-d '<payload>'`, path includes `${resourceId}`
-- **PATCH** — same as PUT with `-X PATCH` (partial update)
-- **File upload** — `-F "file=@${filePath}"`, `--max-time 60`
+Adapt per endpoint: add `-X METHOD` for POST/PUT/PATCH, add `-H "Content-Type: ..."` and `-d '<payload>'` for bodies, add `-F "<field>=@${filePath}"` for uploads. Extract IDs when needed:
 
-For creates, append the new resource ID to `createdResourceIds` for trap cleanup:
+```sh
+  newResourceId=$(echo "$responseBody" | extractId)
+  if [ -n "$newResourceId" ]; then
+    createdResourceIds+=("$newResourceId")
+    echo "$newResourceId"
+  fi
+```
 
 Adapt URLs, methods, status codes, headers, and bodies per the spec. The `validateResponseStatus` helper prints PASS/FAIL to stderr and tracks counts.
 
@@ -365,7 +369,9 @@ Functions return data via stdout — callers capture with `$(fn)`. Status and di
 
 Scripts MUST NOT use `else` statements. Use early return or guard clauses instead. The failure path runs first and returns; the success path follows unindented. This produces linear, scannable code.
 
-### Validation and Config
+### Arithmetic Counters
+
+`((count++))` returns exit code 1 when incrementing from 0 (bash treats the pre-increment value as the return code). Under `set -e`, this aborts the script. Always append `|| true`: `((count++)) || true`.
 
 Validate captured output before piping downstream (non-empty, valid JSON). One parser per extraction. Using `jq -e` and `// empty` is sufficient — explicit empty-check guards are optional. Source all environment-specific values from config — never hardcode.
 
@@ -407,7 +413,14 @@ Never store credentials in the script.
 
 ### Destructive Endpoints Gated
 
-Do not include DELETE operations, secret key rotations, or any destructive PUT/PATCH operations in the default script flow. Mark them with a `DESTRUCTIVE` prefix and skip unless the user sets `RUN_DESTRUCTIVE=true` in the config.
+Do not include DELETE operations, secret key rotations, or destructive PUT/PATCH operations (those that overwrite data with no undo or destroy related resources) in the default script flow. Mark them with a `DESTRUCTIVE` prefix and skip unless the user sets `RUN_DESTRUCTIVE=true` in the config:
+
+```sh
+DESTRUCTIVE_resetPassword() {
+  # skipped by default — set RUN_DESTRUCTIVE=true to run
+  ...
+}
+```
 
 ### Error Visibility
 
