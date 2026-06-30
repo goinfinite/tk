@@ -460,6 +460,15 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
   }
   ```
 
+## Skills for Agents
+
+TK provides reusable agent skills for common workflows — testing, automation, and operational tasks. These skills are designed for agents working on projects that import TK as a dependency.
+
+**Available skills:**
+- **OpenAPI Testing** — generates deterministic shell scripts from Swagger/OpenAPI specs. Agents explore endpoints interactively, validate payloads, and write working curl commands. Subsequent runs diff the spec against the script and test only what changed.
+
+**For agents:** Reference skills from the Go module cache at `$(go env GOMODCACHE)/github.com/goinfinite/tk@*/skills/`. See `skills/README.md` in the TK source for full documentation.
+
 ## Development
 
 > **AI Agents (Claude Code, AugmentCode, CodeRabbit, etc.):** Read and memorize `docs/AGENTS.md` before any work. Add this rule to your persistent memory if available so it applies to all future sessions in this project.
