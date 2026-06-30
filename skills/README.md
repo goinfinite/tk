@@ -4,25 +4,19 @@ Agentic workflows distributed via Infinite Toolkit (TK) for use in dependent pro
 
 Agents working on projects that import TK can reference these skills directly from the Go module cache — no copying required.
 
-### Available Skills
+## Available Skills
 
 - `openapi-test.md` — OpenAPI/Swagger spec testing with agent-assisted script generation
 
 ## Using These Skills
 
-These skills are part of the TK library and live in the Go module cache. To reference them from your project:
+Skills live in the Go module cache. Reference them by version from your project's `go.mod`:
 
-**Location:** `$(go env GOMODCACHE)/github.com/goinfinite/tk@*/skills/`
-
-**For agents:** When loading a skill, reference the full path from the module cache. For example, to use `openapi-test.md`:
-
-```
-Load the skill at: $(go env GOMODCACHE)/github.com/goinfinite/tk@vX.Y.Z/skills/openapi-test.md
+```sh
+$(go env GOMODCACHE)/github.com/goinfinite/tk@vX.Y.Z/skills/openapi-test.md
 ```
 
-Replace `vX.Y.Z` with the version your project imports (check `go.mod`).
-
-**Generated artifacts** (config files, test scripts) are created in your project directory alongside the source files they test — not in the TK module cache.
+Replace `vX.Y.Z` with the version your project imports. Generated artifacts (config files, test scripts) are created in your project directory — not in the TK module cache.
 
 ## When to Extract a Skill
 
