@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.2.8 - 2026/06/30
+feat: add agent skills system with OpenAPI testing skill
+docs: add skills for agents section to README
+chore: add agent tool configs to gitignore
+
 0.2.7 - 2026/04/08
 feat: add TrustedCidrsReader for TRUSTED_CIDRS env var
 feat: add RequesterIpExtractor with XFF-aware IP extraction
