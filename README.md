@@ -271,6 +271,43 @@ For web applications built with Echo:
   ipAddress, err := extractor.Execute(httpRequest)
   ```
 
+- **HoneypotMiddleware**: Deceptive HTTP middleware that traps automated scanners and malicious probes. Intercepts requests to monitored honeypot paths and serves configurable deceptive responses based on aggressiveness mode. Includes a watchdog goroutine for periodic maintenance (TTL cleanup, max entry enforcement). Requires a transient in-memory SQLite database for hit tracking.
+
+  | Aggressiveness Mode | Ban Threshold | Pre-Ban Action | Description |
+  |---|---|---|---|
+  | `immediate` | 1 hit | Serve static payload | Ban after first probe |
+  | `balanced` | 3 hits | Mixed/redirect response | Ban after 3 probes |
+  | `tolerant` | 10 hits | Bandwidth exhaust stream | Ban after 10 probes |
+  | `observe` | Never (0) | Passthrough (no action) | Log only, no ban |
+
+  ```go
+  transientDbSvc, dbInitErr := tkInfraDb.NewTransientDatabaseService()
+  honeypotCmdRepo := tkInfraHoneypot.NewHoneypotCmdRepo(transientDbSvc)
+  honeypotQueryRepo := tkInfraHoneypot.NewHoneypotQueryRepo(transientDbSvc)
+
+  aggressivenessMode, _ := tkValueObject.NewHoneypotAggressivenessMode("balanced")
+  activePathCount, _ := tkValueObject.NewHoneypotActivePathCount(50)
+  maxEntries, _ := tkValueObject.NewHoneypotMaxEntries(10000)
+  maxStreamSize, _ := tkValueObject.NewHoneypotMaxStreamSize(10485760)
+  statsInterval, _ := tkValueObject.NewHoneypotStatsInterval("5m")
+  banDuration, _ := tkValueObject.NewHoneypotBanDuration("1h")
+
+  settings := tkDto.HoneypotSettings{
+      AggressivenessMode: aggressivenessMode,
+      ActivePathCount:    activePathCount,
+      MaxEntries:         maxEntries,
+      MaxStreamSize:      maxStreamSize,
+      StatsInterval:      statsInterval,
+      BanDuration:        banDuration,
+  }
+
+  honeypotMw := tkPresentationMiddleware.NewHoneypotMiddleware(
+      settings, honeypotCmdRepo, honeypotQueryRepo, activityRecordCmdRepo,
+  )
+  echoInstance.Use(honeypotMw.MiddlewareFunc())
+  defer honeypotMw.Stop()
+  ```
+
 ### Presentation Helpers
 
 - **EnvsInspector**: Inspect and validate environment variables from .env files loaded via `ENV_FILE_PATH` env var, supporting required and auto-fillable variables.

@@ -208,3 +208,80 @@ Catches panics, logs stack traces, and returns safe error responses.
 1. `src/presentation/middleware/panicHandler.go` — `ApiPanicHandler` is Echo middleware that catches panics, writes stack traces to `logs/panic.log`, filters domain-layer frames, and returns HTTP 500 with masked error for untrusted clients; `CliPanicHandler` does the same for CLI via `defer`
 
 ---
+
+## Honeypot Ban Decision
+
+Determines whether a requester IP should be banned based on cumulative hit count and aggressiveness mode. Escalates through graduated actions (payload → mixed → stream → ban) depending on mode.
+
+**Flow:**
+
+1. `src/presentation/middleware/honeypotMiddleware.go` — middleware extracts operator IP and invokes ban decision use case
+2. `src/domain/useCase/readHoneypotBanDecision.go` — resolves ban threshold and suggested action from aggressiveness mode
+3. `src/domain/dto/readHoneypotBanDecision.go` — request/response DTOs for ban decision queries
+4. `src/domain/repository/honeypotQueryRepo.go` — interface declaring `ReadBanDecision`
+5. `src/infra/honeypot/honeypotQueryRepo.go` — queries hit count from transient database
+6. `src/infra/db/transientDatabaseService.go` — in-memory SQLite database for honeypot data
+
+---
+
+## Honeypot Hit Creation
+
+Records a honeypot hit when a requester accesses a monitored path. Fire-and-forget — errors are logged but never returned to the caller.
+
+**Flow:**
+
+1. `src/presentation/middleware/honeypotMiddleware.go` — middleware `recordHit` method creates hit entry
+2. `src/domain/useCase/createHoneypotHit.go` — fire-and-forget hit recording via cmd repo (errors logged with slog.Error)
+3. `src/domain/dto/createHoneypotHit.go` — input DTO carrying requester IP, path, class, and cumulative hit count
+4. `src/domain/repository/honeypotCmdRepo.go` — interface declaring `Create` method
+5. `src/infra/honeypot/honeypotCmdRepo.go` — GORM implementation: persists hit to transient database
+6. `src/infra/db/model/honeypotHit.go` — GORM model for honeypot_hits table with unique index on requester_ip_address
+
+---
+
+## Honeypot Stats Report
+
+Queries aggregated honeypot hit statistics: total hits, unique IPs, hit distribution by path class, and ban rate.
+
+**Flow:**
+
+1. `src/domain/useCase/readHoneypotStatsReport.go` — delegates to query repo for aggregated stats; wraps errors
+2. `src/domain/dto/readHoneypotStatsReport.go` — request/response DTOs for stats queries
+3. `src/domain/repository/honeypotQueryRepo.go` — interface declaring `ReadStatsReport`
+4. `src/infra/honeypot/honeypotQueryRepo.go` — queries aggregated stats from transient database
+5. `src/infra/db/transientDatabaseService.go` — in-memory SQLite database for honeypot data
+
+---
+
+## Honeypot Maintenance
+
+Periodic cleanup of expired honeypot entries (TTL-based) and enforcement of maximum entry cap. Runs as a watchdog goroutine inside the middleware.
+
+**Flow:**
+
+1. `src/presentation/middleware/honeypotMiddleware.go` — watchdog goroutine fires maintenance at configured StatsInterval
+2. `src/domain/useCase/runHoneypotMaintenance.go` — calls DeleteExpired then EnforceMaxEntries in sequence
+3. `src/domain/dto/runHoneypotMaintenance.go` — input DTO with MaxEntries and BanDuration parameters
+4. `src/domain/repository/honeypotCmdRepo.go` — interface declaring `DeleteExpired` and `EnforceMaxEntries`
+5. `src/infra/honeypot/honeypotCmdRepo.go` — GORM implementation: TTL-based deletion and entry cap enforcement
+
+---
+
+## Honeypot Middleware
+
+Intercepts HTTP requests to monitored honeypot paths and serves deceptive responses. Supports multiple response strategies: static payload, bandwidth exhaust stream, AI-generated trap content, mixed/redirect, and 403 ban.
+
+**Flow:**
+
+1. `src/presentation/middleware/honeypotMiddleware.go` — Echo middleware entry point: request interception, lifecycle management (Start/Stop), watchdog goroutine
+2. `src/presentation/middleware/honeypot/honeypotPathMapping.go` — resolves request URL paths to honeypot path class
+3. `src/presentation/middleware/honeypot/honeypotPathPool.go` — pool of all possible honeypot paths by class
+4. `src/presentation/middleware/honeypot/honeypotPathSelector.go` — selects active paths based on settings and random seed
+5. `src/presentation/middleware/honeypot/honeypotSettingsParser.go` — parses and validates raw settings input
+6. `src/presentation/middleware/honeypot/streamHandler.go` — serves bandwidth exhaust stream and AI trap continuous stream
+7. `src/presentation/middleware/honeypot/aiTrapGenerator.go` — generates AI-simulated administrative interface content
+8. `src/presentation/middleware/honeypot/mixedResponseHandler.go` — serves mixed/redirect responses (e.g., HTTP 302 to external targets)
+9. `src/presentation/middleware/honeypot/payloadLoader.go` — loads static payload files from embedded filesystem
+10. `src/domain/useCase/readHoneypotBanDecision.go` — ban decision use case called per-request to determine response strategy
+
+---
