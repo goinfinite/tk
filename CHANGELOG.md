@@ -2,6 +2,7 @@
 
 ```log
 0.2.9 - 2026/07/10
+feat: add honeypot settings parser, path system, and payload loader with 114 payloads (Phase 6)
 feat: add honeypot ban decision, hit creation, stats, and maintenance use cases (Phase 5)
 feat: add honeypot command and query repository implementations (Phase 4)
 feat: add transient in-memory SQLite database service and honeypot GORM model (Phase 3)
