@@ -2,6 +2,7 @@
 
 ```log
 0.2.9 - 2026/07/10
+feat: add honeypot repository interfaces and hit entity (Phase 2)
 feat: add honeypot value objects, DTOs, and sentinel errors (Phase 1)
 
 0.2.8 - 2026/06/30
