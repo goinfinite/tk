@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.2.9 - 2026/07/10
+feat: add honeypot value objects, DTOs, and sentinel errors (Phase 1)
+
 0.2.8 - 2026/06/30
 feat: add agent skills system with OpenAPI testing skill
 docs: add skills for agents section to README
