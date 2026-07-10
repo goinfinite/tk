@@ -2,6 +2,7 @@
 
 ```log
 0.2.9 - 2026/07/10
+feat: add honeypot Echo middleware with ban decision, streaming, mixed response, and AI trap (Phase 7)
 feat: add honeypot settings parser, path system, and payload loader with 114 payloads (Phase 6)
 feat: add honeypot ban decision, hit creation, stats, and maintenance use cases (Phase 5)
 feat: add honeypot command and query repository implementations (Phase 4)
