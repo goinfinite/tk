@@ -2,10 +2,14 @@ package tkInfra
 
 import (
 	"errors"
+	"log/slog"
+	"os"
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
+
+const ServerPublicIpAddressEnvVarName string = "SERVER_PUBLIC_IP_ADDR"
 
 func ReadServerPrivateIpAddress() (ipAddress tkValueObject.IpAddress, err error) {
 	rawIpAddress, err := NewShell(
@@ -29,6 +33,20 @@ func ReadServerPrivateIpAddress() (ipAddress tkValueObject.IpAddress, err error)
 }
 
 func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) {
+	rawEnvIpAddress := os.Getenv(ServerPublicIpAddressEnvVarName)
+	if rawEnvIpAddress != "" {
+		envIpAddress, envErr := tkValueObject.NewIpAddress(rawEnvIpAddress)
+		if envErr == nil {
+			return envIpAddress, nil
+		}
+
+		slog.Debug(
+			"InvalidServerPublicIpAddressEnvVar",
+			slog.String("envVarName", ServerPublicIpAddressEnvVarName),
+			slog.String("envValue", rawEnvIpAddress),
+		)
+	}
+
 	primaryResolverHostname, err := tkValueObject.NewUnixHostname("whoami.ds.akahelp.net")
 	if err != nil {
 		return ipAddress, err

@@ -135,7 +135,7 @@ Reads the server's private and public IP addresses.
 
 **Flow:**
 
-1. `src/infra/serverIpAddress.go` — `ReadServerPrivateIpAddress` via `hostname -I`; `ReadServerPublicIpAddress` via DNS lookup to external resolver
+1. `src/infra/serverIpAddress.go` — `ReadServerPrivateIpAddress` via `hostname -I`; `ReadServerPublicIpAddress` honors `SERVER_PUBLIC_IP_ADDR` env var first, then DNS TXT lookup against `whoami.ds.akahelp.net`, with `https://goinfinite.net/ip` as final fallback
 
 ---
 
