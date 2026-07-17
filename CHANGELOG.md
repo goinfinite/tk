@@ -4,8 +4,9 @@
 0.2.9 - 2026/07/17
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
 feat: add RegexPattern value object for validated regex compilation
+feat: honor SERVER_PUBLIC_IP_ADDR env var as primary source of truth in ReadServerPublicIpAddress
 refactor: extract FileClerk error sentinels to package-level vars
-docs: mention FileContentRegexSearch in README
+docs: mention FileContentRegexSearch and SERVER_PUBLIC_IP_ADDR env var in README
 
 0.2.8 - 2026/06/30
 feat: add agent skills system with OpenAPI testing skill

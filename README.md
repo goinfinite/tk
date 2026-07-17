@@ -160,7 +160,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   })
   ```
 
-- **ServerIpAddress**: Retrieve the server's private and public IP addresses.
+- **ServerIpAddress**: Retrieve the server's private and public IP addresses. The public IP read honors `SERVER_PUBLIC_IP_ADDR` as the primary source of truth before any DNS or HTTP lookup.
 
   ```go
   privateIpAddress, privateIpReadingErr := ReadServerPrivateIpAddress()
