@@ -101,11 +101,11 @@ Resolves DNS records with configurable resolvers and timeout.
 
 ## File Operations
 
-Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management.
+Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search.
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` streams the file line-by-line via `bufio.Scanner` and returns `[][]string` (per-line `FindAllStringSubmatch` results) using a caller-supplied `RegexPattern` VO
 
 ---
 

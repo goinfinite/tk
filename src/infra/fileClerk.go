@@ -7,6 +7,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
+)
+
+var (
+	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
+	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
+	ErrFileMissing                  = errors.New("FileNotFound")
+	ErrDirCompressionWrongFormat    = errors.New("DirectoryCompressionMustUseTarFormat")
+	ErrCompressedFileMissing        = errors.New("CompressedFileNotFound")
+	ErrSourceDirMissing             = errors.New("SourceDirNotFound")
+	ErrTargetDirExists              = errors.New("TargetDirAlreadyExists")
+	ErrSourcePathMissing            = errors.New("SourcePathNotFound")
+	ErrSymlinkExists                = errors.New("SymlinkAlreadyExists")
+	ErrTargetPathExists             = errors.New("TargetPathAlreadyExists")
+	ErrUnsupportedCompressionFormat = errors.New("UnsupportedCompressionFormat")
 )
 
 type FileClerk struct{}
@@ -44,11 +60,11 @@ func (clerk FileClerk) CreateFile(filePath string) error {
 
 func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
-		return errors.New("SourceFileNotFound")
+		return ErrSourceFileMissing
 	}
 
 	if clerk.IsFile(targetPath) {
-		return errors.New("TargetFileAlreadyExists")
+		return ErrTargetFileExists
 	}
 
 	sourceFile, err := os.Open(sourcePath)
@@ -76,11 +92,11 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 
 func (clerk FileClerk) MoveFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
-		return errors.New("SourceFileNotFound")
+		return ErrSourceFileMissing
 	}
 
 	if clerk.IsFile(targetPath) {
-		return errors.New("TargetFileAlreadyExists")
+		return ErrTargetFileExists
 	}
 
 	return os.Rename(sourcePath, targetPath)
@@ -103,7 +119,7 @@ func (clerk FileClerk) ReadFileContent(
 	maxContentSizeBytesPtr *int64,
 ) (string, error) {
 	if !clerk.IsFile(filePath) {
-		return "", errors.New("FileNotFound")
+		return "", ErrFileMissing
 	}
 
 	maxContentSizeBytes := int64(1 * 1073741824) // 1GiB
@@ -124,6 +140,45 @@ func (clerk FileClerk) ReadFileContent(
 	}
 
 	return string(fileContentBytes), nil
+}
+
+func (clerk FileClerk) FileContentRegexSearch(
+	filePath tkValueObject.UnixAbsoluteFilePath,
+	pattern tkValueObject.RegexPattern,
+) (regexSubmatches [][]string, err error) {
+	if !clerk.IsFile(filePath.String()) {
+		return regexSubmatches, ErrFileMissing
+	}
+
+	fileHandler, osOpenErr := os.Open(filePath.String())
+	if osOpenErr != nil {
+		if os.IsNotExist(osOpenErr) {
+			return regexSubmatches, ErrFileMissing
+		}
+		return regexSubmatches, osOpenErr
+	}
+	defer fileHandler.Close()
+
+	fileScanner := bufio.NewScanner(fileHandler)
+
+	compiledRegexp, regexpCompileErr := pattern.CompiledRegexp()
+	if regexpCompileErr != nil {
+		return regexSubmatches, regexpCompileErr
+	}
+	for fileScanner.Scan() {
+		lineMatches := compiledRegexp.FindAllStringSubmatch(fileScanner.Text(), -1)
+		if len(lineMatches) == 0 {
+			continue
+		}
+		regexSubmatches = append(regexSubmatches, lineMatches...)
+	}
+
+	scannerErr := fileScanner.Err()
+	if scannerErr != nil {
+		return regexSubmatches, scannerErr
+	}
+
+	return regexSubmatches, nil
 }
 
 func (clerk FileClerk) UpdateFileContent(
@@ -218,22 +273,22 @@ func (clerk FileClerk) CompressFile(
 			compressionCmd = "xz"
 			compressionArgs = []string{"-1", "--memlimit=10%"}
 		default:
-			return compressedFilePath, errors.New("UnsupportedCompressionFormat")
+			return compressedFilePath, ErrUnsupportedCompressionFormat
 		}
 	}
 
 	if !clerk.IsFile(sourcePath) {
 		if !clerk.IsDir(sourcePath) {
-			return compressedFilePath, errors.New("SourceFileNotFound")
+			return compressedFilePath, ErrSourceFileMissing
 		}
 		if compressionSuffix != ".tar" {
-			return compressedFilePath, errors.New("DirectoryCompressionMustUseTarFormat")
+			return compressedFilePath, ErrDirCompressionWrongFormat
 		}
 	}
 
 	targetPath := sourcePath + compressionSuffix
 	if clerk.IsFile(targetPath) {
-		return compressedFilePath, errors.New("TargetFileAlreadyExists")
+		return compressedFilePath, ErrTargetFileExists
 	}
 	switch compressionSuffix {
 	case ".tar", ".zip":
@@ -249,7 +304,7 @@ func (clerk FileClerk) CompressFile(
 	}
 
 	if !clerk.IsFile(targetPath) {
-		return compressedFilePath, errors.New("CompressedFileNotFound")
+		return compressedFilePath, ErrCompressedFileMissing
 	}
 
 	return targetPath, nil
@@ -261,7 +316,7 @@ func (clerk FileClerk) DecompressFile(
 	shouldKeepSourceFilePtr *bool,
 ) (decompressedFilePath string, err error) {
 	if !clerk.IsFile(sourcePath) {
-		return decompressedFilePath, errors.New("SourceFileNotFound")
+		return decompressedFilePath, ErrSourceFileMissing
 	}
 
 	decompressionCmd := "tar"
@@ -294,12 +349,14 @@ func (clerk FileClerk) DecompressFile(
 		}
 	case "xz":
 		decompressionCmd = "xz"
-		decompressionArgs = []string{"--decompress", "--keep", "--memlimit=10%", sourcePath}
+		decompressionArgs = []string{
+			"--decompress", "--keep", "--memlimit=10%", sourcePath,
+		}
 		if targetPathPtr != nil {
 			decompressionArgs = append(decompressionArgs, "--stdout")
 		}
 	default:
-		return decompressedFilePath, errors.New("UnsupportedCompressionFormat")
+		return decompressedFilePath, ErrUnsupportedCompressionFormat
 	}
 
 	shell := NewShell(
@@ -351,11 +408,11 @@ func (clerk FileClerk) CreateDir(dirPath string) error {
 
 func (clerk FileClerk) CopyDir(sourcePath, targetPath string) error {
 	if !clerk.IsDir(sourcePath) {
-		return errors.New("SourceDirNotFound")
+		return ErrSourceDirMissing
 	}
 
 	if clerk.IsDir(targetPath) {
-		return errors.New("TargetDirAlreadyExists")
+		return ErrTargetDirExists
 	}
 
 	return filepath.Walk(
@@ -381,11 +438,11 @@ func (clerk FileClerk) CopyDir(sourcePath, targetPath string) error {
 
 func (clerk FileClerk) MoveDir(sourcePath, targetPath string) error {
 	if !clerk.IsDir(sourcePath) {
-		return errors.New("SourceDirNotFound")
+		return ErrSourceDirMissing
 	}
 
 	if clerk.IsDir(targetPath) {
-		return errors.New("TargetDirAlreadyExists")
+		return ErrTargetDirExists
 	}
 
 	err := clerk.CopyDir(sourcePath, targetPath)
@@ -409,7 +466,7 @@ func (clerk FileClerk) CompressDir(
 	compressionFormatPtr *string,
 ) (compressedFilePath string, err error) {
 	if !clerk.IsDir(sourcePath) {
-		return compressedFilePath, errors.New("SourceDirNotFound")
+		return compressedFilePath, ErrSourceDirMissing
 	}
 
 	tarCompressedFilePath, err := clerk.CompressFile(sourcePath, nil)
@@ -449,7 +506,7 @@ func (clerk FileClerk) DecompressDir(
 		}
 		sourcePathExt := filepath.Ext(sourcePath)
 		if sourcePathExt != ".tar" {
-			return decompressedDirPath, errors.New("UnsupportedCompressionFormat")
+			return decompressedDirPath, ErrUnsupportedCompressionFormat
 		}
 	}
 
@@ -485,15 +542,15 @@ func (clerk FileClerk) CreateSymlink(
 	shouldOverwrite bool,
 ) error {
 	if !clerk.FileExists(sourcePath) {
-		return errors.New("SourcePathNotFound")
+		return ErrSourcePathMissing
 	}
 
 	if !shouldOverwrite {
 		if clerk.IsSymlink(targetPath) {
-			return errors.New("SymlinkAlreadyExists")
+			return ErrSymlinkExists
 		}
 		if clerk.IsFile(targetPath) || clerk.IsDir(targetPath) {
-			return errors.New("TargetPathAlreadyExists")
+			return ErrTargetPathExists
 		}
 	}
 
