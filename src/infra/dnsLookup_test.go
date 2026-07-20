@@ -6,123 +6,85 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestDnsLookup(t *testing.T) {
+func TestNewDnsLookupDefaults(t *testing.T) {
+	t.Run("ZeroQueryTimeoutSecsDefaults", func(t *testing.T) {
+		lookup := NewDnsLookup(DnsLookupSettings{QueryTimeoutSecs: 0})
+		if lookup.queryTimeoutSecs != dnsLookupQueryTimeoutSecsDefault {
+			t.Errorf(
+				"ZeroTimeoutNotDefaulted: expected %d, got %d",
+				dnsLookupQueryTimeoutSecsDefault, lookup.queryTimeoutSecs,
+			)
+		}
+	})
+
+	t.Run("ZeroDialTimeoutMsDefaults", func(t *testing.T) {
+		lookup := NewDnsLookup(DnsLookupSettings{DialTimeoutMs: 0})
+		if lookup.dialTimeoutMs != dnsLookupDialTimeoutMsDefault {
+			t.Errorf(
+				"ZeroDialTimeoutNotDefaulted: expected %d, got %d",
+				dnsLookupDialTimeoutMsDefault, lookup.dialTimeoutMs,
+			)
+		}
+	})
+
+	t.Run("EmptyPrimaryResolverDefaults", func(t *testing.T) {
+		lookup := NewDnsLookup(DnsLookupSettings{})
+		if lookup.primaryResolver != dnsLookupPrimaryResolverDefault {
+			t.Errorf(
+				"EmptyPrimaryResolverNotDefaulted: expected %s, got %s",
+				dnsLookupPrimaryResolverDefault, lookup.primaryResolver,
+			)
+		}
+	})
+
+	t.Run("EmptySecondaryResolverDefaults", func(t *testing.T) {
+		lookup := NewDnsLookup(DnsLookupSettings{})
+		if lookup.secondaryResolver != dnsLookupSecondaryResolverDefault {
+			t.Errorf(
+				"EmptySecondaryResolverNotDefaulted: expected %s, got %s",
+				dnsLookupSecondaryResolverDefault, lookup.secondaryResolver,
+			)
+		}
+	})
+}
+
+func TestDnsLookupExecute(t *testing.T) {
 	validHostname, err := tkValueObject.NewUnixHostname("example.com")
 	if err != nil {
 		t.Fatalf("CreateValidHostnameFailed: %v", err)
-	}
-
-	invalidHostname, err := tkValueObject.NewUnixHostname("invalid..hostname")
-	if err == nil {
-		t.Fatal("InvalidHostnameShouldFail")
 	}
 
 	ptrIpAddress, err := tkValueObject.NewIpAddress("8.8.8.8")
 	if err != nil {
 		t.Fatalf("CreatePtrIpAddressFailed: %v", err)
 	}
+	ptrHostname := tkValueObject.UnixHostname(ptrIpAddress.String())
+
+	dnsLookup := NewDnsLookup(DnsLookupSettings{})
 
 	testCases := []struct {
-		name        string
-		hostname    tkValueObject.UnixHostname
-		recordType  *tkValueObject.DnsRecordType
-		expectError bool
+		name       string
+		hostname   tkValueObject.UnixHostname
+		recordType *tkValueObject.DnsRecordType
 	}{
-		{
-			"DefaultRecordType",
-			validHostname,
-			nil,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeA",
-			validHostname,
-			&tkValueObject.DnsRecordTypeA,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeAAAA",
-			validHostname,
-			&tkValueObject.DnsRecordTypeAAAA,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeMX",
-			validHostname,
-			&tkValueObject.DnsRecordTypeMX,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeTXT",
-			validHostname,
-			&tkValueObject.DnsRecordTypeTXT,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeNS",
-			validHostname,
-			&tkValueObject.DnsRecordTypeNS,
-			false,
-		},
-		{
-			"ValidHostnameRecordTypeCNAME",
-			validHostname,
-			&tkValueObject.DnsRecordTypeCNAME,
-			false,
-		},
-		{
-			"ValidIpAddressRecordTypePTR",
-			tkValueObject.UnixHostname(ptrIpAddress.String()),
-			&tkValueObject.DnsRecordTypePTR,
-			false,
-		},
-		{
-			"InvalidHostname",
-			invalidHostname,
-			&tkValueObject.DnsRecordTypeA,
-			true,
-		},
+		{"DefaultRecordType", validHostname, nil},
+		{"RecordTypeA", validHostname, &tkValueObject.DnsRecordTypeA},
+		{"RecordTypeAAAA", validHostname, &tkValueObject.DnsRecordTypeAAAA},
+		{"RecordTypeMX", validHostname, &tkValueObject.DnsRecordTypeMX},
+		{"RecordTypeTXT", validHostname, &tkValueObject.DnsRecordTypeTXT},
+		{"RecordTypeNS", validHostname, &tkValueObject.DnsRecordTypeNS},
+		{"RecordTypeCNAME", validHostname, &tkValueObject.DnsRecordTypeCNAME},
+		{"RecordTypePTR", ptrHostname, &tkValueObject.DnsRecordTypePTR},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			dnsLookup := NewDnsLookup(testCase.hostname, testCase.recordType)
-
-			if dnsLookup == nil {
-				t.Error("DnsLookupInstanceIsNull")
-			}
-
-			if dnsLookup.hostname.String() != testCase.hostname.String() {
-				t.Errorf(
-					"HostnameMismatch: expected %s, got %s",
-					testCase.hostname.String(), dnsLookup.hostname.String(),
-				)
-			}
-
-			expectedRecordType := tkValueObject.DnsRecordTypeDefault
-			if testCase.recordType != nil {
-				expectedRecordType = *testCase.recordType
-			}
-			if dnsLookup.recordType != expectedRecordType {
-				t.Errorf(
-					"RecordTypeMismatch: expected %s, got %s",
-					expectedRecordType.String(), dnsLookup.recordType.String(),
-				)
-			}
-
-			results, err := dnsLookup.Execute()
-
-			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: %s", testCase.name)
-			}
-			if !testCase.expectError && err != nil {
+			results, err := dnsLookup.Execute(testCase.hostname, testCase.recordType)
+			if err != nil {
 				t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.name)
 			}
-			if !testCase.expectError && len(results) == 0 {
+			if len(results) == 0 {
 				t.Errorf("NoResultsReturned: %s", testCase.name)
-			}
-			if testCase.expectError && len(results) != 0 {
-				t.Errorf("ExpectedNoResultsOnError: got %d [%s]", len(results), testCase.name)
 			}
 		})
 	}

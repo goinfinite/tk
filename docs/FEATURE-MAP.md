@@ -101,11 +101,11 @@ Resolves DNS records with configurable resolvers and timeout.
 
 ## File Operations
 
-Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management.
+Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search.
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` streams the file line-by-line via `bufio.Scanner` and returns `[][]string` (per-line `FindAllStringSubmatch` results) using a caller-supplied `RegexPattern` VO
 
 ---
 
@@ -135,7 +135,7 @@ Reads the server's private and public IP addresses.
 
 **Flow:**
 
-1. `src/infra/serverIpAddress.go` — `ReadServerPrivateIpAddress` via `hostname -I`; `ReadServerPublicIpAddress` via DNS lookup to external resolver
+1. `src/infra/serverIpAddress.go` — `ReadServerPrivateIpAddress` via `hostname -I`; `ReadServerPublicIpAddress` honors `SERVER_PUBLIC_IP_ADDR` env var, then fans out across multiple public IP resolvers
 
 ---
 

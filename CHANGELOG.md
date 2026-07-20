@@ -1,6 +1,16 @@
 # Changelog
 
 ```log
+0.2.9 - 2026/07/20
+feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
+feat: add RegexPattern value object for validated regex compilation
+feat: honor SERVER_PUBLIC_IP_ADDR env var as primary source of truth in ReadServerPublicIpAddress
+fix: bound public IP resolver requests with cancellable contexts
+refactor: extract FileClerk error sentinels to package-level vars
+refactor: replace ReadServerPublicIpAddress DNS+curl flow with native HTTP fan-out across multiple public IP resolvers
+refactor: split DnsLookup config into DnsLookupSettings; move hostname and recordType to Execute()
+docs: mention FileContentRegexSearch and SERVER_PUBLIC_IP_ADDR env var in README
+
 0.2.8 - 2026/06/30
 feat: add agent skills system with OpenAPI testing skill
 docs: add skills for agents section to README

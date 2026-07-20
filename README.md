@@ -52,6 +52,9 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   // FileContentOperations
   maxContentSize := int64(1024)
   fileContent, fileReadingErr := clerk.ReadFileContent("example.txt", &maxContentSize)
+  regexSearchFilePath, regexSearchFilePathErr := tkValueObject.NewUnixAbsoluteFilePath("example.txt", false)
+  regexSearchPattern, regexSearchPatternErr := tkValueObject.NewRegexPattern(`^error: (.+)$`)
+  regexSubmatches, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexSearchPattern)
   shouldOverwrite := true
   fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
   fileContentDeletionErr := clerk.DeleteFileContent("example.txt")
@@ -157,7 +160,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   })
   ```
 
-- **ServerIpAddress**: Retrieve the server's private and public IP addresses.
+- **ServerIpAddress**: Retrieve the server's private and public IP addresses. The public IP read honors `SERVER_PUBLIC_IP_ADDR` as the primary source of truth before any HTTP lookup.
 
   ```go
   privateIpAddress, privateIpReadingErr := ReadServerPrivateIpAddress()

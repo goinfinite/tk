@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
 func TestFileExists(t *testing.T) {
@@ -1341,4 +1343,167 @@ func TestDecompressFile(t *testing.T) {
 			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
+}
+
+func TestFileContentRegexSearch(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	testCaseStructs := []struct {
+		description      string
+		fileContent      string
+		patternSource    string
+		expectedErrMsg   string
+		expectedMatchCt  int
+		expectedFirstRow []string
+		expectedErrIsNil bool
+	}{
+		{
+			description:      "MatchesTwoAnchoredLines",
+			fileContent:      "alpha=1\nbeta=2\nalpha=3",
+			patternSource:    `^alpha=(\d+)$`,
+			expectedErrIsNil: true,
+			expectedMatchCt:  2,
+			expectedFirstRow: []string{"alpha=1", "1"},
+		},
+		{
+			description:      "NonExistentFileReturnsFileNotFound",
+			fileContent:      "",
+			patternSource:    `^foo$`,
+			expectedErrMsg:   "FileNotFound",
+			expectedErrIsNil: false,
+		},
+		{
+			description:      "DirectoryPathReturnsFileNotFound",
+			fileContent:      "",
+			patternSource:    `^foo$`,
+			expectedErrMsg:   "FileNotFound",
+			expectedErrIsNil: false,
+		},
+		{
+			description:      "EmptyFileReturnsNoMatches",
+			fileContent:      "",
+			patternSource:    `^alpha=(\d+)$`,
+			expectedErrIsNil: true,
+			expectedMatchCt:  0,
+		},
+		{
+			description:      "LineExceedingBufferSizeReturnsScannerError",
+			fileContent:      strings.Repeat("a", 100*1024),
+			patternSource:    `^a+$`,
+			expectedErrIsNil: false,
+		},
+	}
+
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.description, func(t *testing.T) {
+			targetFile := filepath.Join(tempDir, testCase.description+".txt")
+			createErr := clerk.CreateFile(targetFile)
+			if createErr != nil {
+				t.Fatalf("CreateFileFailed: %v", createErr)
+			}
+
+			if testCase.fileContent != "" {
+				writeErr := clerk.UpdateFileContent(targetFile, testCase.fileContent, true)
+				if writeErr != nil {
+					t.Fatalf("UpdateFileContentFailed: %v", writeErr)
+				}
+			}
+
+			if testCase.description == "NonExistentFileReturnsFileNotFound" {
+				deleteErr := clerk.DeleteFile(targetFile)
+				if deleteErr != nil {
+					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+				}
+			}
+
+			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+				deleteErr := clerk.DeleteFile(targetFile)
+				if deleteErr != nil {
+					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+				}
+				createDirErr := clerk.CreateDir(targetFile)
+				if createDirErr != nil {
+					t.Fatalf("CreateDirFailed: %v", createDirErr)
+				}
+			}
+
+			filePath, pathErr := tkValueObject.NewUnixAbsoluteFilePath(
+				targetFile, true,
+			)
+			if pathErr != nil {
+				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
+			}
+
+			pattern, patternErr := tkValueObject.NewRegexPattern(testCase.patternSource)
+			if patternErr != nil {
+				t.Fatalf("NewRegexPatternFailed: %v", patternErr)
+			}
+
+			regexSubmatches, searchErr := clerk.FileContentRegexSearch(
+				filePath, pattern,
+			)
+
+			if testCase.expectedErrIsNil {
+				if searchErr != nil {
+					t.Errorf("UnexpectedError: '%s'", searchErr.Error())
+					return
+				}
+			}
+
+			if !testCase.expectedErrIsNil {
+				if searchErr == nil {
+					t.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
+					return
+				}
+				if testCase.expectedErrMsg != "" &&
+					searchErr.Error() != testCase.expectedErrMsg {
+					t.Errorf(
+						"WrongErrorMessage: '%s' vs '%s'",
+						testCase.expectedErrMsg, searchErr.Error(),
+					)
+				}
+				return
+			}
+
+			if len(regexSubmatches) != testCase.expectedMatchCt {
+				t.Errorf(
+					"WrongMatchCount: expected=%d actual=%d",
+					testCase.expectedMatchCt, len(regexSubmatches),
+				)
+				return
+			}
+
+			if testCase.expectedFirstRow != nil {
+				firstRow := regexSubmatches[0]
+				if len(firstRow) != len(testCase.expectedFirstRow) {
+					t.Errorf(
+						"WrongFirstRowFieldCount: expected=%d actual=%d",
+						len(testCase.expectedFirstRow), len(firstRow),
+					)
+					return
+				}
+				for fieldIndex, expectedField := range testCase.expectedFirstRow {
+					if firstRow[fieldIndex] != expectedField {
+						t.Errorf(
+							"WrongFirstRowField%d: '%s' vs '%s'",
+							fieldIndex, expectedField, firstRow[fieldIndex],
+						)
+					}
+				}
+			}
+
+			cleanupErr := clerk.DeleteFile(targetFile)
+			if cleanupErr != nil {
+				t.Errorf("DeleteFileFailed: %v", cleanupErr)
+			}
+
+			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+				dirCleanupErr := clerk.DeleteDir(targetFile)
+				if dirCleanupErr != nil {
+					t.Errorf("DeleteDirFailed: %v", dirCleanupErr)
+				}
+			}
+		})
+	}
 }
