@@ -1,6 +1,7 @@
 package tkInfra
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -42,8 +43,13 @@ func NewPublicIpAddressResolver() *PublicIpAddressResolver {
 func (resolver *PublicIpAddressResolver) resolverFetcher(
 	resolverUrl tkValueObject.Url,
 ) (rawIpAddress string, err error) {
-	httpRequest, newRequestError := http.NewRequest(
-		http.MethodGet, resolverUrl.String(), nil,
+	resolverContext, contextCancel := context.WithTimeout(
+		context.Background(), publicIpResolverRequestTimeout,
+	)
+	defer contextCancel()
+
+	httpRequest, newRequestError := http.NewRequestWithContext(
+		resolverContext, http.MethodGet, resolverUrl.String(), nil,
 	)
 	if newRequestError != nil {
 		return rawIpAddress, newRequestError
