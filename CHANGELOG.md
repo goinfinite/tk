@@ -1,8 +1,6 @@
 # Changelog
 
 ```log
-Unreleased
-
 0.2.9 - 2026/07/20
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
 feat: add RegexPattern value object for validated regex compilation
