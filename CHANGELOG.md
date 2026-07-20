@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+Unreleased
+refactor: split DnsLookup config into DnsLookupSettings; move hostname and recordType to Execute()
+
 0.2.9 - 2026/07/17
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
 feat: add RegexPattern value object for validated regex compilation

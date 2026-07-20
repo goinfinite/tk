@@ -9,31 +9,56 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
+const (
+	dnsLookupQueryTimeoutSecsDefault uint = 5
+	dnsLookupDialTimeoutMsDefault    uint = 200
+)
+
+var (
+	dnsLookupPrimaryResolverDefault   = tkValueObject.IpAddress("8.8.8.8")
+	dnsLookupSecondaryResolverDefault = tkValueObject.IpAddress("185.228.168.168")
+)
+
+type DnsLookupSettings struct {
+	PrimaryResolver   tkValueObject.IpAddress
+	SecondaryResolver tkValueObject.IpAddress
+	QueryTimeoutSecs  uint
+	DialTimeoutMs     uint
+}
+
 type DnsLookup struct {
 	primaryResolver   tkValueObject.IpAddress
 	secondaryResolver tkValueObject.IpAddress
-	queryTimeoutSec   uint
+	queryTimeoutSecs  uint
 	dialTimeoutMs     uint
-	hostname          tkValueObject.UnixHostname
-	recordType        tkValueObject.DnsRecordType
 }
 
-func NewDnsLookup(
-	hostname tkValueObject.UnixHostname,
-	recordType *tkValueObject.DnsRecordType,
-) *DnsLookup {
-	dnsRecordType := tkValueObject.DnsRecordTypeDefault
-	if recordType != nil {
-		dnsRecordType = *recordType
+func NewDnsLookup(settings DnsLookupSettings) *DnsLookup {
+	primaryResolver := dnsLookupPrimaryResolverDefault
+	if settings.PrimaryResolver != "" {
+		primaryResolver = settings.PrimaryResolver
+	}
+
+	secondaryResolver := dnsLookupSecondaryResolverDefault
+	if settings.SecondaryResolver != "" {
+		secondaryResolver = settings.SecondaryResolver
+	}
+
+	queryTimeoutSecs := dnsLookupQueryTimeoutSecsDefault
+	if settings.QueryTimeoutSecs != 0 {
+		queryTimeoutSecs = settings.QueryTimeoutSecs
+	}
+
+	dialTimeoutMs := dnsLookupDialTimeoutMsDefault
+	if settings.DialTimeoutMs != 0 {
+		dialTimeoutMs = settings.DialTimeoutMs
 	}
 
 	return &DnsLookup{
-		primaryResolver:   tkValueObject.IpAddress("8.8.8.8"),
-		secondaryResolver: tkValueObject.IpAddress("185.228.168.168"),
-		queryTimeoutSec:   5,
-		dialTimeoutMs:     200,
-		hostname:          hostname,
-		recordType:        dnsRecordType,
+		primaryResolver:   primaryResolver,
+		secondaryResolver: secondaryResolver,
+		queryTimeoutSecs:  queryTimeoutSecs,
+		dialTimeoutMs:     dialTimeoutMs,
 	}
 }
 
@@ -54,10 +79,13 @@ func (lookup *DnsLookup) resolverFactory(
 func (lookup *DnsLookup) queryDnsRecords(
 	dnsContext context.Context,
 	dnsResolver *net.Resolver,
+	hostname tkValueObject.UnixHostname,
+	recordType tkValueObject.DnsRecordType,
 ) (queryResults []string, queryError error) {
-	switch lookup.recordType {
+	hostnameStr := hostname.String()
+	switch recordType {
 	case tkValueObject.DnsRecordTypeA:
-		queryResults, queryError = dnsResolver.LookupHost(dnsContext, lookup.hostname.String())
+		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 		var ipv4Addresses []string
 		for _, dnsRecord := range queryResults {
 			if net.ParseIP(dnsRecord).To4() != nil {
@@ -66,7 +94,7 @@ func (lookup *DnsLookup) queryDnsRecords(
 		}
 		queryResults = ipv4Addresses
 	case tkValueObject.DnsRecordTypeAAAA:
-		queryResults, queryError = dnsResolver.LookupHost(dnsContext, lookup.hostname.String())
+		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 		var ipv6Addresses []string
 		for _, dnsRecord := range queryResults {
 			if parsedIp := net.ParseIP(dnsRecord); parsedIp != nil && parsedIp.To4() == nil {
@@ -75,7 +103,7 @@ func (lookup *DnsLookup) queryDnsRecords(
 		}
 		queryResults = ipv6Addresses
 	case tkValueObject.DnsRecordTypeMX:
-		mxRecords, err := dnsResolver.LookupMX(dnsContext, lookup.hostname.String())
+		mxRecords, err := dnsResolver.LookupMX(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
@@ -84,9 +112,9 @@ func (lookup *DnsLookup) queryDnsRecords(
 		}
 		queryError = err
 	case tkValueObject.DnsRecordTypeTXT:
-		queryResults, queryError = dnsResolver.LookupTXT(dnsContext, lookup.hostname.String())
+		queryResults, queryError = dnsResolver.LookupTXT(dnsContext, hostnameStr)
 	case tkValueObject.DnsRecordTypeNS:
-		nsRecords, err := dnsResolver.LookupNS(dnsContext, lookup.hostname.String())
+		nsRecords, err := dnsResolver.LookupNS(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
@@ -95,21 +123,21 @@ func (lookup *DnsLookup) queryDnsRecords(
 		}
 		queryError = err
 	case tkValueObject.DnsRecordTypeCNAME:
-		cnameRecord, err := dnsResolver.LookupCNAME(dnsContext, lookup.hostname.String())
+		cnameRecord, err := dnsResolver.LookupCNAME(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
 		queryResults = []string{cnameRecord}
 		queryError = err
 	case tkValueObject.DnsRecordTypePTR:
-		ptrRecords, err := dnsResolver.LookupAddr(dnsContext, lookup.hostname.String())
+		ptrRecords, err := dnsResolver.LookupAddr(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
 		queryResults = ptrRecords
 		queryError = err
 	default:
-		queryResults, queryError = dnsResolver.LookupHost(dnsContext, lookup.hostname.String())
+		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 	}
 
 	var trimmedResults []string
@@ -123,20 +151,33 @@ func (lookup *DnsLookup) queryDnsRecords(
 	return trimmedResults, queryError
 }
 
-func (lookup *DnsLookup) Execute() ([]string, error) {
+func (lookup *DnsLookup) Execute(
+	hostname tkValueObject.UnixHostname,
+	recordType *tkValueObject.DnsRecordType,
+) ([]string, error) {
+	dnsRecordType := tkValueObject.DnsRecordTypeDefault
+	if recordType != nil {
+		dnsRecordType = *recordType
+	}
+
 	lookupContext, contextCancel := context.WithTimeout(
-		context.Background(), time.Duration(lookup.queryTimeoutSec)*time.Second,
+		context.Background(),
+		time.Duration(lookup.queryTimeoutSecs)*time.Second,
 	)
 	defer contextCancel()
 
 	primaryResolver := lookup.resolverFactory(lookup.primaryResolver)
-	zoneRecords, err := lookup.queryDnsRecords(lookupContext, primaryResolver)
+	zoneRecords, err := lookup.queryDnsRecords(
+		lookupContext, primaryResolver, hostname, dnsRecordType,
+	)
 	if err == nil && len(zoneRecords) > 0 {
 		return zoneRecords, nil
 	}
 
 	secondaryResolver := lookup.resolverFactory(lookup.secondaryResolver)
-	zoneRecords, err = lookup.queryDnsRecords(lookupContext, secondaryResolver)
+	zoneRecords, err = lookup.queryDnsRecords(
+		lookupContext, secondaryResolver, hostname, dnsRecordType,
+	)
 	if err == nil && len(zoneRecords) > 0 {
 		return zoneRecords, nil
 	}

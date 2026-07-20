@@ -51,12 +51,14 @@ func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) 
 	if err != nil {
 		return ipAddress, err
 	}
-	primaryResolver := NewDnsLookup(primaryResolverHostname, &tkValueObject.DnsRecordTypeTXT)
-	primaryResolverResults, primaryResolverError := primaryResolver.Execute()
+	primaryResolver := NewDnsLookup(DnsLookupSettings{})
+	primaryResolverResults, primaryResolverError := primaryResolver.Execute(
+		primaryResolverHostname, &tkValueObject.DnsRecordTypeTXT,
+	)
 	if primaryResolverError == nil && len(primaryResolverResults) > 0 {
 		// ExpectedFormat: "ip1.2.3.4"
 		for _, rawRecord := range primaryResolverResults {
-			if !strings.Contains(rawRecord, "ip") {
+			if !strings.HasPrefix(rawRecord, "ip") {
 				continue
 			}
 
@@ -67,6 +69,11 @@ func ReadServerPublicIpAddress() (ipAddress tkValueObject.IpAddress, err error) 
 			}
 		}
 	}
+
+	slog.Debug("PrimaryServerPublicIpResolverFailed",
+		slog.String("primaryResolverHostname", primaryResolverHostname.String()),
+		slog.Any("primaryResolverResults", primaryResolverResults),
+	)
 
 	secondaryResolver := NewShell(ShellSettings{
 		Command:              "curl",
