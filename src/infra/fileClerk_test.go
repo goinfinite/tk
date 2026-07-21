@@ -2,6 +2,7 @@ package tkInfra
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1353,9 +1354,9 @@ func TestFileContentRegexSearch(t *testing.T) {
 		description      string
 		fileContent      string
 		patternSource    string
+		shouldProvideNil bool
 		expectedErrMsg   string
-		expectedMatchCt  int
-		expectedFirstRow []string
+		expectedFindings []FileContentRegexFindings
 		expectedErrIsNil bool
 	}{
 		{
@@ -1363,8 +1364,20 @@ func TestFileContentRegexSearch(t *testing.T) {
 			fileContent:      "alpha=1\nbeta=2\nalpha=3",
 			patternSource:    `^alpha=(\d+)$`,
 			expectedErrIsNil: true,
-			expectedMatchCt:  2,
-			expectedFirstRow: []string{"alpha=1", "1"},
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "alpha=1", Groups: []string{"1"}, LineNum: 1},
+				{Match: "alpha=3", Groups: []string{"3"}, LineNum: 3},
+			},
+		},
+		{
+			description:      "CaptureGroupPopulatesGroups",
+			fileContent:      "user=42\nuser=99",
+			patternSource:    `^user=(\d+)$`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "user=42", Groups: []string{"42"}, LineNum: 1},
+				{Match: "user=99", Groups: []string{"99"}, LineNum: 2},
+			},
 		},
 		{
 			description:      "NonExistentFileReturnsFileNotFound",
@@ -1385,12 +1398,19 @@ func TestFileContentRegexSearch(t *testing.T) {
 			fileContent:      "",
 			patternSource:    `^alpha=(\d+)$`,
 			expectedErrIsNil: true,
-			expectedMatchCt:  0,
+			expectedFindings: []FileContentRegexFindings{},
 		},
 		{
 			description:      "LineExceedingBufferSizeReturnsScannerError",
 			fileContent:      strings.Repeat("a", 100*1024),
 			patternSource:    `^a+$`,
+			expectedErrIsNil: false,
+		},
+		{
+			description:      "NilPatternReturnsRegexSearchPatternCannotBeNil",
+			fileContent:      "alpha=1",
+			shouldProvideNil: true,
+			expectedErrMsg:   "RegexSearchPatternCannotBeNil",
 			expectedErrIsNil: false,
 		},
 	}
@@ -1435,13 +1455,13 @@ func TestFileContentRegexSearch(t *testing.T) {
 				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
 			}
 
-			pattern, patternErr := tkValueObject.NewRegexPattern(testCase.patternSource)
-			if patternErr != nil {
-				t.Fatalf("NewRegexPatternFailed: %v", patternErr)
+			var regexPattern *regexp.Regexp
+			if !testCase.shouldProvideNil {
+				regexPattern = regexp.MustCompile(testCase.patternSource)
 			}
 
-			regexSubmatches, searchErr := clerk.FileContentRegexSearch(
-				filePath, pattern,
+			regexSearchFindings, searchErr := clerk.FileContentRegexSearch(
+				filePath, regexPattern,
 			)
 
 			if testCase.expectedErrIsNil {
@@ -1466,28 +1486,42 @@ func TestFileContentRegexSearch(t *testing.T) {
 				return
 			}
 
-			if len(regexSubmatches) != testCase.expectedMatchCt {
+			if len(regexSearchFindings) != len(testCase.expectedFindings) {
 				t.Errorf(
-					"WrongMatchCount: expected=%d actual=%d",
-					testCase.expectedMatchCt, len(regexSubmatches),
+					"WrongFindingsCount: expected=%d actual=%d",
+					len(testCase.expectedFindings), len(regexSearchFindings),
 				)
 				return
 			}
 
-			if testCase.expectedFirstRow != nil {
-				firstRow := regexSubmatches[0]
-				if len(firstRow) != len(testCase.expectedFirstRow) {
+			for findingIndex, expectedFinding := range testCase.expectedFindings {
+				actualFinding := regexSearchFindings[findingIndex]
+				if actualFinding.Match != expectedFinding.Match {
 					t.Errorf(
-						"WrongFirstRowFieldCount: expected=%d actual=%d",
-						len(testCase.expectedFirstRow), len(firstRow),
+						"WrongFindingMatch%d: '%s' vs '%s'",
+						findingIndex, expectedFinding.Match, actualFinding.Match,
 					)
-					return
 				}
-				for fieldIndex, expectedField := range testCase.expectedFirstRow {
-					if firstRow[fieldIndex] != expectedField {
+				if actualFinding.LineNum != expectedFinding.LineNum {
+					t.Errorf(
+						"WrongFindingLineNum%d: '%d' vs '%d'",
+						findingIndex, expectedFinding.LineNum, actualFinding.LineNum,
+					)
+				}
+				if len(actualFinding.Groups) != len(expectedFinding.Groups) {
+					t.Errorf(
+						"WrongFindingGroupCount%d: expected=%d actual=%d",
+						findingIndex,
+						len(expectedFinding.Groups), len(actualFinding.Groups),
+					)
+					continue
+				}
+				for groupIndex, expectedGroup := range expectedFinding.Groups {
+					if actualFinding.Groups[groupIndex] != expectedGroup {
 						t.Errorf(
-							"WrongFirstRowField%d: '%s' vs '%s'",
-							fieldIndex, expectedField, firstRow[fieldIndex],
+							"WrongFindingGroup%d-%d: '%s' vs '%s'",
+							findingIndex, groupIndex,
+							expectedGroup, actualFinding.Groups[groupIndex],
 						)
 					}
 				}

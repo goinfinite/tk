@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` streams the file line-by-line via `bufio.Scanner` and returns `[][]string` (per-line `FindAllStringSubmatch` results) using a caller-supplied `RegexPattern` VO
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` searches a file's content for regex matches and returns each match with its capture groups and line number
 
 ---
 

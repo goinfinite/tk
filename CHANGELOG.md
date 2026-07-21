@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.3.0 - 2026/07/21
+refactor: replace RegexPattern VO with native *regexp.Regexp in FileContentRegexSearch
+refactor: return []FileContentRegexFindings (match, capture groups, 1-based line number) from FileContentRegexSearch
+refactor: drop tkValueObject.RegexPattern value object
+
 0.2.9 - 2026/07/20
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
 feat: add RegexPattern value object for validated regex compilation

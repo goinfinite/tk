@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -22,6 +23,7 @@ var (
 	ErrSourcePathMissing            = errors.New("SourcePathNotFound")
 	ErrSymlinkExists                = errors.New("SymlinkAlreadyExists")
 	ErrTargetPathExists             = errors.New("TargetPathAlreadyExists")
+	ErrRegexSearchPatternMissing    = errors.New("RegexSearchPatternCannotBeNil")
 	ErrUnsupportedCompressionFormat = errors.New("UnsupportedCompressionFormat")
 )
 
@@ -142,43 +144,48 @@ func (clerk FileClerk) ReadFileContent(
 	return string(fileContentBytes), nil
 }
 
+type FileContentRegexFindings struct {
+	Match   string
+	Groups  []string
+	LineNum int
+}
+
 func (clerk FileClerk) FileContentRegexSearch(
 	filePath tkValueObject.UnixAbsoluteFilePath,
-	pattern tkValueObject.RegexPattern,
-) (regexSubmatches [][]string, err error) {
-	if !clerk.IsFile(filePath.String()) {
-		return regexSubmatches, ErrFileMissing
+	regexPattern *regexp.Regexp,
+) (regexSearchFindings []FileContentRegexFindings, err error) {
+	if regexPattern == nil {
+		return regexSearchFindings, ErrRegexSearchPatternMissing
 	}
 
-	fileHandler, osOpenErr := os.Open(filePath.String())
+	filePathStr := filePath.String()
+	if !clerk.IsFile(filePathStr) {
+		return regexSearchFindings, ErrFileMissing
+	}
+
+	fileHandler, osOpenErr := os.Open(filePathStr)
 	if osOpenErr != nil {
 		if os.IsNotExist(osOpenErr) {
-			return regexSubmatches, ErrFileMissing
+			return regexSearchFindings, ErrFileMissing
 		}
-		return regexSubmatches, osOpenErr
+		return regexSearchFindings, osOpenErr
 	}
 	defer fileHandler.Close()
 
 	fileScanner := bufio.NewScanner(fileHandler)
-
-	compiledRegexp, regexpCompileErr := pattern.CompiledRegexp()
-	if regexpCompileErr != nil {
-		return regexSubmatches, regexpCompileErr
-	}
-	for fileScanner.Scan() {
-		lineMatches := compiledRegexp.FindAllStringSubmatch(fileScanner.Text(), -1)
-		if len(lineMatches) == 0 {
-			continue
+	for currentLineNum := 1; fileScanner.Scan(); currentLineNum++ {
+		for _, lineMatch := range regexPattern.FindAllStringSubmatch(
+			fileScanner.Text(), -1,
+		) {
+			regexSearchFindings = append(regexSearchFindings, FileContentRegexFindings{
+				Match:   lineMatch[0],
+				Groups:  lineMatch[1:],
+				LineNum: currentLineNum,
+			})
 		}
-		regexSubmatches = append(regexSubmatches, lineMatches...)
 	}
 
-	scannerErr := fileScanner.Err()
-	if scannerErr != nil {
-		return regexSubmatches, scannerErr
-	}
-
-	return regexSubmatches, nil
+	return regexSearchFindings, fileScanner.Err()
 }
 
 func (clerk FileClerk) UpdateFileContent(
