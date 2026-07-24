@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` searches a file's content for regex matches and returns each match with its capture groups and line number
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` searches a file's content for regex matches (whole-file pass under 10MiB, bufio streaming above) and returns each match with its capture groups and a 1-based inclusive `LineNumRange [start, end]`; `FileContentRegexReplace` applies a regex substitution atomically (write to .tmp + atomic rename) using the same size-based routing, refuses empty source files, and rejects empty results on non-empty sources
 
 ---
 

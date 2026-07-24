@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,10 +13,17 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
+const (
+	RegexSearchStreamingMinSizeBytes int64 = 10 * 1024 * 1024
+	regexTempFileSuffix                    = ".tmp"
+)
+
 var (
 	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
 	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
 	ErrFileMissing                  = errors.New("FileNotFound")
+	ErrFileEmpty                    = errors.New("FileEmpty")
+	ErrFileEmptiedUnexpectedly      = errors.New("FileEmptiedUnexpectedly")
 	ErrDirCompressionWrongFormat    = errors.New("DirectoryCompressionMustUseTarFormat")
 	ErrCompressedFileMissing        = errors.New("CompressedFileNotFound")
 	ErrSourceDirMissing             = errors.New("SourceDirNotFound")
@@ -144,12 +152,106 @@ func (clerk FileClerk) ReadFileContent(
 	return string(fileContentBytes), nil
 }
 
+// FileContentRegexFindings holds one regex match plus its 1-based line
+// range and capture groups. LineNumRange is [start, end] inclusive;
+// a single-line match has start == end.
 type FileContentRegexFindings struct {
-	Match   string
-	Groups  []string
-	LineNum int
+	Match        string
+	Groups       []string
+	LineNumRange []int
 }
 
+func (clerk FileClerk) regexSearchWholeFile(
+	filePathStr string,
+	regexPattern *regexp.Regexp,
+) (regexSearchFindings []FileContentRegexFindings, err error) {
+	fileContent, readErr := clerk.ReadFileContent(filePathStr, nil)
+	if readErr != nil {
+		return regexSearchFindings, readErr
+	}
+
+	unprocessedMatches := regexPattern.FindAllStringSubmatch(fileContent, -1)
+	regexSearchFindings = make([]FileContentRegexFindings, 0, len(unprocessedMatches))
+
+	nextMatchOffset := 0
+	for _, matchAndGroups := range unprocessedMatches {
+		fullMatch := matchAndGroups[0]
+		captureGroups := matchAndGroups[1:]
+
+		unprocessedContent := fileContent[nextMatchOffset:]
+		matchRelativeStartPosition := strings.Index(unprocessedContent, fullMatch)
+		if matchRelativeStartPosition == -1 {
+			continue
+		}
+		matchAbsoluteStartPosition := nextMatchOffset + matchRelativeStartPosition
+		matchAbsoluteEndPosition := matchAbsoluteStartPosition + len(fullMatch)
+
+		startLineNumber := strings.Count(fileContent[:matchAbsoluteStartPosition], "\n") + 1
+		endLineNumber := strings.Count(fileContent[:matchAbsoluteEndPosition], "\n") + 1
+
+		regexSearchFindings = append(regexSearchFindings, FileContentRegexFindings{
+			Match:        fullMatch,
+			Groups:       captureGroups,
+			LineNumRange: []int{startLineNumber, endLineNumber},
+		})
+
+		nextMatchOffset = matchAbsoluteEndPosition
+	}
+
+	return regexSearchFindings, nil
+}
+
+func (clerk FileClerk) regexSearchStreaming(
+	filePathStr string,
+	regexPattern *regexp.Regexp,
+	fileSize int64,
+) (regexSearchFindings []FileContentRegexFindings, err error) {
+	slog.Warn(
+		"FileContentRegexSearchStreamingFallback",
+		slog.String("filePath", filePathStr),
+		slog.Int64("fileSizeBytes", fileSize),
+		slog.Int64("thresholdBytes", RegexSearchStreamingMinSizeBytes),
+		slog.String("reason", "FileSizeExceedsThreshold"),
+	)
+
+	fileHandler, osOpenErr := os.Open(filePathStr)
+	if osOpenErr != nil {
+		if os.IsNotExist(osOpenErr) {
+			return regexSearchFindings, ErrFileMissing
+		}
+		return regexSearchFindings, osOpenErr
+	}
+	defer fileHandler.Close()
+
+	fileScanner := bufio.NewScanner(fileHandler)
+	for currentLineNumber := 1; fileScanner.Scan(); currentLineNumber++ {
+		for _, lineMatchAndGroups := range regexPattern.FindAllStringSubmatch(
+			fileScanner.Text(), -1,
+		) {
+			fullMatch := lineMatchAndGroups[0]
+			captureGroups := lineMatchAndGroups[1:]
+
+			regexSearchFindings = append(regexSearchFindings, FileContentRegexFindings{
+				Match:        fullMatch,
+				Groups:       captureGroups,
+				LineNumRange: []int{currentLineNumber, currentLineNumber},
+			})
+		}
+	}
+
+	return regexSearchFindings, fileScanner.Err()
+}
+
+// FileContentRegexSearch finds every regex match in a file and returns
+// each match's 1-based inclusive line range plus capture groups.
+//
+// Files below RegexSearchStreamingMinSizeBytes are matched in a single
+// regex pass; patterns with per-line anchors (^ / $) need the (?m) flag.
+// Multi-line matches get a proper LineNumRange spanning every line they touch.
+//
+// Larger files fall back to bufio.Scanner streaming, which splits on
+// newlines — multi-line patterns only match within a single line and
+// LineNumRange is always [n, n].
 func (clerk FileClerk) FileContentRegexSearch(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	regexPattern *regexp.Regexp,
@@ -163,29 +265,180 @@ func (clerk FileClerk) FileContentRegexSearch(
 		return regexSearchFindings, ErrFileMissing
 	}
 
+	fileInfo, statErr := os.Stat(filePathStr)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return regexSearchFindings, ErrFileMissing
+		}
+		return regexSearchFindings, statErr
+	}
+
+	if fileInfo.Size() >= RegexSearchStreamingMinSizeBytes {
+		return clerk.regexSearchStreaming(filePathStr, regexPattern, fileInfo.Size())
+	}
+	return clerk.regexSearchWholeFile(filePathStr, regexPattern)
+}
+
+func (clerk FileClerk) regexReplaceWholeFile(
+	filePathStr string,
+	regexPattern *regexp.Regexp,
+	replacement string,
+	originalFileSize int64,
+) (replacementCount int, err error) {
+	fileContent, readErr := clerk.ReadFileContent(filePathStr, nil)
+	if readErr != nil {
+		return 0, readErr
+	}
+
+	replacementCount = len(regexPattern.FindAllString(fileContent, -1))
+	replacedContent := regexPattern.ReplaceAllString(fileContent, replacement)
+
+	tempFilePath := filePathStr + regexTempFileSuffix
+	tempFileCommitted := false
+	defer func() {
+		if !tempFileCommitted {
+			clerk.DeleteFile(tempFilePath)
+		}
+	}()
+
+	writeErr := clerk.UpdateFileContent(tempFilePath, replacedContent, true)
+	if writeErr != nil {
+		return 0, writeErr
+	}
+
+	if len(replacedContent) == 0 && originalFileSize > 0 {
+		return 0, ErrFileEmptiedUnexpectedly
+	}
+
+	renameErr := clerk.OverwriteFile(tempFilePath, filePathStr)
+	if renameErr != nil {
+		return 0, renameErr
+	}
+
+	tempFileCommitted = true
+	return replacementCount, nil
+}
+
+func (clerk FileClerk) regexReplaceStreaming(
+	filePathStr string,
+	regexPattern *regexp.Regexp,
+	replacement string,
+	originalFileSize int64,
+) (replacementCount int, err error) {
+	slog.Warn(
+		"FileContentRegexReplaceStreamingFallback",
+		slog.String("filePath", filePathStr),
+		slog.Int64("fileSizeBytes", originalFileSize),
+		slog.Int64("thresholdBytes", RegexSearchStreamingMinSizeBytes),
+		slog.String("reason", "FileSizeExceedsThreshold"),
+	)
+
 	fileHandler, osOpenErr := os.Open(filePathStr)
 	if osOpenErr != nil {
 		if os.IsNotExist(osOpenErr) {
-			return regexSearchFindings, ErrFileMissing
+			return 0, ErrFileMissing
 		}
-		return regexSearchFindings, osOpenErr
+		return 0, osOpenErr
 	}
 	defer fileHandler.Close()
 
-	fileScanner := bufio.NewScanner(fileHandler)
-	for currentLineNum := 1; fileScanner.Scan(); currentLineNum++ {
-		for _, lineMatch := range regexPattern.FindAllStringSubmatch(
-			fileScanner.Text(), -1,
-		) {
-			regexSearchFindings = append(regexSearchFindings, FileContentRegexFindings{
-				Match:   lineMatch[0],
-				Groups:  lineMatch[1:],
-				LineNum: currentLineNum,
-			})
-		}
+	tempFilePath := filePathStr + regexTempFileSuffix
+	tempHandler, createErr := os.Create(tempFilePath)
+	if createErr != nil {
+		return 0, createErr
 	}
 
-	return regexSearchFindings, fileScanner.Err()
+	defer func() {
+		_ = tempHandler.Close()
+		clerk.DeleteFile(tempFilePath)
+	}()
+
+	bufferedWriter := bufio.NewWriter(tempHandler)
+	fileScanner := bufio.NewScanner(fileHandler)
+	replacedByteCount := int64(0)
+	for fileScanner.Scan() {
+		currentLine := fileScanner.Text()
+		replacedLine := regexPattern.ReplaceAllString(currentLine, replacement)
+		lineReplacementCount := len(regexPattern.FindAllString(currentLine, -1))
+		replacementCount += lineReplacementCount
+		replacedByteCount += int64(len(replacedLine))
+
+		if _, writeErr := bufferedWriter.WriteString(replacedLine + "\n"); writeErr != nil {
+			return 0, writeErr
+		}
+	}
+	if scanErr := fileScanner.Err(); scanErr != nil {
+		return 0, scanErr
+	}
+	if flushErr := bufferedWriter.Flush(); flushErr != nil {
+		return 0, flushErr
+	}
+	if closeErr := tempHandler.Close(); closeErr != nil {
+		return 0, closeErr
+	}
+
+	if replacedByteCount == 0 && originalFileSize > 0 {
+		return 0, ErrFileEmptiedUnexpectedly
+	}
+
+	if renameErr := clerk.OverwriteFile(tempFilePath, filePathStr); renameErr != nil {
+		return 0, renameErr
+	}
+
+	return replacementCount, nil
+}
+
+// FileContentRegexReplace applies a regex substitution to a file's content
+// atomically: the updated content is written to a sibling .tmp file, sanity-
+// checked, then atomically renamed over the original via os.Rename.
+//
+// The function refuses to operate on an empty source file (use
+// TruncateFileContent to intentionally empty a file). It also rejects an empty
+// result on a non-empty source: a regex that matches everything with an empty
+// replacement would silently wipe the file, which is treated as a call-site
+// bug rather than a supported operation.
+//
+// Files below RegexSearchStreamingMinSizeBytes have the whole content
+// replaced in memory via regex.ReplaceAllString. Larger files run the
+// substitution per line via bufio.Scanner and emit a slog.Warn; the
+// streaming path therefore cannot apply patterns whose match spans a
+// newline boundary, and a source file without a trailing newline comes
+// out with one.
+func (clerk FileClerk) FileContentRegexReplace(
+	filePath tkValueObject.UnixAbsoluteFilePath,
+	regexPattern *regexp.Regexp,
+	replacement string,
+) (replacementCount int, err error) {
+	if regexPattern == nil {
+		return 0, ErrRegexSearchPatternMissing
+	}
+
+	filePathStr := filePath.String()
+	if !clerk.IsFile(filePathStr) {
+		return 0, ErrFileMissing
+	}
+
+	fileInfo, statErr := os.Stat(filePathStr)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return 0, ErrFileMissing
+		}
+		return 0, statErr
+	}
+	originalFileSize := fileInfo.Size()
+
+	if originalFileSize == 0 {
+		return 0, ErrFileEmpty
+	}
+
+	if originalFileSize >= RegexSearchStreamingMinSizeBytes {
+		return clerk.regexReplaceStreaming(
+			filePathStr, regexPattern, replacement, originalFileSize,
+		)
+	}
+	return clerk.regexReplaceWholeFile(
+		filePathStr, regexPattern, replacement, originalFileSize,
+	)
 }
 
 func (clerk FileClerk) UpdateFileContent(
@@ -212,8 +465,16 @@ func (clerk FileClerk) UpdateFileContent(
 	return bufferWriter.Flush()
 }
 
+func (clerk FileClerk) OverwriteFile(sourcePath, targetPath string) error {
+	if !clerk.IsFile(sourcePath) {
+		return ErrSourceFileMissing
+	}
+
+	return os.Rename(sourcePath, targetPath)
+}
+
 func (clerk FileClerk) DeleteFileContent(filePath string) error {
-	return clerk.UpdateFileContent(filePath, "", true)
+	return clerk.TruncateFileContent(filePath)
 }
 
 func (clerk FileClerk) TruncateFileContent(filePath string) error {
