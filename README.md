@@ -8,8 +8,8 @@ If you're looking for UI components, please refer to the [Infinite UI](https://g
 
 > [!IMPORTANT]
 > **Human Reviewed**: Although AI models are employed to assist development, every
-> line of code in our codebase is meticulously reviewed by senior developers who
-> care deeply about the software's coherence, readability, and maintainability.
+> line in our codebase is meticulously reviewed by senior developers who care
+> deeply about the software's coherence, readability, and maintainability.
 
 ## Installation
 
