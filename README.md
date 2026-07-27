@@ -6,6 +6,11 @@ While developed primarily for Infinite ecosystem projects, this open-source libr
 
 If you're looking for UI components, please refer to the [Infinite UI](https://github.com/goinfinite/ui) repository.
 
+> [!IMPORTANT]
+> **Human Reviewed**: Although AI models are employed to assist development, every
+> line of code in our codebase is meticulously reviewed by senior developers who
+> care deeply about the software's coherence, readability, and maintainability.
+
 ## Installation
 
 To use Infinite Toolkit _(TK)_ in your project, you can install it using Go modules. Run the following command in your terminal:
