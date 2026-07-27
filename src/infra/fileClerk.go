@@ -70,7 +70,7 @@ func (clerk FileClerk) CreateFile(filePath string) error {
 	return nil
 }
 
-func (clerk FileClerk) CopyFile(sourcePath, targetPath string) (methodErr error) {
+func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
 		return ErrSourceFileMissing
 	}
@@ -83,17 +83,13 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) (methodErr error)
 	if openErr != nil {
 		return openErr
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	targetFile, createErr := os.Create(targetPath)
 	if createErr != nil {
 		return createErr
 	}
-	defer func() {
-		if methodErr == nil {
-			methodErr = targetFile.Close()
-		}
-	}()
+	defer func() { _ = targetFile.Close() }()
 
 	bufferReader := bufio.NewReader(sourceFile)
 	bufferWriter := bufio.NewWriter(targetFile)
@@ -103,7 +99,17 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) (methodErr error)
 		return readFromErr
 	}
 
-	return bufferWriter.Flush()
+	flushErr := bufferWriter.Flush()
+	if flushErr != nil {
+		return flushErr
+	}
+
+	closeErr := targetFile.Close()
+	if closeErr != nil {
+		return closeErr
+	}
+
+	return nil
 }
 
 func (clerk FileClerk) MoveFile(sourcePath, targetPath string) error {
@@ -125,7 +131,7 @@ func (clerk FileClerk) RenameFile(sourcePath, targetPath string) error {
 func (clerk FileClerk) UpdateFileContent(
 	filePath, newContent string,
 	shouldOverwrite bool,
-) (methodErr error) {
+) error {
 	fileFlags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	if shouldOverwrite {
 		fileFlags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
@@ -135,11 +141,7 @@ func (clerk FileClerk) UpdateFileContent(
 	if openErr != nil {
 		return openErr
 	}
-	defer func() {
-		if methodErr == nil {
-			methodErr = fileHandler.Close()
-		}
-	}()
+	defer func() { _ = fileHandler.Close() }()
 
 	bufferWriter := bufio.NewWriter(fileHandler)
 	_, writeErr := bufferWriter.WriteString(newContent)
@@ -147,7 +149,17 @@ func (clerk FileClerk) UpdateFileContent(
 		return writeErr
 	}
 
-	return bufferWriter.Flush()
+	flushErr := bufferWriter.Flush()
+	if flushErr != nil {
+		return flushErr
+	}
+
+	closeErr := fileHandler.Close()
+	if closeErr != nil {
+		return closeErr
+	}
+
+	return nil
 }
 
 // OverwriteFile atomically replaces targetPath's underlying file with
@@ -176,6 +188,10 @@ func (clerk FileClerk) OverwriteFile(sourcePath, targetPath string) error {
 			return evalErr
 		}
 		actualFilePath = resolvedPath
+	}
+
+	if clerk.IsDir(actualFilePath) {
+		return ErrTargetIsDirectory
 	}
 
 	return os.Rename(sourcePath, actualFilePath)
@@ -358,7 +374,7 @@ func (clerk FileClerk) regexReplaceWholeFile(
 	filePathStr string,
 	regexPattern *regexp.Regexp,
 	replacement string,
-) (replacementCount int, methodErr error) {
+) (replacementCount int, err error) {
 	fileContent, readErr := clerk.ReadFileContent(filePathStr, nil)
 	if readErr != nil {
 		return 0, readErr
@@ -388,9 +404,7 @@ func (clerk FileClerk) regexReplaceWholeFile(
 	tempFilePathStr := tempFileHandle.Name()
 	defer func() {
 		_ = os.Remove(tempFilePathStr)
-		if methodErr == nil {
-			methodErr = tempFileHandle.Close()
-		}
+		_ = tempFileHandle.Close()
 	}()
 
 	_, writeErr := tempFileHandle.WriteString(replacedContent)
@@ -405,6 +419,11 @@ func (clerk FileClerk) regexReplaceWholeFile(
 		}
 	}
 
+	closeErr := tempFileHandle.Close()
+	if closeErr != nil {
+		return 0, closeErr
+	}
+
 	renameErr := clerk.OverwriteFile(tempFilePathStr, filePathStr)
 	if renameErr != nil {
 		return 0, renameErr
@@ -417,7 +436,7 @@ func (clerk FileClerk) regexReplaceStreaming(
 	filePathStr string,
 	regexPattern *regexp.Regexp,
 	replacement string,
-) (replacementCount int, methodErr error) {
+) (replacementCount int, err error) {
 	fileHandler, osOpenErr := os.Open(filePathStr)
 	if osOpenErr != nil {
 		if os.IsNotExist(osOpenErr) {
@@ -443,9 +462,7 @@ func (clerk FileClerk) regexReplaceStreaming(
 	tempFilePathStr := tempFileHandle.Name()
 	defer func() {
 		_ = os.Remove(tempFilePathStr)
-		if methodErr == nil {
-			methodErr = tempFileHandle.Close()
-		}
+		_ = tempFileHandle.Close()
 	}()
 
 	bufferWriter := bufio.NewWriter(tempFileHandle)
@@ -491,6 +508,11 @@ func (clerk FileClerk) regexReplaceStreaming(
 		if chmodErr != nil {
 			return 0, chmodErr
 		}
+	}
+
+	closeErr := tempFileHandle.Close()
+	if closeErr != nil {
+		return 0, closeErr
 	}
 
 	tempFileInfo, statErr := os.Stat(tempFilePathStr)

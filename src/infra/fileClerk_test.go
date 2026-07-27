@@ -1907,7 +1907,7 @@ func TestFileContentRegexReplace(t *testing.T) {
 						"TempFileShouldNotExistAfterReplace: %s",
 						tempLeftoverPath,
 					)
-					clerk.DeleteFile(tempLeftoverPath)
+					_ = clerk.DeleteFile(tempLeftoverPath)
 				}
 
 				return
@@ -1931,7 +1931,7 @@ func TestFileContentRegexReplace(t *testing.T) {
 					"TempFileShouldNotExistAfterFailedReplace: %s",
 					tempLeftoverPath,
 				)
-				clerk.DeleteFile(tempLeftoverPath)
+				_ = clerk.DeleteFile(tempLeftoverPath)
 			}
 
 			if testCase.expectedContent != "" {
