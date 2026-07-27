@@ -1,6 +1,12 @@
 # Changelog
 
 ```log
+0.3.0 - 2026/07/21
+feat: add FileContentRegexSearch and FileContentRegexReplace to FileClerk (size-based routing at 10MiB, atomic .tmp+rename, follow-symlinks, would-empty-result guard)
+feat: add FileClerk.OverwriteFile (atomic source-over-target rename resolving symlink chains via filepath.EvalSymlinks)
+refactor: replace RegexPattern VO with native *regexp.Regexp; return []FileContentRegexFindings with 1-based inclusive LineNumRange
+refactor: tighten FileContentRegex error contract — ErrSourceIsDirectory and ErrTargetIsDirectory distinguished; ErrReplacementWouldTruncateFile via tempfile stat; streaming-fallback slog.Warn lives at the dispatch site; DeleteFileContent delegates to TruncateFileContent
+
 0.2.9 - 2026/07/20
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
 feat: add RegexPattern value object for validated regex compilation

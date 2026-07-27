@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileContentRegexSearch` streams the file line-by-line via `bufio.Scanner` and returns `[][]string` (per-line `FindAllStringSubmatch` results) using a caller-supplied `RegexPattern` VO
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
 
 ---
 

@@ -6,6 +6,11 @@ While developed primarily for Infinite ecosystem projects, this open-source libr
 
 If you're looking for UI components, please refer to the [Infinite UI](https://github.com/goinfinite/ui) repository.
 
+> [!IMPORTANT]
+> **Human Reviewed**: Although AI models are employed to assist development, every
+> line in our codebase is meticulously reviewed by senior developers who care
+> deeply about the software's coherence, readability, and maintainability.
+
 ## Installation
 
 To use Infinite Toolkit _(TK)_ in your project, you can install it using Go modules. Run the following command in your terminal:
@@ -34,7 +39,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
 
-- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, and symlink handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, and symlink handling.
 
   ```go
   clerk := FileClerk{}
@@ -53,8 +58,12 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   maxContentSize := int64(1024)
   fileContent, fileReadingErr := clerk.ReadFileContent("example.txt", &maxContentSize)
   regexSearchFilePath, regexSearchFilePathErr := tkValueObject.NewUnixAbsoluteFilePath("example.txt", false)
-  regexSearchPattern, regexSearchPatternErr := tkValueObject.NewRegexPattern(`^error: (.+)$`)
-  regexSubmatches, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexSearchPattern)
+  regexPattern := regexp.MustCompile(`(?m)^error: (.+)$`)
+  regexSearchFindings, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexPattern)
+  regexReplacement := `warn: $1`
+  replacementCount, regexReplaceErr := clerk.FileContentRegexReplace(
+    regexSearchFilePath, regexPattern, regexReplacement,
+  )
   shouldOverwrite := true
   fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
   fileContentDeletionErr := clerk.DeleteFileContent("example.txt")
@@ -64,6 +73,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   fileCopyErr := clerk.CopyFile("source.txt", "destination.txt")
   fileMoveErr := clerk.MoveFile("old.txt", "new.txt")
   fileRenameErr := clerk.RenameFile("old.txt", "new.txt")
+  fileOverwriteErr := clerk.OverwriteFile("source.tmp", "destination.txt")
   fileDeletionErr := clerk.DeleteFile("example.txt")
 
   // FileAdvancedOperations

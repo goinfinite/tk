@@ -1,7 +1,9 @@
 package tkInfra
 
 import (
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1353,18 +1355,30 @@ func TestFileContentRegexSearch(t *testing.T) {
 		description      string
 		fileContent      string
 		patternSource    string
+		shouldProvideNil bool
 		expectedErrMsg   string
-		expectedMatchCt  int
-		expectedFirstRow []string
+		expectedFindings []FileContentRegexFindings
 		expectedErrIsNil bool
 	}{
 		{
 			description:      "MatchesTwoAnchoredLines",
 			fileContent:      "alpha=1\nbeta=2\nalpha=3",
-			patternSource:    `^alpha=(\d+)$`,
+			patternSource:    `(?m)^alpha=(\d+)$`,
 			expectedErrIsNil: true,
-			expectedMatchCt:  2,
-			expectedFirstRow: []string{"alpha=1", "1"},
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "alpha=1", Groups: []string{"1"}, LineNumRange: []int{1, 1}},
+				{Match: "alpha=3", Groups: []string{"3"}, LineNumRange: []int{3, 3}},
+			},
+		},
+		{
+			description:      "CaptureGroupPopulatesGroups",
+			fileContent:      "user=42\nuser=99",
+			patternSource:    `(?m)^user=(\d+)$`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "user=42", Groups: []string{"42"}, LineNumRange: []int{1, 1}},
+				{Match: "user=99", Groups: []string{"99"}, LineNumRange: []int{2, 2}},
+			},
 		},
 		{
 			description:      "NonExistentFileReturnsFileNotFound",
@@ -1374,10 +1388,10 @@ func TestFileContentRegexSearch(t *testing.T) {
 			expectedErrIsNil: false,
 		},
 		{
-			description:      "DirectoryPathReturnsFileNotFound",
+			description:      "DirectoryPathReturnsTargetIsDirectory",
 			fileContent:      "",
 			patternSource:    `^foo$`,
-			expectedErrMsg:   "FileNotFound",
+			expectedErrMsg:   "TargetIsDirectory",
 			expectedErrIsNil: false,
 		},
 		{
@@ -1385,12 +1399,40 @@ func TestFileContentRegexSearch(t *testing.T) {
 			fileContent:      "",
 			patternSource:    `^alpha=(\d+)$`,
 			expectedErrIsNil: true,
-			expectedMatchCt:  0,
+			expectedFindings: []FileContentRegexFindings{},
 		},
 		{
-			description:      "LineExceedingBufferSizeReturnsScannerError",
+			description:      "LineExceedingScannerBufferSucceedsViaWholeFile",
 			fileContent:      strings.Repeat("a", 100*1024),
 			patternSource:    `^a+$`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: strings.Repeat("a", 100*1024), Groups: []string{}, LineNumRange: []int{1, 1}},
+			},
+		},
+		{
+			description:      "MultiLineMatchSpansLineRange",
+			fileContent:      "alpha=1\nbeta=2\nalpha=3",
+			patternSource:    `(?s)alpha=.+alpha=\d+`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "alpha=1\nbeta=2\nalpha=3", Groups: []string{}, LineNumRange: []int{1, 3}},
+			},
+		},
+		{
+			description:      "MatchTextRepeatedBeforeRealMatchKeepsLineNumbers",
+			fileContent:      "afoo\nfoo",
+			patternSource:    `(?m)^foo$`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "foo", Groups: []string{}, LineNumRange: []int{2, 2}},
+			},
+		},
+		{
+			description:      "NilPatternReturnsRegexPatternCannotBeNil",
+			fileContent:      "alpha=1",
+			shouldProvideNil: true,
+			expectedErrMsg:   "RegexPatternCannotBeNil",
 			expectedErrIsNil: false,
 		},
 	}
@@ -1417,7 +1459,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 				}
 			}
 
-			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				deleteErr := clerk.DeleteFile(targetFile)
 				if deleteErr != nil {
 					t.Fatalf("DeleteFileFailed: %v", deleteErr)
@@ -1435,13 +1477,13 @@ func TestFileContentRegexSearch(t *testing.T) {
 				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
 			}
 
-			pattern, patternErr := tkValueObject.NewRegexPattern(testCase.patternSource)
-			if patternErr != nil {
-				t.Fatalf("NewRegexPatternFailed: %v", patternErr)
+			var regexPattern *regexp.Regexp
+			if !testCase.shouldProvideNil {
+				regexPattern = regexp.MustCompile(testCase.patternSource)
 			}
 
-			regexSubmatches, searchErr := clerk.FileContentRegexSearch(
-				filePath, pattern,
+			regexSearchFindings, searchErr := clerk.FileContentRegexSearch(
+				filePath, regexPattern,
 			)
 
 			if testCase.expectedErrIsNil {
@@ -1466,28 +1508,62 @@ func TestFileContentRegexSearch(t *testing.T) {
 				return
 			}
 
-			if len(regexSubmatches) != testCase.expectedMatchCt {
+			if len(regexSearchFindings) != len(testCase.expectedFindings) {
 				t.Errorf(
-					"WrongMatchCount: expected=%d actual=%d",
-					testCase.expectedMatchCt, len(regexSubmatches),
+					"WrongFindingsCount: expected=%d actual=%d",
+					len(testCase.expectedFindings), len(regexSearchFindings),
 				)
 				return
 			}
 
-			if testCase.expectedFirstRow != nil {
-				firstRow := regexSubmatches[0]
-				if len(firstRow) != len(testCase.expectedFirstRow) {
+			for findingIndex, expectedFinding := range testCase.expectedFindings {
+				actualFinding := regexSearchFindings[findingIndex]
+				if actualFinding.Match != expectedFinding.Match {
 					t.Errorf(
-						"WrongFirstRowFieldCount: expected=%d actual=%d",
-						len(testCase.expectedFirstRow), len(firstRow),
+						"WrongFindingMatch%d: '%s' vs '%s'",
+						findingIndex, expectedFinding.Match, actualFinding.Match,
 					)
-					return
 				}
-				for fieldIndex, expectedField := range testCase.expectedFirstRow {
-					if firstRow[fieldIndex] != expectedField {
+				if len(actualFinding.LineNumRange) != 2 ||
+					len(expectedFinding.LineNumRange) != 2 {
+					t.Errorf(
+						"WrongFindingLineRangeShape%d: expected=%v actual=%v",
+						findingIndex,
+						expectedFinding.LineNumRange,
+						actualFinding.LineNumRange,
+					)
+					continue
+				}
+				if actualFinding.LineNumRange[0] != expectedFinding.LineNumRange[0] {
+					t.Errorf(
+						"WrongFindingLineRangeStart%d: '%d' vs '%d'",
+						findingIndex,
+						expectedFinding.LineNumRange[0],
+						actualFinding.LineNumRange[0],
+					)
+				}
+				if actualFinding.LineNumRange[1] != expectedFinding.LineNumRange[1] {
+					t.Errorf(
+						"WrongFindingLineRangeEnd%d: '%d' vs '%d'",
+						findingIndex,
+						expectedFinding.LineNumRange[1],
+						actualFinding.LineNumRange[1],
+					)
+				}
+				if len(actualFinding.Groups) != len(expectedFinding.Groups) {
+					t.Errorf(
+						"WrongFindingGroupCount%d: expected=%d actual=%d",
+						findingIndex,
+						len(expectedFinding.Groups), len(actualFinding.Groups),
+					)
+					continue
+				}
+				for groupIndex, expectedGroup := range expectedFinding.Groups {
+					if actualFinding.Groups[groupIndex] != expectedGroup {
 						t.Errorf(
-							"WrongFirstRowField%d: '%s' vs '%s'",
-							fieldIndex, expectedField, firstRow[fieldIndex],
+							"WrongFindingGroup%d-%d: '%s' vs '%s'",
+							findingIndex, groupIndex,
+							expectedGroup, actualFinding.Groups[groupIndex],
 						)
 					}
 				}
@@ -1498,10 +1574,379 @@ func TestFileContentRegexSearch(t *testing.T) {
 				t.Errorf("DeleteFileFailed: %v", cleanupErr)
 			}
 
-			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				dirCleanupErr := clerk.DeleteDir(targetFile)
 				if dirCleanupErr != nil {
 					t.Errorf("DeleteDirFailed: %v", dirCleanupErr)
+				}
+			}
+		})
+	}
+}
+
+func TestOverwriteFile(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	t.Run("OverwriteExistingTarget", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "source.txt")
+		targetFile := filepath.Join(tempDir, "target.txt")
+		sourceContent := "new content via overwrite"
+		targetContent := "old content to be overwritten"
+
+		err := clerk.CreateFile(sourceFile)
+		if err != nil {
+			t.Fatalf("CreateSourceFileFailed: %v", err)
+		}
+
+		err = clerk.UpdateFileContent(sourceFile, sourceContent, true)
+		if err != nil {
+			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+		}
+
+		err = clerk.CreateFile(targetFile)
+		if err != nil {
+			t.Fatalf("CreateTargetFileFailed: %v", err)
+		}
+
+		err = clerk.UpdateFileContent(targetFile, targetContent, true)
+		if err != nil {
+			t.Fatalf("UpdateTargetFileContentFailed: %v", err)
+		}
+
+		err = clerk.OverwriteFile(sourceFile, targetFile)
+		if err != nil {
+			t.Errorf("OverwriteFileFailed: %v", err)
+		}
+
+		if clerk.IsFile(sourceFile) {
+			t.Errorf("SourceFileShouldNotExist: %s", sourceFile)
+		}
+
+		if !clerk.IsFile(targetFile) {
+			t.Errorf("TargetFileShouldExist: %s", targetFile)
+		}
+
+		actualContent, err := clerk.ReadFileContent(targetFile, nil)
+		if err != nil {
+			t.Errorf("ReadFileContentFailed: %v", err)
+		}
+
+		if actualContent != sourceContent {
+			t.Errorf(
+				"ContentMismatch: '%s' vs '%s'",
+				actualContent, sourceContent,
+			)
+		}
+
+		err = clerk.DeleteFile(targetFile)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+	})
+
+	t.Run("OverwriteWithNonExistentTarget", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "source2.txt")
+		targetFile := filepath.Join(tempDir, "new_target.txt")
+		sourceContent := "content"
+
+		err := clerk.CreateFile(sourceFile)
+		if err != nil {
+			t.Fatalf("CreateSourceFileFailed: %v", err)
+		}
+
+		err = clerk.UpdateFileContent(sourceFile, sourceContent, true)
+		if err != nil {
+			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+		}
+
+		err = clerk.OverwriteFile(sourceFile, targetFile)
+		if err != nil {
+			t.Errorf("OverwriteFileFailed: %v", err)
+		}
+
+		if clerk.IsFile(sourceFile) {
+			t.Errorf("SourceFileShouldNotExist: %s", sourceFile)
+		}
+
+		if !clerk.IsFile(targetFile) {
+			t.Errorf("TargetFileShouldExist: %s", targetFile)
+		}
+
+		err = clerk.DeleteFile(targetFile)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+	})
+
+	t.Run("OverwriteNonExistentSource", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "nonexistent.txt")
+		targetFile := filepath.Join(tempDir, "target.txt")
+
+		err := clerk.OverwriteFile(sourceFile, targetFile)
+		if err == nil {
+			t.Errorf("MissingExpectedError: SourceFileNotFound")
+		}
+
+		if err != nil && err.Error() != "SourceFileNotFound" {
+			t.Errorf(
+				"WrongErrorMessage: '%s' vs '%s'",
+				"SourceFileNotFound", err.Error(),
+			)
+		}
+	})
+
+	t.Run("OverwriteSymlinkTargetReplacesUnderlyingFile", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "real.txt")
+		linkFile := filepath.Join(tempDir, "link.txt")
+		sourceFile := filepath.Join(tempDir, "source3.txt")
+
+		if err := clerk.UpdateFileContent(realFile, "original", true); err != nil {
+			t.Fatalf("UpdateRealFileContentFailed: %v", err)
+		}
+		if err := os.Symlink(realFile, linkFile); err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+		if err := clerk.UpdateFileContent(sourceFile, "replaced", true); err != nil {
+			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+		}
+
+		if err := clerk.OverwriteFile(sourceFile, linkFile); err != nil {
+			t.Fatalf("OverwriteFileFailed: %v", err)
+		}
+
+		if !clerk.IsSymlink(linkFile) {
+			t.Errorf("SymlinkShouldBePreserved: %s", linkFile)
+		}
+		realContent, err := clerk.ReadFileContent(realFile, nil)
+		if err != nil {
+			t.Fatalf("ReadFileContentFailed: %v", err)
+		}
+		if realContent != "replaced" {
+			t.Errorf("ContentMismatch: '%s' vs 'replaced'", realContent)
+		}
+	})
+
+	t.Run("OverwriteWithDirectorySourceReturnsSourceIsDirectory", func(t *testing.T) {
+		sourceDir := filepath.Join(tempDir, "sourceDir")
+		if err := clerk.CreateDir(sourceDir); err != nil {
+			t.Fatalf("CreateDirFailed: %v", err)
+		}
+
+		err := clerk.OverwriteFile(sourceDir, filepath.Join(tempDir, "any.txt"))
+		if err == nil || err.Error() != "SourceIsDirectory" {
+			t.Errorf("WrongErrorMessage: 'SourceIsDirectory' vs '%v'", err)
+		}
+	})
+}
+
+func TestFileContentRegexReplace(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	testCaseStructs := []struct {
+		description      string
+		fileContent      string
+		patternSource    string
+		replacement      string
+		shouldProvideNil bool
+		expectedErrMsg   string
+		expectedErrIsNil bool
+		expectedContent  string
+		expectedCount    int
+	}{
+		{
+			description:      "SimpleReplacementUpdatesContent",
+			fileContent:      "alpha=1\nbeta=2\nalpha=3",
+			patternSource:    `(?m)^alpha=(\d+)$`,
+			replacement:      `alpha=$1!`,
+			expectedErrIsNil: true,
+			expectedContent:  "alpha=1!\nbeta=2\nalpha=3!",
+			expectedCount:    2,
+		},
+		{
+			description:      "ReplacementWithoutAnchorsReplacesAll",
+			fileContent:      "foo foo foo",
+			patternSource:    `foo`,
+			replacement:      `bar`,
+			expectedErrIsNil: true,
+			expectedContent:  "bar bar bar",
+			expectedCount:    3,
+		},
+		{
+			description:      "NoMatchReturnsZeroCountAndUnchangedContent",
+			fileContent:      "hello world",
+			patternSource:    `^xyz$`,
+			replacement:      `replaced`,
+			expectedErrIsNil: true,
+			expectedContent:  "hello world",
+			expectedCount:    0,
+		},
+		{
+			description:      "EmptyReplacementRemovesMatches",
+			fileContent:      "abc abc def",
+			patternSource:    `abc `,
+			replacement:      ``,
+			expectedErrIsNil: true,
+			expectedContent:  "def",
+			expectedCount:    2,
+		},
+		{
+			description:      "NonExistentFileReturnsFileNotFound",
+			fileContent:      "",
+			patternSource:    `^foo$`,
+			replacement:      `bar`,
+			expectedErrMsg:   "FileNotFound",
+			expectedErrIsNil: false,
+		},
+		{
+			description:      "EmptyFileReturnsFileEmpty",
+			fileContent:      "",
+			patternSource:    `^foo$`,
+			replacement:      `bar`,
+			expectedErrMsg:   "FileEmpty",
+			expectedErrIsNil: false,
+		},
+		{
+			description:      "EmptyResultOnNonEmptySourceReturnsReplacementWouldTruncateFile",
+			fileContent:      "foo bar",
+			patternSource:    `(?s).*`,
+			replacement:      ``,
+			expectedErrMsg:   "ReplacementWouldTruncateFile",
+			expectedErrIsNil: false,
+			expectedContent:  "foo bar",
+		},
+		{
+			description:      "StreamingRegexMatchingAllWithEmptyReplacementProducesNewlineOnlyFile",
+			fileContent:      strings.Repeat("foo\n", 3000000),
+			patternSource:    `(?s).*`,
+			replacement:      ``,
+			expectedErrIsNil: true,
+			expectedContent:  strings.Repeat("\n", 3000000),
+			expectedCount:    3000000,
+		},
+		{
+			description:      "NilPatternReturnsRegexPatternCannotBeNil",
+			fileContent:      "alpha=1",
+			shouldProvideNil: true,
+			replacement:      `alpha=2`,
+			expectedErrMsg:   "RegexPatternCannotBeNil",
+			expectedErrIsNil: false,
+		},
+	}
+
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.description, func(t *testing.T) {
+			targetFile := filepath.Join(tempDir, testCase.description+".txt")
+			createErr := clerk.CreateFile(targetFile)
+			if createErr != nil {
+				t.Fatalf("CreateFileFailed: %v", createErr)
+			}
+
+			if testCase.fileContent != "" {
+				writeErr := clerk.UpdateFileContent(
+					targetFile, testCase.fileContent, true,
+				)
+				if writeErr != nil {
+					t.Fatalf("UpdateFileContentFailed: %v", writeErr)
+				}
+			}
+
+			if testCase.description == "NonExistentFileReturnsFileNotFound" {
+				deleteErr := clerk.DeleteFile(targetFile)
+				if deleteErr != nil {
+					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+				}
+			}
+
+			filePath, pathErr := tkValueObject.NewUnixAbsoluteFilePath(
+				targetFile, true,
+			)
+			if pathErr != nil {
+				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
+			}
+
+			var regexPattern *regexp.Regexp
+			if !testCase.shouldProvideNil {
+				regexPattern = regexp.MustCompile(testCase.patternSource)
+			}
+
+			replacementCount, replaceErr := clerk.FileContentRegexReplace(
+				filePath, regexPattern, testCase.replacement,
+			)
+
+			if testCase.expectedErrIsNil {
+				if replaceErr != nil {
+					t.Errorf("UnexpectedError: '%s'", replaceErr.Error())
+					return
+				}
+
+				if replacementCount != testCase.expectedCount {
+					t.Errorf(
+						"WrongReplacementCount: expected=%d actual=%d",
+						testCase.expectedCount, replacementCount,
+					)
+				}
+
+				actualContent, readErr := clerk.ReadFileContent(targetFile, nil)
+				if readErr != nil {
+					t.Errorf("ReadFileContentFailed: %v", readErr)
+					return
+				}
+
+				if actualContent != testCase.expectedContent {
+					t.Errorf(
+						"WrongContent: '%s' vs '%s'",
+						actualContent, testCase.expectedContent,
+					)
+				}
+
+				tempLeftoverMatches, _ := filepath.Glob(targetFile + ".tmp*")
+				for _, tempLeftoverPath := range tempLeftoverMatches {
+					t.Errorf(
+						"TempFileShouldNotExistAfterReplace: %s",
+						tempLeftoverPath,
+					)
+					_ = clerk.DeleteFile(tempLeftoverPath)
+				}
+
+				return
+			}
+
+			if replaceErr == nil {
+				t.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
+				return
+			}
+			if testCase.expectedErrMsg != "" &&
+				replaceErr.Error() != testCase.expectedErrMsg {
+				t.Errorf(
+					"WrongErrorMessage: '%s' vs '%s'",
+					testCase.expectedErrMsg, replaceErr.Error(),
+				)
+			}
+
+			tempLeftoverMatches, _ := filepath.Glob(targetFile + ".tmp*")
+			for _, tempLeftoverPath := range tempLeftoverMatches {
+				t.Errorf(
+					"TempFileShouldNotExistAfterFailedReplace: %s",
+					tempLeftoverPath,
+				)
+				_ = clerk.DeleteFile(tempLeftoverPath)
+			}
+
+			if testCase.expectedContent != "" {
+				actualContentAfterFail, readErr := clerk.ReadFileContent(
+					targetFile, nil,
+				)
+				if readErr != nil {
+					t.Errorf("ReadFileContentAfterFailFailed: %v", readErr)
+					return
+				}
+				if actualContentAfterFail != testCase.expectedContent {
+					t.Errorf(
+						"OriginalFileShouldBeUnchangedAfterFailedReplace: '%s' vs '%s'",
+						testCase.expectedContent, actualContentAfterFail,
+					)
 				}
 			}
 		})
