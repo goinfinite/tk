@@ -1,11 +1,17 @@
 # Changelog
 
 ```log
-0.3.0 - 2026/07/21
+0.3.0 - 2026/07/27
 feat: add FileContentRegexSearch and FileContentRegexReplace to FileClerk (size-based routing at 10MiB, atomic .tmp+rename, follow-symlinks, would-empty-result guard)
 feat: add FileClerk.OverwriteFile (atomic source-over-target rename resolving symlink chains via filepath.EvalSymlinks)
 refactor: replace RegexPattern VO with native *regexp.Regexp; return []FileContentRegexFindings with 1-based inclusive LineNumRange
 refactor: tighten FileContentRegex error contract — ErrSourceIsDirectory and ErrTargetIsDirectory distinguished; ErrReplacementWouldTruncateFile via tempfile stat; streaming-fallback slog.Warn lives at the dispatch site; DeleteFileContent delegates to TruncateFileContent
+docs: align .context.md, README.md, and FEATURE-MAP with 0.3.0 surface; add Human Reviewed callout to README
+fix: regex search derives match offsets from engine; replace preserves terminators and mode
+fix: capture deferred Close errors in CopyFile and UpdateFileContent
+fix: close file handles before reporting success in write-bearing operations
+fix: resolve symlink target before creating regexReplace temp file (cross-device rename)
+docs: explain why regexSearchWholeFile keeps two-pass regex scan
 
 0.2.9 - 2026/07/20
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search
