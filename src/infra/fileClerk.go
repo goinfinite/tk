@@ -251,6 +251,11 @@ func (clerk FileClerk) regexSearchWholeFile(
 		return regexSearchFindings, readErr
 	}
 
+	// DO NOT REPLACE: FindAllStringSubmatchIndex would halve the regex
+	// scan, but extracting match text and capture groups from raw index
+	// pairs requires manual slice arithmetic that makes the code
+	// unreadable. The gain is negligible (~ms on 10MB files).
+	// Readability over performance.
 	matchesWithGroups := regexPattern.FindAllStringSubmatch(fileContent, -1)
 	matchByteRanges := regexPattern.FindAllStringIndex(fileContent, -1)
 	if len(matchesWithGroups) != len(matchByteRanges) {
