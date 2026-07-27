@@ -70,7 +70,7 @@ func (clerk FileClerk) CreateFile(filePath string) error {
 	return nil
 }
 
-func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
+func (clerk FileClerk) CopyFile(sourcePath, targetPath string) (methodErr error) {
 	if !clerk.IsFile(sourcePath) {
 		return ErrSourceFileMissing
 	}
@@ -79,24 +79,28 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 		return ErrTargetFileExists
 	}
 
-	sourceFile, err := os.Open(sourcePath)
-	if err != nil {
-		return err
+	sourceFile, openErr := os.Open(sourcePath)
+	if openErr != nil {
+		return openErr
 	}
 	defer sourceFile.Close()
 
-	targetFile, err := os.Create(targetPath)
-	if err != nil {
-		return err
+	targetFile, createErr := os.Create(targetPath)
+	if createErr != nil {
+		return createErr
 	}
-	defer targetFile.Close()
+	defer func() {
+		if methodErr == nil {
+			methodErr = targetFile.Close()
+		}
+	}()
 
 	bufferReader := bufio.NewReader(sourceFile)
 	bufferWriter := bufio.NewWriter(targetFile)
 
-	_, err = bufferWriter.ReadFrom(bufferReader)
-	if err != nil {
-		return err
+	_, readFromErr := bufferWriter.ReadFrom(bufferReader)
+	if readFromErr != nil {
+		return readFromErr
 	}
 
 	return bufferWriter.Flush()
@@ -121,22 +125,26 @@ func (clerk FileClerk) RenameFile(sourcePath, targetPath string) error {
 func (clerk FileClerk) UpdateFileContent(
 	filePath, newContent string,
 	shouldOverwrite bool,
-) error {
+) (methodErr error) {
 	fileFlags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	if shouldOverwrite {
 		fileFlags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	}
 
-	fileHandler, err := os.OpenFile(filePath, fileFlags, 0644)
-	if err != nil {
-		return err
+	fileHandler, openErr := os.OpenFile(filePath, fileFlags, 0644)
+	if openErr != nil {
+		return openErr
 	}
-	defer fileHandler.Close()
+	defer func() {
+		if methodErr == nil {
+			methodErr = fileHandler.Close()
+		}
+	}()
 
 	bufferWriter := bufio.NewWriter(fileHandler)
-	_, err = bufferWriter.WriteString(newContent)
-	if err != nil {
-		return err
+	_, writeErr := bufferWriter.WriteString(newContent)
+	if writeErr != nil {
+		return writeErr
 	}
 
 	return bufferWriter.Flush()
