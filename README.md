@@ -34,7 +34,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
 
-- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, and symlink handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, and symlink handling.
 
   ```go
   clerk := FileClerk{}
@@ -55,6 +55,11 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   regexSearchFilePath, regexSearchFilePathErr := tkValueObject.NewUnixAbsoluteFilePath("example.txt", false)
   regexSearchPattern := regexp.MustCompile(`^error: (.+)$`)
   regexSearchFindings, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexSearchPattern)
+  regexReplacePattern := regexp.MustCompile(`^error: (.+)$`)
+  regexReplacement := `warn: $1`
+  replacementCount, regexReplaceErr := clerk.FileContentRegexReplace(
+    regexSearchFilePath, regexReplacePattern, regexReplacement,
+  )
   shouldOverwrite := true
   fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
   fileContentDeletionErr := clerk.DeleteFileContent("example.txt")
@@ -64,6 +69,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   fileCopyErr := clerk.CopyFile("source.txt", "destination.txt")
   fileMoveErr := clerk.MoveFile("old.txt", "new.txt")
   fileRenameErr := clerk.RenameFile("old.txt", "new.txt")
+  fileOverwriteErr := clerk.OverwriteFile("source.tmp", "destination.txt")
   fileDeletionErr := clerk.DeleteFile("example.txt")
 
   // FileAdvancedOperations
