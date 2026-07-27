@@ -1,6 +1,7 @@
 package tkInfra
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -1419,6 +1420,15 @@ func TestFileContentRegexSearch(t *testing.T) {
 			},
 		},
 		{
+			description:      "MatchTextRepeatedBeforeRealMatchKeepsLineNumbers",
+			fileContent:      "afoo\nfoo",
+			patternSource:    `(?m)^foo$`,
+			expectedErrIsNil: true,
+			expectedFindings: []FileContentRegexFindings{
+				{Match: "foo", Groups: []string{}, LineNumRange: []int{2, 2}},
+			},
+		},
+		{
 			description:      "NilPatternReturnsRegexPatternCannotBeNil",
 			fileContent:      "alpha=1",
 			shouldProvideNil: true,
@@ -1685,6 +1695,49 @@ func TestOverwriteFile(t *testing.T) {
 			)
 		}
 	})
+
+	t.Run("OverwriteSymlinkTargetReplacesUnderlyingFile", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "real.txt")
+		linkFile := filepath.Join(tempDir, "link.txt")
+		sourceFile := filepath.Join(tempDir, "source3.txt")
+
+		if err := clerk.UpdateFileContent(realFile, "original", true); err != nil {
+			t.Fatalf("UpdateRealFileContentFailed: %v", err)
+		}
+		if err := os.Symlink(realFile, linkFile); err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+		if err := clerk.UpdateFileContent(sourceFile, "replaced", true); err != nil {
+			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+		}
+
+		if err := clerk.OverwriteFile(sourceFile, linkFile); err != nil {
+			t.Fatalf("OverwriteFileFailed: %v", err)
+		}
+
+		if !clerk.IsSymlink(linkFile) {
+			t.Errorf("SymlinkShouldBePreserved: %s", linkFile)
+		}
+		realContent, err := clerk.ReadFileContent(realFile, nil)
+		if err != nil {
+			t.Fatalf("ReadFileContentFailed: %v", err)
+		}
+		if realContent != "replaced" {
+			t.Errorf("ContentMismatch: '%s' vs 'replaced'", realContent)
+		}
+	})
+
+	t.Run("OverwriteWithDirectorySourceReturnsSourceIsDirectory", func(t *testing.T) {
+		sourceDir := filepath.Join(tempDir, "sourceDir")
+		if err := clerk.CreateDir(sourceDir); err != nil {
+			t.Fatalf("CreateDirFailed: %v", err)
+		}
+
+		err := clerk.OverwriteFile(sourceDir, filepath.Join(tempDir, "any.txt"))
+		if err == nil || err.Error() != "SourceIsDirectory" {
+			t.Errorf("WrongErrorMessage: 'SourceIsDirectory' vs '%v'", err)
+		}
+	})
 }
 
 func TestFileContentRegexReplace(t *testing.T) {
@@ -1848,12 +1901,13 @@ func TestFileContentRegexReplace(t *testing.T) {
 					)
 				}
 
-				tempFilePath := targetFile + ".tmp"
-				if clerk.IsFile(tempFilePath) {
+				tempLeftoverMatches, _ := filepath.Glob(targetFile + ".tmp*")
+				for _, tempLeftoverPath := range tempLeftoverMatches {
 					t.Errorf(
-						"TempFileShouldNotExistAfterReplace: %s", tempFilePath,
+						"TempFileShouldNotExistAfterReplace: %s",
+						tempLeftoverPath,
 					)
-					clerk.DeleteFile(tempFilePath)
+					clerk.DeleteFile(tempLeftoverPath)
 				}
 
 				return
@@ -1871,13 +1925,13 @@ func TestFileContentRegexReplace(t *testing.T) {
 				)
 			}
 
-			tempFilePath := targetFile + ".tmp"
-			if clerk.IsFile(tempFilePath) {
+			tempLeftoverMatches, _ := filepath.Glob(targetFile + ".tmp*")
+			for _, tempLeftoverPath := range tempLeftoverMatches {
 				t.Errorf(
 					"TempFileShouldNotExistAfterFailedReplace: %s",
-					tempFilePath,
+					tempLeftoverPath,
 				)
-				clerk.DeleteFile(tempFilePath)
+				clerk.DeleteFile(tempLeftoverPath)
 			}
 
 			if testCase.expectedContent != "" {

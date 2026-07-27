@@ -58,12 +58,11 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   maxContentSize := int64(1024)
   fileContent, fileReadingErr := clerk.ReadFileContent("example.txt", &maxContentSize)
   regexSearchFilePath, regexSearchFilePathErr := tkValueObject.NewUnixAbsoluteFilePath("example.txt", false)
-  regexSearchPattern := regexp.MustCompile(`^error: (.+)$`)
-  regexSearchFindings, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexSearchPattern)
-  regexReplacePattern := regexp.MustCompile(`^error: (.+)$`)
+  regexPattern := regexp.MustCompile(`(?m)^error: (.+)$`)
+  regexSearchFindings, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexPattern)
   regexReplacement := `warn: $1`
   replacementCount, regexReplaceErr := clerk.FileContentRegexReplace(
-    regexSearchFilePath, regexReplacePattern, regexReplacement,
+    regexSearchFilePath, regexPattern, regexReplacement,
   )
   shouldOverwrite := true
   fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
