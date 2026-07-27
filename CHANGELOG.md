@@ -2,15 +2,10 @@
 
 ```log
 0.3.0 - 2026/07/21
-feat: add FileContentRegexReplace to FileClerk for atomic in-place regex substitution
-feat: add FileClerk.OverwriteFile (atomic source-over-target rename via os.Rename; drops MoveFile's target-exists guard so the target is overwritten)
-feat: FileContentRegexReplace refuses to operate on empty files (use TruncateFileContent to intentionally empty a file)
-feat: FileContentRegexReplace rejects empty result on non-empty source (sanity check; use TruncateFileContent to intentionally empty)
-feat: route FileContentRegex{Search,Replace} to whole-file path for files < 10MiB and bufio streaming for >= 10MiB with slog.Warn
-refactor: replace RegexPattern VO with native *regexp.Regexp in FileContentRegexSearch
-refactor: return []FileContentRegexFindings (match, capture groups, 1-based inclusive LineNumRange [start, end]) from FileContentRegexSearch
-refactor: drop tkValueObject.RegexPattern value object
-refactor: DeleteFileContent delegates to TruncateFileContent to remove duplicated bodies
+feat: add FileContentRegexSearch and FileContentRegexReplace to FileClerk (size-based routing at 10MiB, atomic .tmp+rename, follow-symlinks, would-empty-result guard)
+feat: add FileClerk.OverwriteFile (atomic source-over-target rename resolving symlink chains via filepath.EvalSymlinks)
+refactor: replace RegexPattern VO with native *regexp.Regexp; return []FileContentRegexFindings with 1-based inclusive LineNumRange
+refactor: tighten FileContentRegex error contract — ErrSourceIsDirectory and ErrTargetIsDirectory distinguished; ErrReplacementWouldTruncateFile via tempfile stat; streaming-fallback slog.Warn lives at the dispatch site; DeleteFileContent delegates to TruncateFileContent
 
 0.2.9 - 2026/07/20
 feat: add FileContentRegexSearch to FileClerk for streaming line-by-line regex search

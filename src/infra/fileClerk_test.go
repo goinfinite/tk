@@ -1387,10 +1387,10 @@ func TestFileContentRegexSearch(t *testing.T) {
 			expectedErrIsNil: false,
 		},
 		{
-			description:      "DirectoryPathReturnsFileNotFound",
+			description:      "DirectoryPathReturnsTargetIsDirectory",
 			fileContent:      "",
 			patternSource:    `^foo$`,
-			expectedErrMsg:   "FileNotFound",
+			expectedErrMsg:   "TargetIsDirectory",
 			expectedErrIsNil: false,
 		},
 		{
@@ -1419,10 +1419,10 @@ func TestFileContentRegexSearch(t *testing.T) {
 			},
 		},
 		{
-			description:      "NilPatternReturnsRegexSearchPatternCannotBeNil",
+			description:      "NilPatternReturnsRegexPatternCannotBeNil",
 			fileContent:      "alpha=1",
 			shouldProvideNil: true,
-			expectedErrMsg:   "RegexSearchPatternCannotBeNil",
+			expectedErrMsg:   "RegexPatternCannotBeNil",
 			expectedErrIsNil: false,
 		},
 	}
@@ -1449,7 +1449,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 				}
 			}
 
-			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				deleteErr := clerk.DeleteFile(targetFile)
 				if deleteErr != nil {
 					t.Fatalf("DeleteFileFailed: %v", deleteErr)
@@ -1564,7 +1564,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 				t.Errorf("DeleteFileFailed: %v", cleanupErr)
 			}
 
-			if testCase.description == "DirectoryPathReturnsFileNotFound" {
+			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				dirCleanupErr := clerk.DeleteDir(targetFile)
 				if dirCleanupErr != nil {
 					t.Errorf("DeleteDirFailed: %v", dirCleanupErr)
@@ -1755,28 +1755,29 @@ func TestFileContentRegexReplace(t *testing.T) {
 			expectedErrIsNil: false,
 		},
 		{
-			description:      "EmptyResultOnNonEmptySourceReturnsFileEmptiedUnexpectedly",
+			description:      "EmptyResultOnNonEmptySourceReturnsReplacementWouldTruncateFile",
 			fileContent:      "foo bar",
 			patternSource:    `(?s).*`,
 			replacement:      ``,
-			expectedErrMsg:   "FileEmptiedUnexpectedly",
+			expectedErrMsg:   "ReplacementWouldTruncateFile",
 			expectedErrIsNil: false,
 			expectedContent:  "foo bar",
 		},
 		{
-			description:      "StreamingEmptyResultOnNonEmptySourceReturnsFileEmptiedUnexpectedly",
+			description:      "StreamingRegexMatchingAllWithEmptyReplacementProducesNewlineOnlyFile",
 			fileContent:      strings.Repeat("foo\n", 3000000),
 			patternSource:    `(?s).*`,
 			replacement:      ``,
-			expectedErrMsg:   "FileEmptiedUnexpectedly",
-			expectedErrIsNil: false,
+			expectedErrIsNil: true,
+			expectedContent:  strings.Repeat("\n", 3000000),
+			expectedCount:    3000000,
 		},
 		{
-			description:      "NilPatternReturnsRegexSearchPatternCannotBeNil",
+			description:      "NilPatternReturnsRegexPatternCannotBeNil",
 			fileContent:      "alpha=1",
 			shouldProvideNil: true,
 			replacement:      `alpha=2`,
-			expectedErrMsg:   "RegexSearchPatternCannotBeNil",
+			expectedErrMsg:   "RegexPatternCannotBeNil",
 			expectedErrIsNil: false,
 		},
 	}
