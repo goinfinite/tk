@@ -393,6 +393,14 @@ func (clerk FileClerk) regexReplaceWholeFile(
 		return 0, ErrReplacementWouldTruncateFile
 	}
 
+	if clerk.IsSymlink(filePathStr) {
+		actualFilePath, evalErr := filepath.EvalSymlinks(filePathStr)
+		if evalErr != nil {
+			return 0, evalErr
+		}
+		filePathStr = actualFilePath
+	}
+
 	existingFilePermissions := os.FileMode(0644)
 	existingFileInfo, statErr := os.Stat(filePathStr)
 	if statErr == nil {
@@ -450,6 +458,14 @@ func (clerk FileClerk) regexReplaceStreaming(
 		return 0, osOpenErr
 	}
 	defer fileHandler.Close()
+
+	if clerk.IsSymlink(filePathStr) {
+		actualFilePath, evalErr := filepath.EvalSymlinks(filePathStr)
+		if evalErr != nil {
+			return 0, evalErr
+		}
+		filePathStr = actualFilePath
+	}
 
 	existingFilePermissions := os.FileMode(0644)
 	existingFileInfo, statErr := os.Stat(filePathStr)
