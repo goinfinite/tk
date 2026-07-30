@@ -5,6 +5,8 @@
 fix: ReadFileContent accepts symlinks (replace IsFile guard with os.IsNotExist mapping; os.Open follows the chain)
 fix: lower ReadFileContent default cap from 1GiB to 500MiB to bound in-memory string allocation
 docs: document 500MiB cap on ReadFileContent and recommend streaming (io.Reader/bufio.Scanner) for larger files
+refactor: extract ReadFileContent default cap to ReadFileContentDefaultMaxSizeBytes constant
+fix: correct 10MB to 10MiB unit in regexSearchWholeFile inline comment
 test: add ReadSymlinkToFile and ReadDanglingSymlink coverage to TestReadFileContent
 
 0.3.1 - 2026/07/30
