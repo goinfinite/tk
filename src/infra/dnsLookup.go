@@ -26,12 +26,14 @@ var (
 	dnsLookupPrimaryResolverDefault   = tkValueObject.IpAddress("8.8.8.8")
 	dnsLookupSecondaryResolverDefault = tkValueObject.IpAddress("185.228.168.168")
 
-	ErrDnsLookupResponseIdMismatch    = errors.New("DnsLookupResponseIdMismatch")
-	ErrDnsLookupResponseNameError     = errors.New("DnsLookupResponseNameError")
-	ErrDnsLookupResponseServerFailure = errors.New("DnsLookupResponseServerFailure")
-	ErrDnsLookupResponseRefused       = errors.New("DnsLookupResponseRefused")
-	ErrDnsLookupResponseUnknownRCode  = errors.New("DnsLookupResponseUnknownRCode")
-	ErrDnsLookupResponseTruncated     = errors.New("DnsLookupResponseTruncated")
+	ErrDnsLookupResponseIdMismatch       = errors.New("DnsLookupResponseIdMismatch")
+	ErrDnsLookupResponseNotResponse      = errors.New("DnsLookupResponseNotResponse")
+	ErrDnsLookupResponseQuestionMismatch = errors.New("DnsLookupResponseQuestionMismatch")
+	ErrDnsLookupResponseNameError        = errors.New("DnsLookupResponseNameError")
+	ErrDnsLookupResponseServerFailure    = errors.New("DnsLookupResponseServerFailure")
+	ErrDnsLookupResponseRefused          = errors.New("DnsLookupResponseRefused")
+	ErrDnsLookupResponseUnknownRCode     = errors.New("DnsLookupResponseUnknownRCode")
+	ErrDnsLookupResponseTruncated        = errors.New("DnsLookupResponseTruncated")
 )
 
 type DnsLookupSettings struct {
@@ -97,14 +99,8 @@ func (lookup *DnsLookup) netResolverBuilder(
 }
 
 func (lookup *DnsLookup) dnsMessagePacker(
-	hostname tkValueObject.UnixHostname,
-	questionType dnsmessage.Type,
+	messageQuestion dnsmessage.Question,
 ) (queryBytes []byte, transactionId uint16, buildError error) {
-	dnsName, nameParseError := dnsmessage.NewName(hostname.String() + ".")
-	if nameParseError != nil {
-		return nil, 0, nameParseError
-	}
-
 	var idBytes [2]byte
 	_, readError := rand.Read(idBytes[:])
 	if readError != nil {
@@ -119,11 +115,7 @@ func (lookup *DnsLookup) dnsMessagePacker(
 			ID:               transactionId,
 			RecursionDesired: true,
 		},
-		Questions: []dnsmessage.Question{{
-			Name:  dnsName,
-			Type:  questionType,
-			Class: dnsmessage.ClassINET,
-		}},
+		Questions: []dnsmessage.Question{messageQuestion},
 	}
 
 	packedBytes, packError := queryMessage.Pack()
@@ -173,6 +165,7 @@ func (lookup *DnsLookup) dnsMessageExchanger(
 func (lookup *DnsLookup) dnsMessageValidator(
 	responseBytes []byte,
 	expectedTransactionId uint16,
+	expectedQuestion dnsmessage.Question,
 ) (responseMessage dnsmessage.Message, err error) {
 	unpackFailure := responseMessage.Unpack(responseBytes)
 	if unpackFailure != nil {
@@ -180,8 +173,21 @@ func (lookup *DnsLookup) dnsMessageValidator(
 		return
 	}
 
+	if !responseMessage.Header.Response {
+		err = ErrDnsLookupResponseNotResponse
+		return
+	}
+
 	if responseMessage.Header.ID != expectedTransactionId {
 		err = ErrDnsLookupResponseIdMismatch
+		return
+	}
+
+	if len(responseMessage.Questions) == 0 ||
+		responseMessage.Questions[0].Name.String() != expectedQuestion.Name.String() ||
+		responseMessage.Questions[0].Type != expectedQuestion.Type ||
+		responseMessage.Questions[0].Class != expectedQuestion.Class {
+		err = ErrDnsLookupResponseQuestionMismatch
 		return
 	}
 
@@ -245,9 +251,17 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		)
 	}
 
-	queryBytes, transactionId, buildError := lookup.dnsMessagePacker(
-		hostname, questionType,
-	)
+	dnsName, nameParseError := dnsmessage.NewName(hostname.String() + ".")
+	if nameParseError != nil {
+		return nil, nameParseError
+	}
+	messageQuestion := dnsmessage.Question{
+		Name:  dnsName,
+		Type:  questionType,
+		Class: dnsmessage.ClassINET,
+	}
+
+	queryBytes, transactionId, buildError := lookup.dnsMessagePacker(messageQuestion)
 	if buildError != nil {
 		return nil, buildError
 	}
@@ -260,7 +274,7 @@ func (lookup *DnsLookup) directIpAddressResolver(
 	}
 
 	responseMessage, validateError := lookup.dnsMessageValidator(
-		responseBytes, transactionId,
+		responseBytes, transactionId, messageQuestion,
 	)
 	if validateError != nil {
 		return nil, validateError

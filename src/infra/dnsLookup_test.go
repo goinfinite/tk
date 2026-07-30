@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/dns/dnsmessage"
+
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
@@ -332,4 +334,80 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId(
+	t *testing.T,
+) {
+	lookup := NewDnsLookup(DnsLookupSettings{})
+
+	transactionId := uint16(0x1234)
+
+	expectedDnsName, nameParseError := dnsmessage.NewName("example.com.")
+	if nameParseError != nil {
+		t.Fatalf("CreateExpectedNameFailed: %v", nameParseError)
+	}
+	expectedQuestion := dnsmessage.Question{
+		Name:  expectedDnsName,
+		Type:  dnsmessage.TypeA,
+		Class: dnsmessage.ClassINET,
+	}
+
+	t.Run("RejectsNonResponsePacket", func(t *testing.T) {
+		queryShapedPacket := dnsmessage.Message{
+			Header: dnsmessage.Header{
+				ID:               transactionId,
+				Response:         false,
+				RecursionDesired: true,
+			},
+			Questions: []dnsmessage.Question{expectedQuestion},
+		}
+		packedBytes, packError := queryShapedPacket.Pack()
+		if packError != nil {
+			t.Fatalf("PackQueryShapedPacketFailed: %v", packError)
+		}
+
+		_, validateError := lookup.dnsMessageValidator(
+			packedBytes, transactionId, expectedQuestion,
+		)
+		if validateError != ErrDnsLookupResponseNotResponse {
+			t.Errorf(
+				"ExpectedErrDnsLookupResponseNotResponse: got '%v'",
+				validateError,
+			)
+		}
+	})
+
+	t.Run("RejectsMismatchedQuestion", func(t *testing.T) {
+		attackerDnsName, nameParseError := dnsmessage.NewName("attacker.com.")
+		if nameParseError != nil {
+			t.Fatalf("CreateAttackerNameFailed: %v", nameParseError)
+		}
+		mismatchedPacket := dnsmessage.Message{
+			Header: dnsmessage.Header{
+				ID:               transactionId,
+				Response:         true,
+				RecursionDesired: true,
+			},
+			Questions: []dnsmessage.Question{{
+				Name:  attackerDnsName,
+				Type:  dnsmessage.TypeA,
+				Class: dnsmessage.ClassINET,
+			}},
+		}
+		packedBytes, packError := mismatchedPacket.Pack()
+		if packError != nil {
+			t.Fatalf("PackMismatchedPacketFailed: %v", packError)
+		}
+
+		_, validateError := lookup.dnsMessageValidator(
+			packedBytes, transactionId, expectedQuestion,
+		)
+		if validateError != ErrDnsLookupResponseQuestionMismatch {
+			t.Errorf(
+				"ExpectedErrDnsLookupResponseQuestionMismatch: got '%v'",
+				validateError,
+			)
+		}
+	})
 }
