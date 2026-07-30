@@ -1,6 +1,12 @@
 # Changelog
 
 ```log
+0.3.2 - 2026/07/30
+fix: ReadFileContent accepts symlinks (replace IsFile guard with os.IsNotExist mapping; os.Open follows the chain)
+fix: lower ReadFileContent default cap from 1GiB to 500MiB to bound in-memory string allocation
+docs: document 500MiB cap on ReadFileContent and recommend streaming (io.Reader/bufio.Scanner) for larger files
+test: add ReadSymlinkToFile and ReadDanglingSymlink coverage to TestReadFileContent
+
 0.3.1 - 2026/07/30
 feat: add ShouldBypassLocalResolver to DnsLookupSettings; bypass /etc/hosts by issuing raw dnsmessage UDP query for A/AAAA and parsing the response in-process
 feat: add directIpAddressResolver that builds DNS messages via golang.org/x/net/dns/dnsmessage and parses A/AAAA resource records
