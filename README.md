@@ -178,13 +178,17 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   publicIpAddress, publicIpReadingErr := ReadServerPublicIpAddress()
   ```
 
-- **DnsLookup**: Perform DNS queries for various record types using custom resolvers with fallback support.
+- **DnsLookup**: Perform DNS queries for various record types using custom resolvers with fallback support. Setting `ShouldBypassLocalResolver: true` skips Go's net.Resolver and issues raw dnsmessage UDP queries to bypass `/etc/hosts` and `resolv.conf` (applies to A/AAAA only).
 
   ```go
   hostname, _ := tkValueObject.NewUnixHostname("example.com")
-  dnsLookup := NewDnsLookup(hostname, &tkValueObject.DnsRecordTypeA)
+  dnsLookup := NewDnsLookup(DnsLookupSettings{
+      ShouldBypassLocalResolver: true,
+  })
 
-  dnsRecords, lookupErr := dnsLookup.Execute()
+  dnsRecords, lookupErr := dnsLookup.Execute(
+      hostname, &tkValueObject.DnsRecordTypeA,
+  )
   ```
 
 - **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`.

@@ -91,11 +91,11 @@ Runs subprocess commands with configurable timeout, user, working directory, and
 
 ## DNS Lookup
 
-Resolves DNS records with configurable resolvers and timeout.
+Resolves DNS records with configurable resolvers, timeouts, and an optional local-resolver bypass. The bypass path skips Go's net.Resolver (so /etc/hosts and resolv.conf are not consulted) and issues raw dnsmessage UDP queries to the configured resolver; it applies only to A and AAAA record types.
 
 **Flow:**
 
-1. `src/infra/dnsLookup.go` — `NewDnsLookup` configures resolver IPs, hostname, and record type; `Lookup` performs the resolution
+1. `src/infra/dnsLookup.go` — `NewDnsLookup` accepts a `DnsLookupSettings` (resolvers, timeouts, bypass flag); `Execute(hostname, *recordType)` performs the resolution with primary-then-secondary fallback and logs each failed attempt
 
 ---
 
