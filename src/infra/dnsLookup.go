@@ -2,6 +2,8 @@ package tkInfra
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"log/slog"
 	"net"
@@ -16,11 +18,20 @@ import (
 const (
 	dnsLookupQueryTimeoutSecsDefault uint = 5
 	dnsLookupDialTimeoutMsDefault    uint = 200
+
+	dnsStandardPort = "53"
 )
 
 var (
 	dnsLookupPrimaryResolverDefault   = tkValueObject.IpAddress("8.8.8.8")
 	dnsLookupSecondaryResolverDefault = tkValueObject.IpAddress("185.228.168.168")
+
+	ErrDnsLookupResponseIdMismatch    = errors.New("DnsLookupResponseIdMismatch")
+	ErrDnsLookupResponseNameError     = errors.New("DnsLookupResponseNameError")
+	ErrDnsLookupResponseServerFailure = errors.New("DnsLookupResponseServerFailure")
+	ErrDnsLookupResponseRefused       = errors.New("DnsLookupResponseRefused")
+	ErrDnsLookupResponseUnknownRCode  = errors.New("DnsLookupResponseUnknownRCode")
+	ErrDnsLookupResponseTruncated     = errors.New("DnsLookupResponseTruncated")
 )
 
 type DnsLookupSettings struct {
@@ -78,23 +89,34 @@ func (lookup *DnsLookup) netResolverBuilder(
 			dialer := net.Dialer{
 				Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
 			}
-			return dialer.DialContext(ctx, "udp", resolverIpAddress.String()+":53")
+			return dialer.DialContext(
+				ctx, "udp", resolverIpAddress.String()+":"+dnsStandardPort,
+			)
 		},
 	}
 }
 
-func dnsMessagePackBuilder(
+func dnsMessagePacker(
 	hostname tkValueObject.UnixHostname,
 	questionType dnsmessage.Type,
-) (queryBytes []byte, buildError error) {
-	dnsName, nameError := dnsmessage.NewName(hostname.String() + ".")
-	if nameError != nil {
-		return nil, nameError
+) (queryBytes []byte, transactionId uint16, buildError error) {
+	dnsName, nameParseError := dnsmessage.NewName(hostname.String() + ".")
+	if nameParseError != nil {
+		return nil, 0, nameParseError
 	}
+
+	var idBytes [2]byte
+	_, readError := rand.Read(idBytes[:])
+	if readError != nil {
+		return nil, 0, errors.New(
+			"DnsLookupQueryIdRandomSourceUnavailable: " + readError.Error(),
+		)
+	}
+	transactionId = binary.BigEndian.Uint16(idBytes[:])
 
 	queryMessage := dnsmessage.Message{
 		Header: dnsmessage.Header{
-			ID:               1,
+			ID:               transactionId,
 			RecursionDesired: true,
 		},
 		Questions: []dnsmessage.Question{{
@@ -104,7 +126,12 @@ func dnsMessagePackBuilder(
 		}},
 	}
 
-	return queryMessage.Pack()
+	packedBytes, packError := queryMessage.Pack()
+	if packError != nil {
+		return nil, 0, packError
+	}
+
+	return packedBytes, transactionId, nil
 }
 
 func (lookup *DnsLookup) dnsMessageExchanger(
@@ -116,7 +143,7 @@ func (lookup *DnsLookup) dnsMessageExchanger(
 		Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
 	}
 	udpConn, dialError := dialer.DialContext(
-		dnsContext, "udp", resolverIpAddress.String()+":53",
+		dnsContext, "udp", resolverIpAddress.String()+":"+dnsStandardPort,
 	)
 	if dialError != nil {
 		return nil, dialError
@@ -143,25 +170,61 @@ func (lookup *DnsLookup) dnsMessageExchanger(
 	return rawResponseBuffer[:bytesRead], nil
 }
 
-func dnsResponseIpAddressesExtractor(
+func dnsMessageValidator(
 	responseBytes []byte,
-) (ipAddresses []string, decodeError error) {
-	var responseMessage dnsmessage.Message
-	unpackError := responseMessage.Unpack(responseBytes)
-	if unpackError != nil {
-		return nil, unpackError
+	expectedTransactionId uint16,
+) (responseMessage dnsmessage.Message, err error) {
+	unpackFailure := responseMessage.Unpack(responseBytes)
+	if unpackFailure != nil {
+		err = unpackFailure
+		return
 	}
 
+	if responseMessage.Header.ID != expectedTransactionId {
+		err = ErrDnsLookupResponseIdMismatch
+		return
+	}
+
+	switch responseMessage.Header.RCode {
+	case dnsmessage.RCodeSuccess:
+	case dnsmessage.RCodeNameError:
+		err = ErrDnsLookupResponseNameError
+		return
+	case dnsmessage.RCodeServerFailure:
+		err = ErrDnsLookupResponseServerFailure
+		return
+	case dnsmessage.RCodeRefused:
+		err = ErrDnsLookupResponseRefused
+		return
+	default:
+		err = ErrDnsLookupResponseUnknownRCode
+		return
+	}
+
+	if responseMessage.Header.Truncated {
+		err = ErrDnsLookupResponseTruncated
+		return
+	}
+
+	return
+}
+
+func dnsMessageIpAddrExtractor(
+	responseMessage dnsmessage.Message,
+) (ipAddresses []string) {
 	for _, answer := range responseMessage.Answers {
 		switch typedAnswer := answer.Body.(type) {
 		case *dnsmessage.AResource:
-			ipAddresses = append(ipAddresses, net.IP(typedAnswer.A[:]).String())
+			ipAddresses = append(
+				ipAddresses, net.IP(typedAnswer.A[:]).String(),
+			)
 		case *dnsmessage.AAAAResource:
-			ipAddresses = append(ipAddresses, net.IP(typedAnswer.AAAA[:]).String())
+			ipAddresses = append(
+				ipAddresses, net.IP(typedAnswer.AAAA[:]).String(),
+			)
 		}
 	}
-
-	return ipAddresses, nil
+	return
 }
 
 func (lookup *DnsLookup) directIpAddressResolver(
@@ -169,7 +232,7 @@ func (lookup *DnsLookup) directIpAddressResolver(
 	resolverIpAddress tkValueObject.IpAddress,
 	hostname tkValueObject.UnixHostname,
 	recordType tkValueObject.DnsRecordType,
-) (ipAddresses []string, queryError error) {
+) ([]string, error) {
 	var questionType dnsmessage.Type
 	switch recordType {
 	case tkValueObject.DnsRecordTypeA:
@@ -182,7 +245,7 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		)
 	}
 
-	queryBytes, buildError := dnsMessagePackBuilder(hostname, questionType)
+	queryBytes, transactionId, buildError := dnsMessagePacker(hostname, questionType)
 	if buildError != nil {
 		return nil, buildError
 	}
@@ -194,7 +257,14 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		return nil, exchangeError
 	}
 
-	return dnsResponseIpAddressesExtractor(responseBytes)
+	responseMessage, validateError := dnsMessageValidator(
+		responseBytes, transactionId,
+	)
+	if validateError != nil {
+		return nil, validateError
+	}
+
+	return dnsMessageIpAddrExtractor(responseMessage), nil
 }
 
 func defaultDnsRecordsResolver(
@@ -218,7 +288,8 @@ func defaultDnsRecordsResolver(
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 		var ipv6Addresses []string
 		for _, dnsRecord := range queryResults {
-			if parsedIp := net.ParseIP(dnsRecord); parsedIp != nil && parsedIp.To4() == nil {
+			parsedIp := net.ParseIP(dnsRecord)
+			if parsedIp != nil && parsedIp.To4() == nil {
 				ipv6Addresses = append(ipv6Addresses, dnsRecord)
 			}
 		}
@@ -231,7 +302,6 @@ func defaultDnsRecordsResolver(
 		for _, mxRecord := range mxRecords {
 			queryResults = append(queryResults, mxRecord.Host)
 		}
-		queryError = err
 	case tkValueObject.DnsRecordTypeTXT:
 		queryResults, queryError = dnsResolver.LookupTXT(dnsContext, hostnameStr)
 	case tkValueObject.DnsRecordTypeNS:
@@ -242,21 +312,18 @@ func defaultDnsRecordsResolver(
 		for _, nsRecord := range nsRecords {
 			queryResults = append(queryResults, nsRecord.Host)
 		}
-		queryError = err
 	case tkValueObject.DnsRecordTypeCNAME:
 		cnameRecord, err := dnsResolver.LookupCNAME(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
 		queryResults = []string{cnameRecord}
-		queryError = err
 	case tkValueObject.DnsRecordTypePTR:
 		ptrRecords, err := dnsResolver.LookupAddr(dnsContext, hostnameStr)
 		if err != nil {
 			return nil, err
 		}
 		queryResults = ptrRecords
-		queryError = err
 	default:
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 	}
@@ -295,7 +362,7 @@ func (lookup *DnsLookup) dnsRecordsResolver(
 func (lookup *DnsLookup) Execute(
 	hostname tkValueObject.UnixHostname,
 	recordType *tkValueObject.DnsRecordType,
-) (dnsRecords []string, err error) {
+) ([]string, error) {
 	dnsRecordType := tkValueObject.DnsRecordTypeDefault
 	if recordType != nil {
 		dnsRecordType = *recordType
@@ -310,21 +377,29 @@ func (lookup *DnsLookup) Execute(
 	resolverIpAddresses := []tkValueObject.IpAddress{
 		lookup.primaryResolver, lookup.secondaryResolver,
 	}
+
+	var lastRecords []string
+	var lastError error
 	for _, resolverIpAddress := range resolverIpAddresses {
-		dnsRecords, err = lookup.dnsRecordsResolver(
+		records, lookupError := lookup.dnsRecordsResolver(
 			lookupContext, resolverIpAddress, hostname, dnsRecordType,
 		)
-		if err == nil && len(dnsRecords) > 0 {
-			return dnsRecords, nil
+		if lookupError == nil && len(records) > 0 {
+			return records, nil
 		}
 
-		if err != nil {
-			slog.Debug("DnsLookupResolverFailed",
+		if lookupError != nil {
+			slog.Debug(
+				"DnsLookupResolverFailed",
+				slog.String("hostname", hostname.String()),
 				slog.String("resolverIpAddress", resolverIpAddress.String()),
-				slog.String("error", err.Error()),
+				slog.String("error", lookupError.Error()),
 			)
 		}
+
+		lastRecords = records
+		lastError = lookupError
 	}
 
-	return dnsRecords, err
+	return lastRecords, lastError
 }

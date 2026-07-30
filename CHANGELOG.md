@@ -1,13 +1,17 @@
 # Changelog
 
 ```log
-0.3.1 - 2026/07/29
+0.3.1 - 2026/07/30
 feat: add ShouldBypassLocalResolver to DnsLookupSettings; bypass /etc/hosts by issuing raw dnsmessage UDP query for A/AAAA and parsing the response in-process
 feat: add directIpAddressResolver that builds DNS messages via golang.org/x/net/dns/dnsmessage and parses A/AAAA resource records
-refactor: rename resolverFactory to resolverBuilder and queryDnsRecords to defaultDnsRecordsResolver; extract dnsRecordsResolver dispatcher that routes IP record types to the direct path and others to the system resolver
+refactor: rename resolverFactory to netResolverBuilder and queryDnsRecords to defaultDnsRecordsResolver; extract dnsRecordsResolver dispatcher that routes IP record types to the direct path and others to the system resolver
 chore: promote golang.org/x/net from indirect to direct dependency
 test: add directIpAddressResolver A/AAAA tests, ShouldBypassLocalResolver construction test, and bypass-aware Execute tests (bypass verified against /etc/hosts pointing goinfinite.dev to 127.0.0.1)
 test: refactor dnsLookup_test into 3 top-level table-driven funcs; verify ShouldBypassLocalResolver via localhost (local resolver returns 127.0.0.1, raw 8.8.8.8 query does not)
+fix: randomize DNS transaction id via crypto/rand; surface response RCODE, truncation, and id-mismatch failures as ErrDnsLookupResponse* sentinels in direct resolver path (was silent empty+nils with static id=1)
+refactor: split dnsResponseIpAddressesExtractor into dnsMessageValidator (parse + header validation) and dnsMessageIpAddrExtractor (record extraction); rename dnsMessagePackBuilder to dnsMessagePacker; drop dead `queryError = err` after guards in defaultDnsRecordsResolver
+chore: extract dnsStandardPort = "53" constant (was hardcoded in two dial sites)
+test: LocalhostBypassedSkipsLocalLookup accepts DnsLookupResponseNameError as evidence bypass succeeded (8.8.8.8 returns NXDOMAIN for localhost under bypass, not empty+nils)
 
 0.3.0 - 2026/07/27
 feat: add FileContentRegexSearch and FileContentRegexReplace to FileClerk (size-based routing at 10MiB, atomic .tmp+rename, follow-symlinks, would-empty-result guard)

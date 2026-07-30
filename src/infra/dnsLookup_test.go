@@ -226,7 +226,8 @@ func TestDnsLookupExecute(t *testing.T) {
 		results, lookupErr := lookup.Execute(
 			localhostHostname, &tkValueObject.DnsRecordTypeA,
 		)
-		if lookupErr != nil {
+		if lookupErr != nil &&
+			lookupErr.Error() != ErrDnsLookupResponseNameError.Error() {
 			t.Fatalf("BypassedLocalhostLookupFailed: %v", lookupErr)
 		}
 
