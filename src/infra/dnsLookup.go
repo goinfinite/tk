@@ -96,7 +96,7 @@ func (lookup *DnsLookup) netResolverBuilder(
 	}
 }
 
-func dnsMessagePacker(
+func (lookup *DnsLookup) dnsMessagePacker(
 	hostname tkValueObject.UnixHostname,
 	questionType dnsmessage.Type,
 ) (queryBytes []byte, transactionId uint16, buildError error) {
@@ -170,7 +170,7 @@ func (lookup *DnsLookup) dnsMessageExchanger(
 	return rawResponseBuffer[:bytesRead], nil
 }
 
-func dnsMessageValidator(
+func (lookup *DnsLookup) dnsMessageValidator(
 	responseBytes []byte,
 	expectedTransactionId uint16,
 ) (responseMessage dnsmessage.Message, err error) {
@@ -209,7 +209,7 @@ func dnsMessageValidator(
 	return
 }
 
-func dnsMessageIpAddrExtractor(
+func (lookup *DnsLookup) dnsMessageIpAddrExtractor(
 	responseMessage dnsmessage.Message,
 ) (ipAddresses []string) {
 	for _, answer := range responseMessage.Answers {
@@ -245,7 +245,9 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		)
 	}
 
-	queryBytes, transactionId, buildError := dnsMessagePacker(hostname, questionType)
+	queryBytes, transactionId, buildError := lookup.dnsMessagePacker(
+		hostname, questionType,
+	)
 	if buildError != nil {
 		return nil, buildError
 	}
@@ -257,17 +259,17 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		return nil, exchangeError
 	}
 
-	responseMessage, validateError := dnsMessageValidator(
+	responseMessage, validateError := lookup.dnsMessageValidator(
 		responseBytes, transactionId,
 	)
 	if validateError != nil {
 		return nil, validateError
 	}
 
-	return dnsMessageIpAddrExtractor(responseMessage), nil
+	return lookup.dnsMessageIpAddrExtractor(responseMessage), nil
 }
 
-func defaultDnsRecordsResolver(
+func (lookup *DnsLookup) defaultDnsRecordsResolver(
 	dnsContext context.Context,
 	dnsResolver *net.Resolver,
 	hostname tkValueObject.UnixHostname,
@@ -354,7 +356,7 @@ func (lookup *DnsLookup) dnsRecordsResolver(
 	}
 
 	resolver := lookup.netResolverBuilder(resolverIpAddress)
-	return defaultDnsRecordsResolver(
+	return lookup.defaultDnsRecordsResolver(
 		dnsContext, resolver, hostname, recordType,
 	)
 }
