@@ -9,82 +9,108 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestNewDnsLookupDefaults(t *testing.T) {
-	t.Run("ZeroQueryTimeoutSecsDefaults", func(t *testing.T) {
-		lookup := NewDnsLookup(DnsLookupSettings{QueryTimeoutSecs: 0})
-		if lookup.queryTimeoutSecs != dnsLookupQueryTimeoutSecsDefault {
-			t.Errorf(
-				"ZeroTimeoutNotDefaulted: expected %d, got %d",
-				dnsLookupQueryTimeoutSecsDefault, lookup.queryTimeoutSecs,
-			)
-		}
-	})
+// 192.0.2.0/24 (TEST-NET-1, RFC 5737) is reserved for documentation;
+// traffic to it is never routed, so a resolver there can never reply.
+var nonRoutableTestNetOneIpAddress = tkValueObject.IpAddress("192.0.2.1")
 
-	t.Run("ZeroDialTimeoutMsDefaults", func(t *testing.T) {
-		lookup := NewDnsLookup(DnsLookupSettings{DialTimeoutMs: 0})
-		if lookup.dialTimeoutMs != dnsLookupDialTimeoutMsDefault {
-			t.Errorf(
-				"ZeroDialTimeoutNotDefaulted: expected %d, got %d",
-				dnsLookupDialTimeoutMsDefault, lookup.dialTimeoutMs,
-			)
-		}
-	})
+const localhostLoopbackIpAddress = "127.0.0.1"
 
-	t.Run("EmptyPrimaryResolverDefaults", func(t *testing.T) {
-		lookup := NewDnsLookup(DnsLookupSettings{})
-		if lookup.primaryResolver != dnsLookupPrimaryResolverDefault {
-			t.Errorf(
-				"EmptyPrimaryResolverNotDefaulted: expected %s, got %s",
-				dnsLookupPrimaryResolverDefault, lookup.primaryResolver,
-			)
-		}
-	})
+func TestNewDnsLookup(t *testing.T) {
+	customPrimaryIpAddress, primaryIpErr := tkValueObject.NewIpAddress("1.1.1.1")
+	if primaryIpErr != nil {
+		t.Fatalf("CreateCustomPrimaryIpAddressFailed: %v", primaryIpErr)
+	}
 
-	t.Run("EmptySecondaryResolverDefaults", func(t *testing.T) {
-		lookup := NewDnsLookup(DnsLookupSettings{})
-		if lookup.secondaryResolver != dnsLookupSecondaryResolverDefault {
-			t.Errorf(
-				"EmptySecondaryResolverNotDefaulted: expected %s, got %s",
-				dnsLookupSecondaryResolverDefault, lookup.secondaryResolver,
-			)
-		}
-	})
+	customSecondaryIpAddress, secondaryIpErr := tkValueObject.NewIpAddress("9.9.9.9")
+	if secondaryIpErr != nil {
+		t.Fatalf("CreateCustomSecondaryIpAddressFailed: %v", secondaryIpErr)
+	}
 
-	t.Run("ProvidedPrimaryResolverHonored", func(t *testing.T) {
-		customPrimaryIpAddress, err := tkValueObject.NewIpAddress("1.1.1.1")
-		if err != nil {
-			t.Fatalf("CreateCustomPrimaryIpAddressFailed: %v", err)
-		}
+	testCaseStructs := []struct {
+		name                 string
+		settings             DnsLookupSettings
+		expectedPrimary      tkValueObject.IpAddress
+		expectedSecondary    tkValueObject.IpAddress
+		expectedQueryTimeout uint
+		expectedDialTimeout  uint
+		expectedBypass       bool
+	}{
+		{
+			name:                 "AllDefaultsWhenAllFieldsZero",
+			settings:             DnsLookupSettings{},
+			expectedPrimary:      dnsLookupPrimaryResolverDefault,
+			expectedSecondary:    dnsLookupSecondaryResolverDefault,
+			expectedQueryTimeout: dnsLookupQueryTimeoutSecsDefault,
+			expectedDialTimeout:  dnsLookupDialTimeoutMsDefault,
+			expectedBypass:       false,
+		},
+		{
+			name:                 "CustomPrimaryResolverHonored",
+			settings:             DnsLookupSettings{PrimaryResolver: customPrimaryIpAddress},
+			expectedPrimary:      customPrimaryIpAddress,
+			expectedSecondary:    dnsLookupSecondaryResolverDefault,
+			expectedQueryTimeout: dnsLookupQueryTimeoutSecsDefault,
+			expectedDialTimeout:  dnsLookupDialTimeoutMsDefault,
+			expectedBypass:       false,
+		},
+		{
+			name: "CustomSecondaryResolverHonored",
+			settings: DnsLookupSettings{
+				SecondaryResolver: customSecondaryIpAddress,
+			},
+			expectedPrimary:      dnsLookupPrimaryResolverDefault,
+			expectedSecondary:    customSecondaryIpAddress,
+			expectedQueryTimeout: dnsLookupQueryTimeoutSecsDefault,
+			expectedDialTimeout:  dnsLookupDialTimeoutMsDefault,
+			expectedBypass:       false,
+		},
+		{
+			name:                 "ShouldBypassLocalResolverHonored",
+			settings:             DnsLookupSettings{ShouldBypassLocalResolver: true},
+			expectedPrimary:      dnsLookupPrimaryResolverDefault,
+			expectedSecondary:    dnsLookupSecondaryResolverDefault,
+			expectedQueryTimeout: dnsLookupQueryTimeoutSecsDefault,
+			expectedDialTimeout:  dnsLookupDialTimeoutMsDefault,
+			expectedBypass:       true,
+		},
+	}
 
-		lookup := NewDnsLookup(DnsLookupSettings{
-			PrimaryResolver: customPrimaryIpAddress,
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			lookup := NewDnsLookup(testCase.settings)
+
+			if lookup.primaryResolver != testCase.expectedPrimary {
+				t.Errorf(
+					"WrongPrimaryResolver: expected '%s', got '%s'",
+					testCase.expectedPrimary, lookup.primaryResolver,
+				)
+			}
+			if lookup.secondaryResolver != testCase.expectedSecondary {
+				t.Errorf(
+					"WrongSecondaryResolver: expected '%s', got '%s'",
+					testCase.expectedSecondary, lookup.secondaryResolver,
+				)
+			}
+			if lookup.queryTimeoutSecs != testCase.expectedQueryTimeout {
+				t.Errorf(
+					"WrongQueryTimeoutSecs: expected %d, got %d",
+					testCase.expectedQueryTimeout, lookup.queryTimeoutSecs,
+				)
+			}
+			if lookup.dialTimeoutMs != testCase.expectedDialTimeout {
+				t.Errorf(
+					"WrongDialTimeoutMs: expected %d, got %d",
+					testCase.expectedDialTimeout, lookup.dialTimeoutMs,
+				)
+			}
+			if lookup.shouldBypassLocalResolver != testCase.expectedBypass {
+				t.Errorf(
+					"WrongShouldBypassLocalResolver: expected %t, got %t",
+					testCase.expectedBypass, lookup.shouldBypassLocalResolver,
+				)
+			}
 		})
-
-		if lookup.primaryResolver != customPrimaryIpAddress {
-			t.Errorf(
-				"ProvidedPrimaryResolverIgnored: expected %s, got %s",
-				customPrimaryIpAddress, lookup.primaryResolver,
-			)
-		}
-	})
-
-	t.Run("ProvidedSecondaryResolverHonored", func(t *testing.T) {
-		customSecondaryIpAddress, err := tkValueObject.NewIpAddress("9.9.9.9")
-		if err != nil {
-			t.Fatalf("CreateCustomSecondaryIpAddressFailed: %v", err)
-		}
-
-		lookup := NewDnsLookup(DnsLookupSettings{
-			SecondaryResolver: customSecondaryIpAddress,
-		})
-
-		if lookup.secondaryResolver != customSecondaryIpAddress {
-			t.Errorf(
-				"ProvidedSecondaryResolverIgnored: expected %s, got %s",
-				customSecondaryIpAddress, lookup.secondaryResolver,
-			)
-		}
-	})
+	}
 }
 
 func TestDnsLookupExecute(t *testing.T) {
@@ -101,7 +127,7 @@ func TestDnsLookupExecute(t *testing.T) {
 
 	dnsLookup := NewDnsLookup(DnsLookupSettings{})
 
-	testCases := []struct {
+	recordTypeTestCases := []struct {
 		name       string
 		hostname   tkValueObject.UnixHostname
 		recordType *tkValueObject.DnsRecordType
@@ -116,32 +142,31 @@ func TestDnsLookupExecute(t *testing.T) {
 		{"RecordTypePTR", ptrHostname, &tkValueObject.DnsRecordTypePTR},
 	}
 
-	for _, testCase := range testCases {
+	for _, testCase := range recordTypeTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			results, err := dnsLookup.Execute(testCase.hostname, testCase.recordType)
-			if err != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.name)
+			results, lookupErr := dnsLookup.Execute(
+				testCase.hostname, testCase.recordType,
+			)
+			if lookupErr != nil {
+				t.Errorf(
+					"UnexpectedError: '%s' [%s]",
+					lookupErr.Error(), testCase.name,
+				)
 			}
 			if len(results) == 0 {
 				t.Errorf("NoResultsReturned: %s", testCase.name)
 			}
 		})
 	}
-}
 
-// 192.0.2.0/24 (TEST-NET-1, RFC 5737) is reserved for documentation;
-// traffic to it is never routed, so a resolver there can never reply.
-var nonRoutableTestNetOneIpAddress = tkValueObject.IpAddress("192.0.2.1")
+	t.Run("UnreachableResolversFailLookup", func(t *testing.T) {
+		uniqueHostname, err := tkValueObject.NewUnixHostname(fmt.Sprintf(
+			"resolver-isolation-%d.invalid", time.Now().UnixNano(),
+		))
+		if err != nil {
+			t.Fatalf("CreateUniqueHostnameFailed: %v", err)
+		}
 
-func TestDnsLookupExecuteWithUnreachableResolver(t *testing.T) {
-	uniqueHostname, err := tkValueObject.NewUnixHostname(fmt.Sprintf(
-		"resolver-isolation-%d.invalid", time.Now().UnixNano(),
-	))
-	if err != nil {
-		t.Fatalf("CreateUniqueHostnameFailed: %v", err)
-	}
-
-	t.Run("NonRoutableResolversFailLookup", func(t *testing.T) {
 		lookup := NewDnsLookup(DnsLookupSettings{
 			PrimaryResolver:   nonRoutableTestNetOneIpAddress,
 			SecondaryResolver: nonRoutableTestNetOneIpAddress,
@@ -149,26 +174,96 @@ func TestDnsLookupExecuteWithUnreachableResolver(t *testing.T) {
 			DialTimeoutMs:     500,
 		})
 
-		results, err := lookup.Execute(uniqueHostname, nil)
-		if err == nil {
+		results, lookupErr := lookup.Execute(uniqueHostname, nil)
+		if lookupErr == nil {
 			t.Errorf(
 				"NonRoutableResolversShouldHaveFailed: got %v",
 				results,
 			)
 		}
 	})
-}
 
-func TestNewDnsLookupHonorsShouldBypassLocalResolver(t *testing.T) {
-	lookup := NewDnsLookup(DnsLookupSettings{
-		ShouldBypassLocalResolver: true,
+	t.Run("LocalhostReturnsLoopbackViaLocalResolver", func(t *testing.T) {
+		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
+		if err != nil {
+			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
+		}
+
+		lookup := NewDnsLookup(DnsLookupSettings{})
+
+		results, lookupErr := lookup.Execute(
+			localhostHostname, &tkValueObject.DnsRecordTypeA,
+		)
+		if lookupErr != nil {
+			t.Fatalf("LocalhostLookupFailed: %v", lookupErr)
+		}
+
+		foundLoopback := false
+		for _, result := range results {
+			if result == localhostLoopbackIpAddress {
+				foundLoopback = true
+				break
+			}
+		}
+		if !foundLoopback {
+			t.Errorf(
+				"LocalResolverShouldReturnLoopback: got %v, expected to contain '%s'",
+				results, localhostLoopbackIpAddress,
+			)
+		}
 	})
-	if !lookup.shouldBypassLocalResolver {
-		t.Error("ShouldBypassLocalResolverIgnored: expected true")
-	}
+
+	t.Run("LocalhostBypassedSkipsLocalLookup", func(t *testing.T) {
+		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
+		if err != nil {
+			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
+		}
+
+		lookup := NewDnsLookup(DnsLookupSettings{
+			ShouldBypassLocalResolver: true,
+		})
+
+		results, lookupErr := lookup.Execute(
+			localhostHostname, &tkValueObject.DnsRecordTypeA,
+		)
+		if lookupErr != nil {
+			t.Fatalf("BypassedLocalhostLookupFailed: %v", lookupErr)
+		}
+
+		for _, result := range results {
+			if result == localhostLoopbackIpAddress {
+				t.Errorf(
+					"BypassedLocalhostNotContainLoopback: %v contains '%s'",
+					results, localhostLoopbackIpAddress,
+				)
+				break
+			}
+		}
+	})
+
+	t.Run("BypassIgnoredForNonIpRecordType", func(t *testing.T) {
+		nonIpHostname, err := tkValueObject.NewUnixHostname("example.com")
+		if err != nil {
+			t.Fatalf("CreateNonIpHostnameFailed: %v", err)
+		}
+
+		lookup := NewDnsLookup(DnsLookupSettings{
+			ShouldBypassLocalResolver: true,
+		})
+
+		results, lookupErr := lookup.Execute(
+			nonIpHostname, &tkValueObject.DnsRecordTypeTXT,
+		)
+		if lookupErr != nil {
+			t.Fatalf("TxtLookupFailed: %v", lookupErr)
+		}
+		if len(results) == 0 {
+			t.Fatalf("TxtLookupReturnedEmpty")
+		}
+	})
 }
 
-func TestDirectIpAddressResolver(t *testing.T) {
+func TestDnsLookupDirectResolver(t *testing.T) {
 	publicResolver, err := tkValueObject.NewIpAddress("8.8.8.8")
 	if err != nil {
 		t.Fatalf("CreatePublicResolverIpAddressFailed: %v", err)
@@ -185,106 +280,55 @@ func TestDirectIpAddressResolver(t *testing.T) {
 		DialTimeoutMs:    1000,
 	})
 
-	t.Run("ReturnsARecords", func(t *testing.T) {
-		results, lookupError := lookup.directIpAddressResolver(
-			context.Background(), publicResolver,
-			dnsGoogleHostname, tkValueObject.DnsRecordTypeA,
-		)
-		if lookupError != nil {
-			t.Fatalf("DirectARecordLookupFailed: %v", lookupError)
-		}
-		if len(results) == 0 {
-			t.Fatalf("DirectARecordLookupReturnedEmpty")
-		}
-		foundKnownAddress := false
-		for _, result := range results {
-			if result == "8.8.8.8" {
-				foundKnownAddress = true
-				break
-			}
-		}
-		if !foundKnownAddress {
-			t.Errorf("ExpectedARecordMissing: got %v", results)
-		}
-	})
-
-	t.Run("ReturnsAAAARecords", func(t *testing.T) {
-		results, lookupError := lookup.directIpAddressResolver(
-			context.Background(), publicResolver,
-			dnsGoogleHostname, tkValueObject.DnsRecordTypeAAAA,
-		)
-		if lookupError != nil {
-			t.Fatalf("DirectAAAARecordLookupFailed: %v", lookupError)
-		}
-		if len(results) == 0 {
-			t.Fatalf("DirectAAAARecordLookupReturnedEmpty")
-		}
-	})
-
-	t.Run("RejectsUnsupportedRecordType", func(t *testing.T) {
-		_, lookupError := lookup.directIpAddressResolver(
-			context.Background(), publicResolver,
-			dnsGoogleHostname, tkValueObject.DnsRecordTypeMX,
-		)
-		if lookupError == nil {
-			t.Errorf("DirectResolutionAcceptedNonIpRecordType")
-		}
-	})
-}
-
-// The bypass test requires the operator to have set up /etc/hosts so that
-// goinfinite.dev points at 127.0.0.1; queried by 8.8.8.8 it resolves to the
-// real public IP (216.238.102.32). The contrast proves /etc/hosts is bypassed.
-const bypassTestHostname = "goinfinite.dev"
-const bypassTestLoopbackAddress = "127.0.0.1"
-
-func TestDnsLookupExecuteBypassesLocalResolver(t *testing.T) {
-	bypassHostname, err := tkValueObject.NewUnixHostname(bypassTestHostname)
-	if err != nil {
-		t.Fatalf("CreateBypassHostnameFailed: %v", err)
+	testCaseStructs := []struct {
+		name          string
+		recordType    tkValueObject.DnsRecordType
+		expectError   bool
+		expectKnownIp string
+	}{
+		{"ReturnsARecords", tkValueObject.DnsRecordTypeA, false, "8.8.8.8"},
+		{"ReturnsAAAARecords", tkValueObject.DnsRecordTypeAAAA, false, ""},
+		{"RejectsUnsupportedRecordType", tkValueObject.DnsRecordTypeMX, true, ""},
 	}
 
-	lookup := NewDnsLookup(DnsLookupSettings{
-		ShouldBypassLocalResolver: true,
-	})
-
-	results, lookupError := lookup.Execute(
-		bypassHostname, &tkValueObject.DnsRecordTypeA,
-	)
-	if lookupError != nil {
-		t.Fatalf("BypassLookupFailed: %v", lookupError)
-	}
-	if len(results) == 0 {
-		t.Fatalf("BypassLookupReturnedEmpty")
-	}
-
-	for _, result := range results {
-		if result == bypassTestLoopbackAddress {
-			t.Errorf(
-				"LocalResolverNotBypassed: got %v (contains %s, expected public DNS answer)",
-				results, bypassTestLoopbackAddress,
+	for _, testCase := range testCaseStructs {
+		t.Run(testCase.name, func(t *testing.T) {
+			results, lookupErr := lookup.directIpAddressResolver(
+				context.Background(), publicResolver,
+				dnsGoogleHostname, testCase.recordType,
 			)
-		}
-	}
-}
 
-func TestDnsLookupExecuteIgnoresBypassForNonIpRecordType(t *testing.T) {
-	bypassHostname, err := tkValueObject.NewUnixHostname(bypassTestHostname)
-	if err != nil {
-		t.Fatalf("CreateBypassHostnameFailed: %v", err)
-	}
+			if testCase.expectError {
+				if lookupErr == nil {
+					t.Errorf("ExpectedErrorButGotNone")
+				}
+				return
+			}
 
-	lookup := NewDnsLookup(DnsLookupSettings{
-		ShouldBypassLocalResolver: true,
-	})
+			if lookupErr != nil {
+				t.Fatalf("DirectLookupFailed: %v", lookupErr)
+			}
+			if len(results) == 0 {
+				t.Fatalf("DirectLookupReturnedEmpty")
+			}
 
-	results, lookupError := lookup.Execute(
-		bypassHostname, &tkValueObject.DnsRecordTypeTXT,
-	)
-	if lookupError != nil {
-		t.Fatalf("TxtLookupFailed: %v", lookupError)
-	}
-	if len(results) == 0 {
-		t.Fatalf("TxtLookupReturnedEmpty")
+			if testCase.expectKnownIp == "" {
+				return
+			}
+
+			foundKnownAddress := false
+			for _, result := range results {
+				if result == testCase.expectKnownIp {
+					foundKnownAddress = true
+					break
+				}
+			}
+			if !foundKnownAddress {
+				t.Errorf(
+					"ExpectedIpMissing: got %v, expected to contain '%s'",
+					results, testCase.expectKnownIp,
+				)
+			}
+		})
 	}
 }

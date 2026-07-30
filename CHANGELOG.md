@@ -1,6 +1,14 @@
 # Changelog
 
 ```log
+0.3.1 - 2026/07/29
+feat: add ShouldBypassLocalResolver to DnsLookupSettings; bypass /etc/hosts by issuing raw dnsmessage UDP query for A/AAAA and parsing the response in-process
+feat: add directIpAddressResolver that builds DNS messages via golang.org/x/net/dns/dnsmessage and parses A/AAAA resource records
+refactor: rename resolverFactory to resolverBuilder and queryDnsRecords to defaultDnsRecordsResolver; extract dnsRecordsResolver dispatcher that routes IP record types to the direct path and others to the system resolver
+chore: promote golang.org/x/net from indirect to direct dependency
+test: add directIpAddressResolver A/AAAA tests, ShouldBypassLocalResolver construction test, and bypass-aware Execute tests (bypass verified against /etc/hosts pointing goinfinite.dev to 127.0.0.1)
+test: refactor dnsLookup_test into 3 top-level table-driven funcs; verify ShouldBypassLocalResolver via localhost (local resolver returns 127.0.0.1, raw 8.8.8.8 query does not)
+
 0.3.0 - 2026/07/27
 feat: add FileContentRegexSearch and FileContentRegexReplace to FileClerk (size-based routing at 10MiB, atomic .tmp+rename, follow-symlinks, would-empty-result guard)
 feat: add FileClerk.OverwriteFile (atomic source-over-target rename resolving symlink chains via filepath.EvalSymlinks)
