@@ -370,12 +370,6 @@ func (lookup *DnsLookup) Execute(
 		dnsRecordType = *recordType
 	}
 
-	lookupContext, contextCancel := context.WithTimeout(
-		context.Background(),
-		time.Duration(lookup.queryTimeoutSecs)*time.Second,
-	)
-	defer contextCancel()
-
 	resolverIpAddresses := []tkValueObject.IpAddress{
 		lookup.primaryResolver, lookup.secondaryResolver,
 	}
@@ -383,9 +377,15 @@ func (lookup *DnsLookup) Execute(
 	var lastRecords []string
 	var lastError error
 	for _, resolverIpAddress := range resolverIpAddresses {
-		records, lookupError := lookup.dnsRecordsResolver(
-			lookupContext, resolverIpAddress, hostname, dnsRecordType,
+		attemptContext, attemptCancel := context.WithTimeout(
+			context.Background(),
+			time.Duration(lookup.queryTimeoutSecs)*time.Second,
 		)
+		records, lookupError := lookup.dnsRecordsResolver(
+			attemptContext, resolverIpAddress, hostname, dnsRecordType,
+		)
+		attemptCancel()
+
 		if lookupError == nil && len(records) > 0 {
 			return records, nil
 		}
