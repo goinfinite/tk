@@ -220,6 +220,16 @@ func TestDirectIpAddressResolver(t *testing.T) {
 			t.Fatalf("DirectAAAARecordLookupReturnedEmpty")
 		}
 	})
+
+	t.Run("RejectsUnsupportedRecordType", func(t *testing.T) {
+		_, lookupError := lookup.directIpAddressResolver(
+			context.Background(), publicResolver,
+			dnsGoogleHostname, tkValueObject.DnsRecordTypeMX,
+		)
+		if lookupError == nil {
+			t.Errorf("DirectResolutionAcceptedNonIpRecordType")
+		}
+	})
 }
 
 // The bypass test requires the operator to have set up /etc/hosts so that

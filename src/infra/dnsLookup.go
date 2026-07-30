@@ -2,6 +2,8 @@ package tkInfra
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -67,7 +69,7 @@ func NewDnsLookup(settings DnsLookupSettings) *DnsLookup {
 	}
 }
 
-func (lookup *DnsLookup) resolverBuilder(
+func (lookup *DnsLookup) netResolverBuilder(
 	resolverIpAddress tkValueObject.IpAddress,
 ) *net.Resolver {
 	return &net.Resolver{
@@ -81,7 +83,7 @@ func (lookup *DnsLookup) resolverBuilder(
 	}
 }
 
-func dnsQueryBuilder(
+func dnsMessagePackBuilder(
 	hostname tkValueObject.UnixHostname,
 	questionType dnsmessage.Type,
 ) (queryBytes []byte, buildError error) {
@@ -105,7 +107,7 @@ func dnsQueryBuilder(
 	return queryMessage.Pack()
 }
 
-func (lookup *DnsLookup) exchangeDnsMessage(
+func (lookup *DnsLookup) dnsMessageExchanger(
 	dnsContext context.Context,
 	resolverIpAddress tkValueObject.IpAddress,
 	queryBytes []byte,
@@ -113,7 +115,6 @@ func (lookup *DnsLookup) exchangeDnsMessage(
 	dialer := net.Dialer{
 		Timeout: time.Duration(lookup.dialTimeoutMs) * time.Millisecond,
 	}
-
 	udpConn, dialError := dialer.DialContext(
 		dnsContext, "udp", resolverIpAddress.String()+":53",
 	)
@@ -142,9 +143,8 @@ func (lookup *DnsLookup) exchangeDnsMessage(
 	return rawResponseBuffer[:bytesRead], nil
 }
 
-func dnsMessageResponseIpAddressExtractor(
+func dnsResponseIpAddressesExtractor(
 	responseBytes []byte,
-	questionType dnsmessage.Type,
 ) (ipAddresses []string, decodeError error) {
 	var responseMessage dnsmessage.Message
 	unpackError := responseMessage.Unpack(responseBytes)
@@ -176,24 +176,28 @@ func (lookup *DnsLookup) directIpAddressResolver(
 		questionType = dnsmessage.TypeA
 	case tkValueObject.DnsRecordTypeAAAA:
 		questionType = dnsmessage.TypeAAAA
+	default:
+		return nil, errors.New(
+			"DnsLookupDirectResolutionUnsupportedRecordType: " + recordType.String(),
+		)
 	}
 
-	queryBytes, buildError := dnsQueryBuilder(hostname, questionType)
+	queryBytes, buildError := dnsMessagePackBuilder(hostname, questionType)
 	if buildError != nil {
 		return nil, buildError
 	}
 
-	responseBytes, exchangeError := lookup.exchangeDnsMessage(
+	responseBytes, exchangeError := lookup.dnsMessageExchanger(
 		dnsContext, resolverIpAddress, queryBytes,
 	)
 	if exchangeError != nil {
 		return nil, exchangeError
 	}
 
-	return dnsMessageResponseIpAddressExtractor(responseBytes, questionType)
+	return dnsResponseIpAddressesExtractor(responseBytes)
 }
 
-func (lookup *DnsLookup) defaultDnsRecordsResolver(
+func defaultDnsRecordsResolver(
 	dnsContext context.Context,
 	dnsResolver *net.Resolver,
 	hostname tkValueObject.UnixHostname,
@@ -282,8 +286,8 @@ func (lookup *DnsLookup) dnsRecordsResolver(
 		)
 	}
 
-	resolver := lookup.resolverBuilder(resolverIpAddress)
-	return lookup.defaultDnsRecordsResolver(
+	resolver := lookup.netResolverBuilder(resolverIpAddress)
+	return defaultDnsRecordsResolver(
 		dnsContext, resolver, hostname, recordType,
 	)
 }
@@ -291,7 +295,7 @@ func (lookup *DnsLookup) dnsRecordsResolver(
 func (lookup *DnsLookup) Execute(
 	hostname tkValueObject.UnixHostname,
 	recordType *tkValueObject.DnsRecordType,
-) ([]string, error) {
+) (dnsRecords []string, err error) {
 	dnsRecordType := tkValueObject.DnsRecordTypeDefault
 	if recordType != nil {
 		dnsRecordType = *recordType
@@ -303,19 +307,24 @@ func (lookup *DnsLookup) Execute(
 	)
 	defer contextCancel()
 
-	primaryResults, err := lookup.dnsRecordsResolver(
-		lookupContext, lookup.primaryResolver, hostname, dnsRecordType,
-	)
-	if err == nil && len(primaryResults) > 0 {
-		return primaryResults, nil
+	resolverIpAddresses := []tkValueObject.IpAddress{
+		lookup.primaryResolver, lookup.secondaryResolver,
+	}
+	for _, resolverIpAddress := range resolverIpAddresses {
+		dnsRecords, err = lookup.dnsRecordsResolver(
+			lookupContext, resolverIpAddress, hostname, dnsRecordType,
+		)
+		if err == nil && len(dnsRecords) > 0 {
+			return dnsRecords, nil
+		}
+
+		if err != nil {
+			slog.Debug("DnsLookupResolverFailed",
+				slog.String("resolverIpAddress", resolverIpAddress.String()),
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 
-	secondaryResults, err := lookup.dnsRecordsResolver(
-		lookupContext, lookup.secondaryResolver, hostname, dnsRecordType,
-	)
-	if err == nil && len(secondaryResults) > 0 {
-		return secondaryResults, nil
-	}
-
-	return secondaryResults, err
+	return dnsRecords, err
 }
