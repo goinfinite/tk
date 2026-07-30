@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	RegexLargeFileThresholdBytes int64 = 10 * 1024 * 1024
-	regexTempFileSuffix                = ".tmp"
+	RegexLargeFileThresholdBytes       int64 = 10 * 1024 * 1024
+	ReadFileContentDefaultMaxSizeBytes int64 = 500 * 1024 * 1024
+	regexTempFileSuffix                      = ".tmp"
 )
 
 var (
@@ -206,7 +207,7 @@ func (clerk FileClerk) DeleteFile(filePath string) error {
 }
 
 // ReadFileContent reads a file's full content into memory, capped at
-// 512MiB by default. The entire file is loaded as a string, so callers
+// 500MiB by default. The entire file is loaded as a string, so callers
 // dealing with larger files should stream the file themselves
 // (io.Reader/bufio.Scanner) instead of raising the limit.
 func (clerk FileClerk) ReadFileContent(
@@ -222,7 +223,7 @@ func (clerk FileClerk) ReadFileContent(
 	}
 	defer fileHandler.Close()
 
-	maxContentSizeBytes := int64(512 * 1024 * 1024) // 512MiB
+	maxContentSizeBytes := ReadFileContentDefaultMaxSizeBytes
 	if maxContentSizeBytesPtr != nil {
 		maxContentSizeBytes = *maxContentSizeBytesPtr
 	}
@@ -257,7 +258,7 @@ func (clerk FileClerk) regexSearchWholeFile(
 	// DO NOT REPLACE: FindAllStringSubmatchIndex would halve the regex
 	// scan, but extracting match text and capture groups from raw index
 	// pairs requires manual slice arithmetic that makes the code
-	// unreadable. The gain is negligible (~ms on 10MB files).
+	// unreadable. The gain is negligible (~ms on 10MiB files).
 	// Readability over performance.
 	matchesWithGroups := regexPattern.FindAllStringSubmatch(fileContent, -1)
 	matchByteRanges := regexPattern.FindAllStringIndex(fileContent, -1)
