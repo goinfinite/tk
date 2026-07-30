@@ -515,6 +515,80 @@ func TestReadFileContent(t *testing.T) {
 			t.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
+
+	t.Run("ReadSymlinkToFile", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "symlink_target.txt")
+		symlinkPath := filepath.Join(tempDir, "symlink.txt")
+		expectedContent := "content behind the symlink"
+
+		err := clerk.CreateFile(targetFile)
+		if err != nil {
+			t.Fatalf("CreateTargetFileFailed: %v", err)
+		}
+
+		err = clerk.UpdateFileContent(targetFile, expectedContent, true)
+		if err != nil {
+			t.Fatalf("UpdateTargetFileContentFailed: %v", err)
+		}
+
+		err = os.Symlink(targetFile, symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		actualContent, err := clerk.ReadFileContent(symlinkPath, nil)
+		if err != nil {
+			t.Errorf("ReadFileContentFailed: %v", err)
+		}
+
+		if actualContent != expectedContent {
+			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
+		}
+
+		err = clerk.RemoveSymlink(symlinkPath)
+		if err != nil {
+			t.Errorf("RemoveSymlinkFailed: %v", err)
+		}
+
+		err = clerk.DeleteFile(targetFile)
+		if err != nil {
+			t.Errorf("DeleteTargetFileFailed: %v", err)
+		}
+	})
+
+	t.Run("ReadDanglingSymlink", func(t *testing.T) {
+		deletedTarget := filepath.Join(tempDir, "deleted_target.txt")
+		symlinkPath := filepath.Join(tempDir, "dangling.txt")
+
+		err := clerk.CreateFile(deletedTarget)
+		if err != nil {
+			t.Fatalf("CreateFileFailed: %v", err)
+		}
+
+		err = os.Symlink(deletedTarget, symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.DeleteFile(deletedTarget)
+		if err != nil {
+			t.Fatalf("DeleteTargetFileFailed: %v", err)
+		}
+
+		_, err = clerk.ReadFileContent(symlinkPath, nil)
+		if err == nil {
+			t.Errorf("MissingExpectedError: FileNotFound")
+		}
+
+		if err != nil && err.Error() != "FileNotFound" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
+		}
+
+		err = clerk.RemoveSymlink(symlinkPath)
+		if err != nil {
+			t.Errorf("RemoveSymlinkFailed: %v", err)
+		}
+	})
 }
 
 func TestUpdateFileContent(t *testing.T) {

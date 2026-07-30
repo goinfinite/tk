@@ -15,7 +15,7 @@ import (
 
 const (
 	RegexLargeFileThresholdBytes int64 = 10 * 1024 * 1024
-	regexTempFileSuffix                 = ".tmp"
+	regexTempFileSuffix                = ".tmp"
 )
 
 var (
@@ -205,29 +205,32 @@ func (clerk FileClerk) DeleteFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
+// ReadFileContent reads a file's full content into memory, capped at
+// 512MiB by default. The entire file is loaded as a string, so callers
+// dealing with larger files should stream the file themselves
+// (io.Reader/bufio.Scanner) instead of raising the limit.
 func (clerk FileClerk) ReadFileContent(
 	filePath string,
 	maxContentSizeBytesPtr *int64,
-) (string, error) {
-	if !clerk.IsFile(filePath) {
-		return "", ErrFileMissing
+) (fileContent string, err error) {
+	fileHandler, openErr := os.Open(filePath)
+	if openErr != nil {
+		if os.IsNotExist(openErr) {
+			return fileContent, ErrFileMissing
+		}
+		return fileContent, openErr
 	}
+	defer fileHandler.Close()
 
-	maxContentSizeBytes := int64(1 * 1073741824) // 1GiB
+	maxContentSizeBytes := int64(512 * 1024 * 1024) // 512MiB
 	if maxContentSizeBytesPtr != nil {
 		maxContentSizeBytes = *maxContentSizeBytesPtr
 	}
 
-	fileHandler, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer fileHandler.Close()
-
 	limitedReader := io.LimitedReader{R: fileHandler, N: maxContentSizeBytes}
 	fileContentBytes, err := io.ReadAll(&limitedReader)
 	if err != nil {
-		return "", err
+		return fileContent, err
 	}
 
 	return string(fileContentBytes), nil
