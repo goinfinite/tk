@@ -2,15 +2,37 @@ package tkInfra
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
+
+	"golang.org/x/term"
 )
+
+const (
+	ShellExecutionTimeoutDefaultSecs   uint64 = 1800
+	ShellExecutionTimeoutHardLimitSecs uint64 = 3600
+	ShellExecutionTimeoutGraceSecs     uint64 = 10
+	ShellCommandTimeoutExitCode        int    = 124
+)
+
+// IsStdoutTerminal is the single interactivity check shared by the CLI logger
+// and response renderer. Both honor one contract: logs go to stderr, stdout
+// carries the JSON response only, and a human at a terminal gets richer
+// formatting. Both sides must agree or the response channel corrupts.
+func IsStdoutTerminal() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
 
 type Shell struct {
 	runtimeSettings ShellSettings
@@ -20,6 +42,7 @@ type ShellSettings struct {
 	Command                         string
 	Args                            []string
 	ShouldUseSubShell               bool
+	ShouldUseCleanEnv               bool
 	ShouldDisableTimeoutHardLimit   bool
 	ShouldIgnoreUsernameLookupError bool
 	Username                        string
@@ -30,6 +53,10 @@ type ShellSettings struct {
 	StderrFilePath                  string
 }
 
+// NewShell returns a value, not a pointer. Run copies the settings per call,
+// so the sub-shell rewrite during preparation never compounds. A pointer
+// receiver was rejected: it would leak that rewrite across calls and
+// double-wrap the command on the second Run.
 func NewShell(settings ShellSettings) Shell {
 	return Shell{runtimeSettings: settings}
 }
@@ -44,27 +71,71 @@ func (e *ShellError) Error() string {
 	return string(jsonError)
 }
 
-func (shell Shell) sysCallCredentialsFactory() (*syscall.Credential, error) {
+func (shell Shell) sysCallCredentialsFactory() (
+	*syscall.Credential, *user.User, error,
+) {
 	userStruct, err := user.Lookup(shell.runtimeSettings.Username)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	userId, err := strconv.Atoi(userStruct.Uid)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	groupId, err := strconv.Atoi(userStruct.Gid)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &syscall.Credential{
 		Uid: uint32(userId),
 		Gid: uint32(groupId),
-	}, nil
+	}, userStruct, nil
 }
 
-type preparedExec struct {
+func (shell Shell) childEnvironmentBuilder(
+	execCmd *exec.Cmd,
+	targetUserPtr *user.User,
+) []string {
+	const debianFrontendEnv = "DEBIAN_FRONTEND=noninteractive"
+	const standardSystemPath = "/usr/local/sbin:/usr/local/bin:" +
+		"/usr/sbin:/usr/bin:/sbin:/bin"
+
+	if !shell.runtimeSettings.ShouldUseCleanEnv {
+		inheritedEnv := append(execCmd.Environ(), debianFrontendEnv)
+		return slices.Concat(inheritedEnv, shell.runtimeSettings.Envs)
+	}
+
+	userHome := os.Getenv("HOME")
+	if targetUserPtr != nil {
+		userHome = targetUserPtr.HomeDir
+	}
+
+	childPath := standardSystemPath
+	if userHome != "" {
+		childPath = userHome + "/.local/bin:" + standardSystemPath
+	}
+
+	cleanEnv := []string{"PATH=" + childPath, debianFrontendEnv}
+	if userHome != "" {
+		cleanEnv = append(cleanEnv, "HOME="+userHome)
+	}
+	if execCmd.Dir != "" {
+		cleanEnv = append(cleanEnv, "PWD="+execCmd.Dir)
+	}
+
+	return slices.Concat(cleanEnv, shell.runtimeSettings.Envs)
+}
+
+func (shell Shell) closeFileHandler(fileHandlerPtr *os.File) error {
+	if fileHandlerPtr == nil {
+		return nil
+	}
+
+	return fileHandlerPtr.Close()
+}
+
+type executionPlan struct {
 	ExecCmd           *exec.Cmd
 	StdoutBytesBuffer *bytes.Buffer
 	StdoutFileHandler *os.File
@@ -73,7 +144,7 @@ type preparedExec struct {
 	Err               error
 }
 
-func (shell Shell) prepareExec() preparedExec {
+func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan {
 	if shell.runtimeSettings.ShouldUseSubShell {
 		subShellCmd := shell.runtimeSettings.Command + " " +
 			strings.Join(shell.runtimeSettings.Args, " ")
@@ -82,103 +153,138 @@ func (shell Shell) prepareExec() preparedExec {
 		shell.runtimeSettings.Args = subShellArgs
 	}
 
-	timeoutSecsDefault := uint64(1800)
-	if shell.runtimeSettings.ExecutionTimeoutSecs == 0 {
-		shell.runtimeSettings.ExecutionTimeoutSecs = timeoutSecsDefault
-	}
-
-	timeoutSecsHardLimit := uint64(3600)
-	if shell.runtimeSettings.ExecutionTimeoutSecs > timeoutSecsHardLimit &&
-		!shell.runtimeSettings.ShouldDisableTimeoutHardLimit {
-		shell.runtimeSettings.ExecutionTimeoutSecs = timeoutSecsHardLimit
-	}
-
-	timeoutSecsStr := strconv.FormatUint(shell.runtimeSettings.ExecutionTimeoutSecs, 10)
-
-	timeoutArgs := []string{timeoutSecsStr, shell.runtimeSettings.Command}
-	timeoutArgs = slices.Concat(timeoutArgs, shell.runtimeSettings.Args)
-	shell.runtimeSettings.Command = "timeout"
-	shell.runtimeSettings.Args = timeoutArgs
-
-	execCmd := exec.Command(
-		shell.runtimeSettings.Command, shell.runtimeSettings.Args...,
+	execCmd := exec.CommandContext(
+		executionCtx, shell.runtimeSettings.Command, shell.runtimeSettings.Args...,
 	)
+	execCmd.Cancel = func() error {
+		return execCmd.Process.Signal(syscall.SIGTERM)
+	}
+	execCmd.WaitDelay = time.Duration(ShellExecutionTimeoutGraceSecs) * time.Second
+
+	var targetUserPtr *user.User
 	if shell.runtimeSettings.Username != "" {
-		sysCallCredentials, err := shell.sysCallCredentialsFactory()
+		sysCallCredentials, targetUser, err := shell.sysCallCredentialsFactory()
 		if err != nil && !shell.runtimeSettings.ShouldIgnoreUsernameLookupError {
-			return preparedExec{Err: err}
+			return executionPlan{Err: err}
 		}
 		if err == nil {
+			targetUserPtr = targetUser
 			execCmd.SysProcAttr = &syscall.SysProcAttr{Credential: sysCallCredentials}
 		}
 	}
 
 	if shell.runtimeSettings.WorkingDirectory != "" {
-		execCmd.Dir = shell.runtimeSettings.WorkingDirectory
+		workingDirectory, absErr := filepath.Abs(shell.runtimeSettings.WorkingDirectory)
+		if absErr != nil {
+			return executionPlan{Err: absErr}
+		}
+		execCmd.Dir = workingDirectory
 	}
 
 	var stdoutBytesBuffer bytes.Buffer
+	var stdoutFileHandlerPtr *os.File
 	execCmd.Stdout = &stdoutBytesBuffer
 	if shell.runtimeSettings.StdoutFilePath != "" {
 		stdoutFileHandler, err := os.Create(shell.runtimeSettings.StdoutFilePath)
 		if err != nil {
-			return preparedExec{Err: err}
+			return executionPlan{Err: err}
 		}
-		execCmd.Stdout = stdoutFileHandler
+		stdoutFileHandlerPtr = stdoutFileHandler
+		execCmd.Stdout = stdoutFileHandlerPtr
 	}
 
 	var stderrBytesBuffer bytes.Buffer
+	var stderrFileHandlerPtr *os.File
 	execCmd.Stderr = &stderrBytesBuffer
 	if shell.runtimeSettings.StderrFilePath != "" {
 		stderrFileHandler, err := os.Create(shell.runtimeSettings.StderrFilePath)
 		if err != nil {
-			return preparedExec{Err: err}
+			if closeErr := shell.closeFileHandler(stdoutFileHandlerPtr); closeErr != nil {
+				slog.Error(
+					"ShellStdoutFileCloseFailed",
+					slog.String("file", stdoutFileHandlerPtr.Name()),
+					slog.String("err", closeErr.Error()),
+				)
+			}
+			return executionPlan{Err: err}
 		}
-		execCmd.Stderr = stderrFileHandler
+		stderrFileHandlerPtr = stderrFileHandler
+		execCmd.Stderr = stderrFileHandlerPtr
 	}
 
-	execCmd.Env = append(execCmd.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	execCmd.Env = slices.Concat(execCmd.Env, shell.runtimeSettings.Envs)
+	execCmd.Env = shell.childEnvironmentBuilder(execCmd, targetUserPtr)
 
-	return preparedExec{
+	return executionPlan{
 		ExecCmd:           execCmd,
 		StdoutBytesBuffer: &stdoutBytesBuffer,
+		StdoutFileHandler: stdoutFileHandlerPtr,
 		StderrBytesBuffer: &stderrBytesBuffer,
+		StderrFileHandler: stderrFileHandlerPtr,
 	}
 }
 
+func (shell Shell) executionTimeoutResolver() time.Duration {
+	timeoutSecs := shell.runtimeSettings.ExecutionTimeoutSecs
+	if timeoutSecs == 0 {
+		timeoutSecs = ShellExecutionTimeoutDefaultSecs
+	}
+	if timeoutSecs > ShellExecutionTimeoutHardLimitSecs &&
+		!shell.runtimeSettings.ShouldDisableTimeoutHardLimit {
+		timeoutSecs = ShellExecutionTimeoutHardLimitSecs
+	}
+
+	return time.Duration(timeoutSecs) * time.Second
+}
+
 func (shell Shell) Run() (stdoutStr string, err error) {
-	preparedExec := shell.prepareExec()
-	if preparedExec.Err != nil {
-		return stdoutStr, preparedExec.Err
+	executionCtx, cancelExecution := context.WithTimeout(
+		context.Background(), shell.executionTimeoutResolver(),
+	)
+	defer cancelExecution()
+
+	runPlan := shell.executionPlanner(executionCtx)
+	if runPlan.Err != nil {
+		return stdoutStr, runPlan.Err
 	}
 
-	preparedExec.Err = preparedExec.ExecCmd.Run()
-	if preparedExec.StdoutFileHandler != nil {
-		preparedExec.StdoutFileHandler.Close()
+	runPlan.Err = runPlan.ExecCmd.Run()
+	if closeErr := shell.closeFileHandler(runPlan.StdoutFileHandler); closeErr != nil {
+		slog.Error(
+			"ShellStdoutFileCloseFailed",
+			slog.String("file", runPlan.StdoutFileHandler.Name()),
+			slog.String("err", closeErr.Error()),
+		)
 	}
-	if preparedExec.StderrFileHandler != nil {
-		preparedExec.StderrFileHandler.Close()
+	if closeErr := shell.closeFileHandler(runPlan.StderrFileHandler); closeErr != nil {
+		slog.Error(
+			"ShellStderrFileCloseFailed",
+			slog.String("file", runPlan.StderrFileHandler.Name()),
+			slog.String("err", closeErr.Error()),
+		)
 	}
 
-	if preparedExec.StdoutBytesBuffer != nil {
-		stdoutStr = strings.TrimSpace(preparedExec.StdoutBytesBuffer.String())
+	if runPlan.StdoutBytesBuffer != nil {
+		stdoutStr = strings.TrimSpace(runPlan.StdoutBytesBuffer.String())
 	}
-	if preparedExec.Err == nil {
+	if runPlan.Err == nil {
 		return stdoutStr, nil
 	}
 
-	if exitErr, assertOk := preparedExec.Err.(*exec.ExitError); assertOk {
-		stdErrStr := preparedExec.StderrBytesBuffer.String()
-		if exitErr.ExitCode() == 124 {
-			stdErrStr = "CommandDeadlineExceeded"
-		}
-
+	// exec.Wait prefers the child's own ExitError over the context error, so
+	// cancellation is detected on the context — errors.Is(err, DeadlineExceeded)
+	// never matches a signal-killed command.
+	if errors.Is(executionCtx.Err(), context.DeadlineExceeded) {
 		return stdoutStr, &ShellError{
-			StdErr:   stdErrStr,
+			StdErr:   "CommandDeadlineExceeded",
+			ExitCode: ShellCommandTimeoutExitCode,
+		}
+	}
+	if exitErr, assertOk := runPlan.Err.(*exec.ExitError); assertOk {
+		return stdoutStr, &ShellError{
+			StdErr:   runPlan.StderrBytesBuffer.String(),
 			ExitCode: exitErr.ExitCode(),
 		}
 	}
 
-	return stdoutStr, preparedExec.Err
+	return stdoutStr, runPlan.Err
 }
