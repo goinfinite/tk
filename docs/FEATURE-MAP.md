@@ -84,7 +84,7 @@ Runs subprocess commands with configurable timeout, user, working directory, and
 
 **Flow:**
 
-1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it with timeout enforcement, optional user switching, and stdout/stderr capture
+1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under a context deadline (SIGTERM, SIGKILL after a grace; exit 124 `CommandDeadlineExceeded`), optional user switching, and stdout/stderr capture; when `ShouldUseCleanEnv` is set the child runs from a minimal environment (PATH of the resolved user's `~/.local/bin` plus the standard system directories, HOME — parent's for same-user runs or the target user's home on Username switch, PWD when a working directory is set, DEBIAN_FRONTEND, and explicit Envs) so the parent's other variables cannot leak
 2. `src/infra/shellEscape.go` — `Quote` escapes shell arguments for safe interpolation
 
 ---
@@ -165,7 +165,7 @@ Wraps responses in a standard envelope for API consumers and provides syntax-hig
 
 **Flow:**
 
-1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON responses; `LiaisonCliResponseRenderer` for terminal output with chroma syntax highlighting; `SimpleCliResponseRenderer(isSuccess, message)` for simplified CLI usage — maps isSuccess to a LiaisonResponse status and delegates to LiaisonCliResponseRenderer for JSON envelope output
+1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON responses; `LiaisonCliResponseRenderer` for terminal output with chroma syntax highlighting; `SimpleCliResponseRenderer(isSuccess, message)` for simplified CLI usage — maps isSuccess to a LiaisonResponse status and delegates to LiaisonCliResponseRenderer for JSON envelope output; `LiaisonApiResponseEmitter` and `LiaisonCliResponseRenderer` translate each curated `LiaisonResponseStatus` (success, created, accepted/202, multiStatus, userError, unauthorized, forbidden, notFound, timeout, conflict/409, rateLimited, infraError, unknownError, serviceUnavailable/503) to its HTTP code and sysexits CLI code
 
 ---
 
@@ -195,7 +195,7 @@ Configures structured logging level at application startup.
 
 **Flow:**
 
-1. `src/presentation/middleware/logHandler.go` — `LogHandler.Init` reads LOG_LEVEL env var and configures slog with zerolog backend; supports Debug, Info, Warn, Error levels with TTY-aware formatting
+1. `src/presentation/middleware/logHandler.go` — `LogHandler.Init` reads LOG_LEVEL env var and configures slog with zerolog backend; supports Debug, Info, Warn, Error levels case-insensitively; logs always go to stderr so the CLI's stdout carries only the JSON response, and interactive debug sessions get the console writer formatting (tkInfra.IsStdoutTerminal)
 
 ---
 

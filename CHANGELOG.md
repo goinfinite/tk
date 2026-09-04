@@ -1,6 +1,19 @@
 # Changelog
 
 ```log
+0.3.3 - 2026/09/03
+fix: CLI logs no longer corrupt the machine-readable stdout channel; all logs go to stderr — interactive debug keeps its console formatting — so stdout carries only the JSON response in every session mode (LOG_LEVEL=debug included); LOG_LEVEL matching is now case-insensitive
+fix: CLI response renderer writes its error diagnostics (ResponseEncodingError, SyntaxHighlighting*Error) to stderr instead of stdout
+fix: LogHandler.SetLevel logs a failed LOG_LEVEL env write instead of dropping it silently
+refactor: extract the stdout-terminal check into tkInfra.IsStdoutTerminal and use it from both the log handler and the CLI response renderer so they cannot drift
+fix: Shell enforces ExecutionTimeoutSecs via a Go context deadline (SIGTERM on expiry) instead of the external timeout binary; a command that exits 124 on its own is no longer misreported as CommandDeadlineExceeded (a real timeout still surfaces as exit 124 with CommandDeadlineExceeded)
+refactor: extract the timeout policy to exported constants ShellExecutionTimeoutDefaultSecs, ShellExecutionTimeoutHardLimitSecs, ShellExecutionTimeoutGraceSecs, and ShellCommandTimeoutExitCode, applied by Shell.executionTimeoutResolver; SIGTERM children that ignore the signal are escalated to SIGKILL after the grace via Cmd.WaitDelay
+fix: Shell.Run closes its stdout/stderr capture files — executionPlanner never populated the executionPlan file-handler fields, so the handles leaked on every run with StdoutFilePath/StderrFilePath; a failed stderr capture creation now also releases the already-opened stdout capture file
+feat: add ShouldUseCleanEnv to ShellSettings; when set, the child runs from a minimal environment — PATH of ~/.local/bin (the resolved user's own, target's on Username switch) plus the standard system directories, HOME (parent's for same-user runs, target user's home on Username switch), PWD when a working directory is set, DEBIAN_FRONTEND, and explicit Envs — so the parent's other variables cannot leak; independent of Username, so it also covers running as the same user with a clean environment
+feat: add LiaisonResponseStatus accepted (202/exit 0), conflict (409/exit 65), and serviceUnavailable (503/exit 69); both renderers map them per the curated table
+test: add TestLogLevelParser, TestIsStdoutTerminal, TestChildEnvironment (inherited+PWD, Username-alone-inherits, clean-env PATH/HOME/PWD policy incl. target-user home on switch, Envs-win end-to-end over parent and clean base), StdoutFileCapture/CaptureFileHandlesDoNotLeak (fd-count regression), and timeout (CommandTimeoutEnforced, NaturalExitCode124KeepsCommandStdErr) coverage; extend both renderer tests with the three new statuses
+chore: gofmt paginationQueryBuilder_test.go (pre-existing formatting drift)
+
 0.3.2 - 2026/07/30
 fix: ReadFileContent accepts symlinks (replace IsFile guard with os.IsNotExist mapping; os.Open follows the chain)
 fix: lower ReadFileContent default cap from 1GiB to 500MiB to bound in-memory string allocation
