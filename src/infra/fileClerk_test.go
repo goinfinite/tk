@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
@@ -16,9 +18,9 @@ func TestFileExists(t *testing.T) {
 
 	t.Run("ExistingFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "existing.txt")
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.FileExists(testFile) {
@@ -62,9 +64,9 @@ func TestIsFile(t *testing.T) {
 
 	t.Run("RegularFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
@@ -125,9 +127,9 @@ func TestIsDir(t *testing.T) {
 
 	t.Run("RegularFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if clerk.IsDir(testFile) {
@@ -148,15 +150,15 @@ func TestIsDir(t *testing.T) {
 	})
 }
 
-func TestCreateFile(t *testing.T) {
+func TestTouchFile(t *testing.T) {
 	clerk := FileClerk{}
 	tempDir := t.TempDir()
 
 	t.Run("CreateNewFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "newfile.txt")
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Errorf("CreateFileFailed: %v", err)
+			t.Errorf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
@@ -169,12 +171,172 @@ func TestCreateFile(t *testing.T) {
 		}
 	})
 
-	t.Run("CreateFileInNonExistentDir", func(t *testing.T) {
+	t.Run("TouchFileInNonExistentDir", func(t *testing.T) {
 		nonExistentDir := filepath.Join(tempDir, "nonexistent", "subdir")
 		testFile := filepath.Join(nonExistentDir, "file.txt")
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: CreateFileInNonExistentDir")
+			t.Errorf("MissingExpectedError: TouchFileInNonExistentDir")
+		}
+	})
+
+	t.Run("TouchExistingFileRefreshesTimestamps", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "existing_touch.txt")
+
+		err := clerk.TouchFile(testFile)
+		if err != nil {
+			t.Fatalf("TouchFileFailed: %v", err)
+		}
+
+		pastTimestamp := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		err = os.Chtimes(testFile, pastTimestamp, pastTimestamp)
+		if err != nil {
+			t.Fatalf("ChtimesFailed: %v", err)
+		}
+
+		err = clerk.TouchFile(testFile)
+		if err != nil {
+			t.Errorf("TouchFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(testFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if !fileInfo.ModTime().After(pastTimestamp) {
+			t.Errorf("TimestampsNotRefreshed: mtime %v", fileInfo.ModTime())
+		}
+	})
+
+	t.Run("TouchExistingFileKeepsContent", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "kept_content.txt")
+
+		err := clerk.WriteNewFile(testFile, "do not truncate me", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		err = clerk.TouchFile(testFile)
+		if err != nil {
+			t.Errorf("TouchFileFailed: %v", err)
+		}
+
+		content, readErr := clerk.ReadFileContent(testFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if content != "do not truncate me" {
+			t.Errorf("ContentWasTruncated: '%s'", content)
+		}
+	})
+
+	t.Run("TouchDanglingSymlinkFails", func(t *testing.T) {
+		targetPath := filepath.Join(tempDir, "dangling_touch_target")
+		symlinkPath := filepath.Join(tempDir, "dangling_touch.txt")
+
+		err := os.Symlink(targetPath, symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.TouchFile(symlinkPath)
+		if err == nil || err.Error() != "TargetIsSymlink" {
+			t.Errorf("MissingExpectedError: TargetIsSymlink, got %v", err)
+		}
+		if clerk.FileExists(targetPath) {
+			t.Errorf("TouchFollowedDanglingSymlink")
+		}
+	})
+}
+
+func TestWriteNewFile(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	t.Run("WritesContentWithExactPermissions", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "written.txt")
+
+		err := clerk.WriteNewFile(testFile, "hello clerk", 0666)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(testFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Mode().Perm() != 0666 {
+			t.Errorf(
+				"PermissionsMismatch: umask must not shrink granted mode, got %04o",
+				fileInfo.Mode().Perm(),
+			)
+		}
+
+		content, readErr := clerk.ReadFileContent(testFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if content != "hello clerk" {
+			t.Errorf("ContentMismatch: '%s' vs '%s'", content, "hello clerk")
+		}
+	})
+
+	t.Run("EmptyContentWritesEmptyFile", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "empty.txt")
+
+		err := clerk.WriteNewFile(testFile, "", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(testFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Size() != 0 {
+			t.Errorf("FileShouldBeEmpty: size %d", fileInfo.Size())
+		}
+	})
+
+	t.Run("ExistingPathFails", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "occupied.txt")
+
+		err := clerk.WriteNewFile(testFile, "first", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		err = clerk.WriteNewFile(testFile, "second", 0644)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+		}
+		if err != nil && err.Error() != "TargetFileAlreadyExists" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+		}
+
+		content, readErr := clerk.ReadFileContent(testFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if content != "first" {
+			t.Errorf("ExistingContentWasOverwritten: '%s'", content)
+		}
+	})
+
+	t.Run("DanglingSymlinkPathFails", func(t *testing.T) {
+		symlinkPath := filepath.Join(tempDir, "dangling_link.txt")
+
+		err := os.Symlink(filepath.Join(tempDir, "nowhere"), symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.WriteNewFile(symlinkPath, "payload", 0644)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+		}
+		if clerk.FileExists(filepath.Join(tempDir, "nowhere")) {
+			t.Errorf("WriteFollowedDanglingSymlink")
 		}
 	})
 }
@@ -188,9 +350,9 @@ func TestCopyFile(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		testContent := "test content for copy"
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(sourceFile, testContent, true)
@@ -245,12 +407,12 @@ func TestCopyFile(t *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source.txt")
 		targetFile := filepath.Join(tempDir, "existing_target.txt")
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
 			t.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(targetFile)
+		err = clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -274,6 +436,58 @@ func TestCopyFile(t *testing.T) {
 			t.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
+
+	t.Run("CopyPreservesSourceModeIncludingExecBit", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "executable.sh")
+		targetFile := filepath.Join(tempDir, "executable_copy.sh")
+
+		err := clerk.WriteNewFile(sourceFile, "#!/bin/sh\necho hi\n", 0755)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		err = clerk.CopyFile(sourceFile, targetFile)
+		if err != nil {
+			t.Fatalf("CopyFileFailed: %v", err)
+		}
+
+		targetInfo, statErr := os.Stat(targetFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if targetInfo.Mode().Perm() != 0755 {
+			t.Errorf(
+				"ModeMismatch: exec bit must survive copy, got %04o",
+				targetInfo.Mode().Perm(),
+			)
+		}
+	})
+
+	t.Run("CopyToDanglingSymlinkFails", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "copy_source.txt")
+		symlinkPath := filepath.Join(tempDir, "dangling_target.txt")
+
+		err := clerk.WriteNewFile(sourceFile, "payload", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		err = os.Symlink(filepath.Join(tempDir, "nowhere_copy"), symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.CopyFile(sourceFile, symlinkPath)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+		}
+		if err != nil && err.Error() != "TargetFileAlreadyExists" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+		}
+		if clerk.FileExists(filepath.Join(tempDir, "nowhere_copy")) {
+			t.Errorf("CopyFollowedDanglingSymlink")
+		}
+	})
 }
 
 func TestMoveFile(t *testing.T) {
@@ -285,9 +499,9 @@ func TestMoveFile(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		testContent := "test content for move"
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(sourceFile, testContent, true)
@@ -336,6 +550,132 @@ func TestMoveFile(t *testing.T) {
 			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
+
+	t.Run("MoveToExistingTargetFails", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "move_source.txt")
+		targetFile := filepath.Join(tempDir, "move_existing_target.txt")
+
+		err := clerk.TouchFile(sourceFile)
+		if err != nil {
+			t.Fatalf("CreateSourceFileFailed: %v", err)
+		}
+
+		err = clerk.TouchFile(targetFile)
+		if err != nil {
+			t.Fatalf("CreateTargetFileFailed: %v", err)
+		}
+
+		err = clerk.MoveFile(sourceFile, targetFile)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+		}
+		if err != nil && err.Error() != "TargetFileAlreadyExists" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+		}
+
+		if !clerk.IsFile(sourceFile) || !clerk.IsFile(targetFile) {
+			t.Errorf("FailedMoveMustLeaveBothFilesIntact")
+		}
+	})
+
+	t.Run("MoveToDanglingSymlinkFails", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "move_dangling_source.txt")
+		symlinkPath := filepath.Join(tempDir, "move_dangling_target.txt")
+
+		err := clerk.TouchFile(sourceFile)
+		if err != nil {
+			t.Fatalf("CreateSourceFileFailed: %v", err)
+		}
+
+		err = os.Symlink(filepath.Join(tempDir, "move_dangling_nowhere"), symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.MoveFile(sourceFile, symlinkPath)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+		}
+		if !clerk.IsFile(sourceFile) {
+			t.Errorf("SourceFileMustSurviveFailedMove: %s", sourceFile)
+		}
+	})
+
+	t.Run("MoveFileOntoItselfSucceeds", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "move_onto_itself.txt")
+
+		err := clerk.TouchFile(testFile)
+		if err != nil {
+			t.Fatalf("TouchFileFailed: %v", err)
+		}
+
+		err = clerk.MoveFile(testFile, testFile)
+		if err != nil {
+			t.Errorf("MoveFileOntoItselfFailed: %v", err)
+		}
+		if !clerk.IsFile(testFile) {
+			t.Errorf("FileShouldStillExist: %s", testFile)
+		}
+	})
+
+	t.Run("MoveFileCrossDeviceFallsBackToCopyAndDelete", func(t *testing.T) {
+		sourceFile := filepath.Join(tempDir, "xdev_source.txt")
+
+		err := clerk.WriteNewFile(sourceFile, "cross device payload", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		otherDeviceBase := directoryOnDifferentDevice(t, tempDir)
+		otherDeviceDir, mkErr := os.MkdirTemp(otherDeviceBase, "tk-xdev-")
+		if mkErr != nil {
+			t.Fatalf("MkdirTempFailed: %v", mkErr)
+		}
+		defer func() { _ = os.RemoveAll(otherDeviceDir) }()
+
+		targetFile := filepath.Join(otherDeviceDir, "xdev_target.txt")
+
+		err = clerk.MoveFile(sourceFile, targetFile)
+		if err != nil {
+			t.Fatalf("MoveFileCrossDeviceFailed: %v", err)
+		}
+		if clerk.FileExists(sourceFile) {
+			t.Errorf("SourceShouldBeRemovedAfterCrossDeviceMove: %s", sourceFile)
+		}
+
+		content, readErr := clerk.ReadFileContent(targetFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if content != "cross device payload" {
+			t.Errorf("ContentMismatch: '%s'", content)
+		}
+	})
+}
+
+// directoryOnDifferentDevice finds a world-writable directory living on
+// another device than referenceDir, so MoveFile must take its EXDEV path.
+func directoryOnDifferentDevice(t *testing.T, referenceDir string) string {
+	t.Helper()
+
+	referenceInfo, statErr := os.Stat(referenceDir)
+	if statErr != nil {
+		t.Fatalf("StatFailed: %v", statErr)
+	}
+	referenceDevice := referenceInfo.Sys().(*syscall.Stat_t).Dev
+
+	for _, candidate := range []string{"/var/tmp", "/dev/shm"} {
+		candidateInfo, statErr := os.Stat(candidate)
+		if statErr != nil {
+			continue
+		}
+		if candidateInfo.Sys().(*syscall.Stat_t).Dev != referenceDevice {
+			return candidate
+		}
+	}
+
+	t.Skip("NoDirectoryOnDifferentDevice")
+	return ""
 }
 
 func TestRenameFile(t *testing.T) {
@@ -346,9 +686,9 @@ func TestRenameFile(t *testing.T) {
 		sourceFile := filepath.Join(tempDir, "original.txt")
 		targetFile := filepath.Join(tempDir, "renamed.txt")
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.RenameFile(sourceFile, targetFile)
@@ -378,9 +718,9 @@ func TestDeleteFile(t *testing.T) {
 	t.Run("DeleteExistingFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "todelete.txt")
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
@@ -405,6 +745,60 @@ func TestDeleteFile(t *testing.T) {
 			t.Errorf("DeleteNonExistentFileFailed: %v", err)
 		}
 	})
+
+	t.Run("DeleteDirectoryFails", func(t *testing.T) {
+		testDir := filepath.Join(tempDir, "undeletable_dir")
+
+		err := clerk.CreateDir(testDir)
+		if err != nil {
+			t.Fatalf("CreateDirFailed: %v", err)
+		}
+
+		err = clerk.DeleteFile(testDir)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetIsDirectory")
+		}
+		if err != nil && err.Error() != "TargetIsDirectory" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsDirectory", err.Error())
+		}
+
+		err = clerk.DeleteDir(testDir)
+		if err != nil {
+			t.Errorf("DeleteDirFailed: %v", err)
+		}
+	})
+
+	t.Run("DeleteSymlinkRemovesLinkOnly", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "symlink_target_delete.txt")
+		symlinkPath := filepath.Join(tempDir, "symlink_delete.txt")
+
+		err := clerk.TouchFile(targetFile)
+		if err != nil {
+			t.Fatalf("TouchFileFailed: %v", err)
+		}
+
+		err = os.Symlink(targetFile, symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.DeleteFile(symlinkPath)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+
+		if clerk.IsSymlink(symlinkPath) {
+			t.Errorf("SymlinkShouldBeGone: %s", symlinkPath)
+		}
+		if !clerk.IsFile(targetFile) {
+			t.Errorf("SymlinkTargetMustSurvive: %s", targetFile)
+		}
+
+		err = clerk.DeleteFile(targetFile)
+		if err != nil {
+			t.Errorf("DeleteTargetFileFailed: %v", err)
+		}
+	})
 }
 
 func TestReadFileContent(t *testing.T) {
@@ -415,9 +809,9 @@ func TestReadFileContent(t *testing.T) {
 		testFile := filepath.Join(tempDir, "content.txt")
 		expectedContent := "Hello, World!\nThis is test content."
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(testFile, expectedContent, true)
@@ -453,17 +847,36 @@ func TestReadFileContent(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadWithMaxContentSizeLimit", func(t *testing.T) {
+	t.Run("ReadExceedingMaxContentSizeFails", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "limited.txt")
 		fullContent := "This is a longer content that should be truncated when reading with size limit."
 		maxSize := int64(20)
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.UpdateFileContent(testFile, fullContent, true)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("UpdateFileContentFailed: %v", err)
 		}
 
-		err = clerk.UpdateFileContent(testFile, fullContent, true)
+		_, err = clerk.ReadFileContent(testFile, &maxSize)
+		if err == nil {
+			t.Fatalf("MissingExpectedError: FileTooLarge")
+		}
+		if err.Error() != "FileTooLarge" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileTooLarge", err.Error())
+		}
+
+		err = clerk.DeleteFile(testFile)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+	})
+
+	t.Run("ReadExactlyAtMaxContentSize", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "exact_limit.txt")
+		fullContent := "exactly-twenty-chars"
+		maxSize := int64(len(fullContent))
+
+		err := clerk.UpdateFileContent(testFile, fullContent, true)
 		if err != nil {
 			t.Fatalf("UpdateFileContentFailed: %v", err)
 		}
@@ -472,13 +885,28 @@ func TestReadFileContent(t *testing.T) {
 		if err != nil {
 			t.Errorf("ReadFileContentFailed: %v", err)
 		}
-
-		if int64(len(actualContent)) > maxSize {
-			t.Errorf("ContentSizeExceedsLimit:  %d vs %d", len(actualContent), maxSize)
+		if actualContent != fullContent {
+			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, fullContent)
 		}
 
-		if len(actualContent) == 0 {
-			t.Errorf("ContentShouldNotBeEmpty")
+		err = clerk.DeleteFile(testFile)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+	})
+
+	t.Run("ReadWithNegativeMaxSizeFails", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "negative_limit.txt")
+		negativeSize := int64(-1)
+
+		err := clerk.UpdateFileContent(testFile, "content", true)
+		if err != nil {
+			t.Fatalf("UpdateFileContentFailed: %v", err)
+		}
+
+		_, err = clerk.ReadFileContent(testFile, &negativeSize)
+		if err == nil || err.Error() != "FileTooLarge" {
+			t.Errorf("WrongErrorForNegativeCap: %v", err)
 		}
 
 		err = clerk.DeleteFile(testFile)
@@ -491,9 +919,9 @@ func TestReadFileContent(t *testing.T) {
 		testFile := filepath.Join(tempDir, "default_size.txt")
 		testContent := "Content with default size limit"
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(testFile, testContent, true)
@@ -521,7 +949,7 @@ func TestReadFileContent(t *testing.T) {
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 		expectedContent := "content behind the symlink"
 
-		err := clerk.CreateFile(targetFile)
+		err := clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -560,9 +988,9 @@ func TestReadFileContent(t *testing.T) {
 		deletedTarget := filepath.Join(tempDir, "deleted_target.txt")
 		symlinkPath := filepath.Join(tempDir, "dangling.txt")
 
-		err := clerk.CreateFile(deletedTarget)
+		err := clerk.TouchFile(deletedTarget)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.Symlink(deletedTarget, symlinkPath)
@@ -600,9 +1028,9 @@ func TestUpdateFileContent(t *testing.T) {
 		initialContent := "Initial content"
 		newContent := "New content"
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(testFile, initialContent, true)
@@ -636,9 +1064,9 @@ func TestUpdateFileContent(t *testing.T) {
 		appendContent := " Appended"
 		expectedContent := initialContent + appendContent
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(testFile, initialContent, true)
@@ -675,9 +1103,9 @@ func TestDeleteFileContent(t *testing.T) {
 		testFile := filepath.Join(tempDir, "clear.txt")
 		initialContent := "Content to be cleared"
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFileContent(testFile, initialContent, true)
@@ -782,7 +1210,7 @@ func TestCopyDir(t *testing.T) {
 			t.Fatalf("CreateSourceDirFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(testFile)
+		err = clerk.TouchFile(testFile)
 		if err != nil {
 			t.Fatalf("CreateTestFileFailed: %v", err)
 		}
@@ -856,7 +1284,7 @@ func TestMoveDir(t *testing.T) {
 			t.Fatalf("CreateSourceDirFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(testFile)
+		err = clerk.TouchFile(testFile)
 		if err != nil {
 			t.Fatalf("CreateTestFileFailed: %v", err)
 		}
@@ -927,9 +1355,9 @@ func TestDeleteDir(t *testing.T) {
 			t.Fatalf("CreateDirFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(testFile)
+		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsDir(testDir) {
@@ -954,6 +1382,32 @@ func TestDeleteDir(t *testing.T) {
 			t.Errorf("DeleteNonExistentDirFailed: %v", err)
 		}
 	})
+
+	t.Run("DeleteFileThroughDeleteDirFails", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "not_a_dir.txt")
+
+		err := clerk.TouchFile(testFile)
+		if err != nil {
+			t.Fatalf("TouchFileFailed: %v", err)
+		}
+
+		err = clerk.DeleteDir(testFile)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetNotDirectory")
+		}
+		if err != nil && err.Error() != "TargetNotDirectory" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetNotDirectory", err.Error())
+		}
+
+		if !clerk.IsFile(testFile) {
+			t.Errorf("FileMustSurviveRejectedDelete: %s", testFile)
+		}
+
+		err = clerk.DeleteFile(testFile)
+		if err != nil {
+			t.Errorf("DeleteFileFailed: %v", err)
+		}
+	})
 }
 
 func TestIsSymlink(t *testing.T) {
@@ -963,9 +1417,9 @@ func TestIsSymlink(t *testing.T) {
 	t.Run("RegularFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if clerk.IsSymlink(testFile) {
@@ -995,7 +1449,7 @@ func TestCreateSymlink(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
-		err := clerk.CreateFile(targetFile)
+		err := clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -1043,7 +1497,7 @@ func TestIsSymlinkTo(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
-		err := clerk.CreateFile(targetFile)
+		err := clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -1072,12 +1526,12 @@ func TestIsSymlinkTo(t *testing.T) {
 		regularFile := filepath.Join(tempDir, "regular.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		err := clerk.CreateFile(regularFile)
+		err := clerk.TouchFile(regularFile)
 		if err != nil {
 			t.Fatalf("CreateRegularFileFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(targetFile)
+		err = clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -1106,7 +1560,7 @@ func TestRemoveSymlink(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
-		err := clerk.CreateFile(targetFile)
+		err := clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -1142,11 +1596,11 @@ func TestUpdateFilePermissions(t *testing.T) {
 
 	t.Run("UpdateFilePermissionsWithCustomValue", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "permissions.txt")
-		customPermissions := int(0600)
+		customPermissions := os.FileMode(0600)
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(testFile, &customPermissions)
@@ -1163,9 +1617,9 @@ func TestUpdateFilePermissions(t *testing.T) {
 	t.Run("UpdateFilePermissionsWithDefaultValue", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "default_permissions.txt")
 
-		err := clerk.CreateFile(testFile)
+		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateFileFailed: %v", err)
+			t.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(testFile, nil)
@@ -1195,6 +1649,38 @@ func TestUpdateFilePermissions(t *testing.T) {
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
 			t.Errorf("DeleteDirFailed: %v", err)
+		}
+	})
+
+	t.Run("UpdateSymlinkPermissionsFails", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "chmod_target.txt")
+		symlinkPath := filepath.Join(tempDir, "chmod_link.txt")
+		restrictivePermissions := os.FileMode(0600)
+
+		err := clerk.UpdateFileContent(targetFile, "target", true)
+		if err != nil {
+			t.Fatalf("UpdateFileContentFailed: %v", err)
+		}
+
+		err = os.Symlink(targetFile, symlinkPath)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.UpdateFilePermissions(symlinkPath, &restrictivePermissions)
+		if err == nil {
+			t.Errorf("MissingExpectedError: TargetIsSymlink")
+		}
+		if err != nil && err.Error() != "TargetIsSymlink" {
+			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsSymlink", err.Error())
+		}
+
+		targetInfo, statErr := os.Stat(targetFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if targetInfo.Mode().Perm() == 0600 {
+			t.Errorf("ChmodLandedOnSymlinkTarget")
 		}
 	})
 }
@@ -1235,9 +1721,9 @@ func TestCompressFile(t *testing.T) {
 			testFile := filepath.Join(tempDir, "compress_"+formatName+".txt")
 			testContent := "content to compress with " + formatName
 
-			err := clerk.CreateFile(testFile)
+			err := clerk.TouchFile(testFile)
 			if err != nil {
-				t.Fatalf("CreateFileFailed: %v", err)
+				t.Fatalf("TouchFileFailed: %v", err)
 			}
 
 			err = clerk.UpdateFileContent(testFile, testContent, true)
@@ -1245,7 +1731,7 @@ func TestCompressFile(t *testing.T) {
 				t.Fatalf("UpdateFileContentFailed: %v", err)
 			}
 
-			compressedFilePath, err := clerk.CompressFile(testFile, testCase.format)
+			compressedFilePath, err := clerk.CompressFile(testFile, testCase.format, nil)
 			if err != nil && testCase.shouldSucceed {
 				t.Errorf("[%s] CompressFileFailed: %v", formatName, err)
 			}
@@ -1280,13 +1766,115 @@ func TestCompressFile(t *testing.T) {
 	t.Run("CompressNonExistentFile", func(t *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 
-		_, err := clerk.CompressFile(nonExistentFile, nil)
+		_, err := clerk.CompressFile(nonExistentFile, nil, nil)
 		if err == nil {
 			t.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
 			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
+		}
+	})
+
+	t.Run("SourceDeletionContractIsFormatIndependent", func(t *testing.T) {
+		keepSourceTrue := true
+		formats := []string{"tar", "gz", "zip", "xz", "br"}
+
+		for _, format := range formats {
+			formatName := format
+
+			t.Run("Keep_"+formatName, func(t *testing.T) {
+				testFile := filepath.Join(tempDir, "keep_"+formatName+".txt")
+				err := clerk.WriteNewFile(testFile, "content for keep "+formatName, 0644)
+				if err != nil {
+					t.Fatalf("WriteNewFileFailed: %v", err)
+				}
+
+				compressedFile, err := clerk.CompressFile(testFile, &formatName, &keepSourceTrue)
+				if err != nil {
+					t.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
+				}
+				if !clerk.IsFile(testFile) {
+					t.Errorf("[%s] SourceMustBeKept: %s", formatName, testFile)
+				}
+
+				_ = clerk.DeleteFile(testFile)
+				_ = clerk.DeleteFile(compressedFile)
+			})
+
+			t.Run("Remove_"+formatName, func(t *testing.T) {
+				testFile := filepath.Join(tempDir, "remove_"+formatName+".txt")
+				err := clerk.WriteNewFile(testFile, "content for remove "+formatName, 0644)
+				if err != nil {
+					t.Fatalf("WriteNewFileFailed: %v", err)
+				}
+
+				compressedFile, err := clerk.CompressFile(testFile, &formatName, nil)
+				if err != nil {
+					t.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
+				}
+				if clerk.FileExists(testFile) {
+					t.Errorf("[%s] SourceMustBeRemoved: %s", formatName, testFile)
+				}
+
+				_ = clerk.DeleteFile(compressedFile)
+			})
+		}
+	})
+}
+
+func TestCompressDir(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	t.Run("DefaultBrotliStageSucceedsAndCleansIntermediateTar", func(t *testing.T) {
+		sourceDir := filepath.Join(tempDir, "compressdir_br")
+		nestedFile := filepath.Join(sourceDir, "nested.txt")
+
+		err := clerk.CreateDir(sourceDir)
+		if err != nil {
+			t.Fatalf("CreateDirFailed: %v", err)
+		}
+
+		err = clerk.WriteNewFile(nestedFile, "nested content", 0644)
+		if err != nil {
+			t.Fatalf("WriteNewFileFailed: %v", err)
+		}
+
+		compressedFilePath, err := clerk.CompressDir(sourceDir, nil)
+		if err != nil {
+			t.Fatalf("CompressDirFailed: %v", err)
+		}
+
+		if !strings.HasSuffix(compressedFilePath, ".tar.br") {
+			t.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
+		}
+		if !clerk.IsFile(compressedFilePath) {
+			t.Errorf("CompressedFileShouldExist: %s", compressedFilePath)
+		}
+		if clerk.FileExists(sourceDir + ".tar") {
+			t.Errorf("IntermediateTarShouldBeRemoved: %s", sourceDir+".tar")
+		}
+		if !clerk.IsDir(sourceDir) {
+			t.Errorf("SourceDirMustBeKept: %s", sourceDir)
+		}
+	})
+
+	t.Run("TarFormatSkipsSecondStage", func(t *testing.T) {
+		sourceDir := filepath.Join(tempDir, "compressdir_tar")
+		tarFormat := "tar"
+
+		err := clerk.CreateDir(sourceDir)
+		if err != nil {
+			t.Fatalf("CreateDirFailed: %v", err)
+		}
+
+		compressedFilePath, err := clerk.CompressDir(sourceDir, &tarFormat)
+		if err != nil {
+			t.Fatalf("CompressDirFailed: %v", err)
+		}
+		if !strings.HasSuffix(compressedFilePath, ".tar") {
+			t.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
 		}
 	})
 }
@@ -1321,9 +1909,9 @@ func TestDecompressFile(t *testing.T) {
 			testFile := filepath.Join(tempDir, "decompress_test.txt")
 			preCompressedContent := "content to decompress"
 
-			err := clerk.CreateFile(testFile)
+			err := clerk.TouchFile(testFile)
 			if err != nil {
-				t.Fatalf("CreateFileFailed: %v", err)
+				t.Fatalf("TouchFileFailed: %v", err)
 			}
 
 			err = clerk.UpdateFileContent(testFile, preCompressedContent, true)
@@ -1331,7 +1919,7 @@ func TestDecompressFile(t *testing.T) {
 				t.Fatalf("UpdateFileContentFailed: %v", err)
 			}
 
-			compressedFile, err := clerk.CompressFile(testFile, &testCase.format)
+			compressedFile, err := clerk.CompressFile(testFile, &testCase.format, nil)
 			if err != nil && testCase.shouldSucceed {
 				t.Fatalf("[%s] CompressFileFailed: %v", testCase.format, err)
 
@@ -1514,9 +2102,9 @@ func TestFileContentRegexSearch(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
 			targetFile := filepath.Join(tempDir, testCase.description+".txt")
-			createErr := clerk.CreateFile(targetFile)
+			createErr := clerk.TouchFile(targetFile)
 			if createErr != nil {
-				t.Fatalf("CreateFileFailed: %v", createErr)
+				t.Fatalf("TouchFileFailed: %v", createErr)
 			}
 
 			if testCase.fileContent != "" {
@@ -1668,7 +2256,7 @@ func TestOverwriteFile(t *testing.T) {
 		sourceContent := "new content via overwrite"
 		targetContent := "old content to be overwritten"
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
 			t.Fatalf("CreateSourceFileFailed: %v", err)
 		}
@@ -1678,7 +2266,7 @@ func TestOverwriteFile(t *testing.T) {
 			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
 		}
 
-		err = clerk.CreateFile(targetFile)
+		err = clerk.TouchFile(targetFile)
 		if err != nil {
 			t.Fatalf("CreateTargetFileFailed: %v", err)
 		}
@@ -1724,7 +2312,7 @@ func TestOverwriteFile(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "new_target.txt")
 		sourceContent := "content"
 
-		err := clerk.CreateFile(sourceFile)
+		err := clerk.TouchFile(sourceFile)
 		if err != nil {
 			t.Fatalf("CreateSourceFileFailed: %v", err)
 		}
@@ -1912,9 +2500,9 @@ func TestFileContentRegexReplace(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		t.Run(testCase.description, func(t *testing.T) {
 			targetFile := filepath.Join(tempDir, testCase.description+".txt")
-			createErr := clerk.CreateFile(targetFile)
+			createErr := clerk.TouchFile(targetFile)
 			if createErr != nil {
-				t.Fatalf("CreateFileFailed: %v", createErr)
+				t.Fatalf("TouchFileFailed: %v", createErr)
 			}
 
 			if testCase.fileContent != "" {

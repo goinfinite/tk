@@ -16,8 +16,8 @@ func TestNewMailAddress(t *testing.T) {
 			{"user+tag@example.com", MailAddress("user+tag@example.com"), false},
 			{"first.last@subdomain.example.com", MailAddress("first.last@subdomain.example.com"), false},
 			{"user@127.0.0.1", MailAddress("user@127.0.0.1"), false},
-			// IPv6 format not supported by mail.ParseAddress
-			{"user@[IPv6:2001:db8::1]", MailAddress(""), true},
+			// Go 1.27's net/mail accepts bracketed IPv6 domains
+			{"user@[IPv6:2001:db8::1]", MailAddress("user@[IPv6:2001:db8::1]"), false},
 			{"\"quoted\"@example.com", MailAddress("\"quoted\"@example.com"), false},
 			{" user@example.com ", MailAddress("user@example.com"), false}, // Trimmed
 			// Invalid email addresses

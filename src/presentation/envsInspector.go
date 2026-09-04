@@ -51,13 +51,11 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	envFilePathStr := envsInspector.envFilePath.String()
 
 	fileClerk := tkInfra.FileClerk{}
-	if !fileClerk.FileExists(envFilePathStr) {
-		err = fileClerk.CreateFile(envFilePathStr)
-		if err != nil {
-			return errors.New("EnvsInspectorEnvCreateFileError")
-		}
+	err = fileClerk.TouchFile(envFilePathStr)
+	if err != nil {
+		return errors.New("EnvsInspectorEnvTouchFileError")
 	}
-	envFileWritePermissions := int(0600)
+	envFileWritePermissions := os.FileMode(0600)
 	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileWritePermissions)
 	if err != nil {
 		return errors.New("EnvsInspectorEnvUpdateFileWritePermissionsError")
@@ -94,7 +92,7 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		os.Setenv(envVarName, envVarValue)
 	}
 
-	envFileReadOnlyPermissions := int(0400)
+	envFileReadOnlyPermissions := os.FileMode(0400)
 	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileReadOnlyPermissions)
 	if err != nil {
 		return errors.New("EnvsInspectorEnvUpdateFileReadOnlyPermissionsError")
@@ -102,7 +100,8 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 
 	if len(missingRequiredEnvVars) > 0 {
 		return errors.New(
-			"EnvsInspectorMissingRequiredEnvVars: " + strings.Join(missingRequiredEnvVars, ", "),
+			"EnvsInspectorMissingRequiredEnvVars: " +
+				strings.Join(missingRequiredEnvVars, ", "),
 		)
 	}
 

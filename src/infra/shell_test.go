@@ -1,6 +1,11 @@
 package tkInfra
 
 import (
+	"context"
+	"os"
+	"os/user"
+	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -66,6 +71,290 @@ func TestShell(t *testing.T) {
 					}
 				}
 			}
+		}
+	})
+
+	t.Run("StdoutFileCapture", func(t *testing.T) {
+		outputFilePath := filepath.Join(t.TempDir(), "stdout.log")
+
+		shell := NewShell(ShellSettings{
+			Command:        "echo",
+			Args:           []string{"hello"},
+			StdoutFilePath: outputFilePath,
+		})
+		_, err := shell.Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+
+		fileContent, readErr := os.ReadFile(outputFilePath)
+		if readErr != nil {
+			t.Fatalf("OutputFileReadFailed: %v", readErr)
+		}
+		if string(fileContent) != "hello\n" {
+			t.Errorf("UnexpectedFileContent: '%s'", fileContent)
+		}
+	})
+
+	t.Run("CaptureFileHandlesDoNotLeak", func(t *testing.T) {
+		openDescriptorCount := func() int {
+			fdEntries, err := os.ReadDir("/proc/self/fd")
+			if err != nil {
+				t.Fatalf("FdScanFailed: %v", err)
+			}
+			return len(fdEntries)
+		}
+
+		captureDir := t.TempDir()
+		settings := ShellSettings{
+			Command:        "echo",
+			Args:           []string{"hello"},
+			StdoutFilePath: filepath.Join(captureDir, "stdout.log"),
+			StderrFilePath: filepath.Join(captureDir, "stderr.log"),
+		}
+
+		runCapture := func() {
+			if _, runErr := NewShell(settings).Run(); runErr != nil {
+				t.Fatalf("RunFailed: %v", runErr)
+			}
+		}
+
+		runCapture()
+		baselineDescriptors := openDescriptorCount()
+
+		for runIndex := 0; runIndex < 9; runIndex++ {
+			runCapture()
+		}
+
+		if leakedCount := openDescriptorCount() - baselineDescriptors; leakedCount > 0 {
+			t.Errorf("CaptureFileHandlesLeaked: %d descriptors left open", leakedCount)
+		}
+	})
+
+	t.Run("CommandTimeoutEnforced", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command:              "sleep",
+			Args:                 []string{"5"},
+			ExecutionTimeoutSecs: 1,
+		}).Run()
+
+		shellErr, assertOk := err.(*ShellError)
+		if !assertOk {
+			t.Fatalf("ExpectedShellError,Got%v", err)
+		}
+		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
+			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+		}
+		if shellErr.StdErr != "CommandDeadlineExceeded" {
+			t.Errorf("UnexpectedTimeoutMessage: '%s'", shellErr.StdErr)
+		}
+	})
+
+	t.Run("NaturalExitCode124KeepsCommandStdErr", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command: "bash",
+			Args:    []string{"-c", "echo boom 1>&2; exit 124"},
+		}).Run()
+
+		shellErr, assertOk := err.(*ShellError)
+		if !assertOk {
+			t.Fatalf("ExpectedShellError,Got%v", err)
+		}
+		if shellErr.ExitCode != 124 {
+			t.Errorf("UnexpectedExitCode: %d", shellErr.ExitCode)
+		}
+		if shellErr.StdErr != "boom\n" {
+			t.Errorf("Natural124MisreportedAsTimeout: '%s'", shellErr.StdErr)
+		}
+	})
+}
+
+func TestChildEnvironment(t *testing.T) {
+	t.Setenv("TK_PARENT_ONLY_VAR", "leaked")
+	standardSystemPath := "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+	t.Run("InheritsParentEnvAndWorkingDirectoryPwd", func(t *testing.T) {
+		runPlan := NewShell(ShellSettings{
+			Command:          "env",
+			WorkingDirectory: "/tmp",
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+		childEnv := runPlan.ExecCmd.Env
+
+		if !slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
+			t.Errorf("ParentEnvNotInherited: %v", childEnv)
+		}
+		if !slices.Contains(childEnv, "DEBIAN_FRONTEND=noninteractive") {
+			t.Errorf("MissingDebianFrontend: %v", childEnv)
+		}
+		if !slices.Contains(childEnv, "PWD=/tmp") {
+			t.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
+		}
+	})
+
+	t.Run("UsernameAloneStillInheritsParentEnv", func(t *testing.T) {
+		runPlan := NewShell(ShellSettings{
+			Command:  "env",
+			Username: "root",
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+		childEnv := runPlan.ExecCmd.Env
+
+		if !slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
+			t.Errorf("UsernameShouldNotImplyCleanEnv: %v", childEnv)
+		}
+	})
+
+	t.Run("CleanEnvDropsParentWhenFlagSet", func(t *testing.T) {
+		runPlan := NewShell(ShellSettings{
+			Command:           "env",
+			ShouldUseCleanEnv: true,
+			WorkingDirectory:  "/tmp",
+			Envs:              []string{"HOME=/home/target"},
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+		childEnv := runPlan.ExecCmd.Env
+
+		if slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
+			t.Errorf("ParentEnvLeakedIntoCleanChild: %v", childEnv)
+		}
+		if !slices.Contains(childEnv, "DEBIAN_FRONTEND=noninteractive") {
+			t.Errorf("MissingDebianFrontend: %v", childEnv)
+		}
+		if !slices.Contains(childEnv, "PWD=/tmp") {
+			t.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
+		}
+		if !slices.Contains(childEnv, "HOME=/home/target") {
+			t.Errorf("MissingExplicitEnv: %v", childEnv)
+		}
+		expectedPath := "PATH=" + os.Getenv("HOME") + "/.local/bin:" + standardSystemPath
+		if !slices.Contains(childEnv, expectedPath) {
+			t.Errorf("MissingUserLocalBinAndStandardPath: %v", childEnv)
+		}
+	})
+
+	t.Run("CleanEnvKeepsParentHomeForSameUser", func(t *testing.T) {
+		t.Setenv("HOME", "/home/simulator-user")
+
+		runPlan := NewShell(ShellSettings{
+			Command:           "env",
+			ShouldUseCleanEnv: true,
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+		childEnv := runPlan.ExecCmd.Env
+
+		if !slices.Contains(childEnv, "HOME=/home/simulator-user") {
+			t.Errorf("ParentHomeDroppedForSameUser: %v", childEnv)
+		}
+	})
+
+	t.Run("CleanEnvSetsTargetUserHomeOnUsernameSwitch", func(t *testing.T) {
+		targetUser, err := user.Lookup("root")
+		if err != nil {
+			t.Fatalf("RootLookupFailed: %v", err)
+		}
+
+		runPlan := NewShell(ShellSettings{
+			Command:           "env",
+			ShouldUseCleanEnv: true,
+			Username:          "root",
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+		childEnv := runPlan.ExecCmd.Env
+
+		if !slices.Contains(childEnv, "HOME="+targetUser.HomeDir) {
+			t.Errorf("TargetUserHomeMissing: %v", childEnv)
+		}
+		if parentHome := os.Getenv("HOME"); parentHome != targetUser.HomeDir {
+			if slices.Contains(childEnv, "HOME="+parentHome) {
+				t.Errorf("ParentHomeLeakedIntoSwitchedChild: %v", childEnv)
+			}
+			targetLocalBinPath := "PATH=" + targetUser.HomeDir + "/.local/bin:" +
+				standardSystemPath
+			if !slices.Contains(childEnv, targetLocalBinPath) {
+				t.Errorf("TargetUserLocalBinPathMissing: %v", childEnv)
+			}
+		}
+	})
+
+	t.Run("CleanEnvPwdIsAbsoluteForRelativeWorkingDirectory", func(t *testing.T) {
+		runPlan := NewShell(ShellSettings{
+			Command:           "env",
+			ShouldUseCleanEnv: true,
+			WorkingDirectory:  "relative-dir",
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+
+		expectedPwd, err := filepath.Abs("relative-dir")
+		if err != nil {
+			t.Fatalf("AbsPathFailed: %v", err)
+		}
+		if !slices.Contains(runPlan.ExecCmd.Env, "PWD="+expectedPwd) {
+			t.Errorf("RelativeWorkingDirectoryPwdNotAbsolute: %v", runPlan.ExecCmd.Env)
+		}
+	})
+
+	t.Run("EnvsWinOverSameNamedParentEntries", func(t *testing.T) {
+		t.Setenv("TK_TEST_ENV_PRECEDENCE", "from-parent")
+
+		shellOutput, err := NewShell(ShellSettings{
+			Command: "printenv",
+			Args:    []string{"TK_TEST_ENV_PRECEDENCE"},
+			Envs:    []string{"TK_TEST_ENV_PRECEDENCE=from-envs"},
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if shellOutput != "from-envs" {
+			t.Errorf("EnvsDidNotOverrideParentEntry: got '%s'", shellOutput)
+		}
+	})
+
+	t.Run("EnvsWinOverCleanBaseEntries", func(t *testing.T) {
+		t.Setenv("HOME", "/parent/home")
+
+		shellOutput, err := NewShell(ShellSettings{
+			Command:           "printenv",
+			Args:              []string{"HOME"},
+			ShouldUseCleanEnv: true,
+			Envs:              []string{"HOME=/home/envs-wins"},
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if shellOutput != "/home/envs-wins" {
+			t.Errorf("EnvsDidNotOverrideCleanBaseHome: got '%s'", shellOutput)
+		}
+	})
+}
+
+func TestIsStdoutTerminal(t *testing.T) {
+	t.Run("PipeIsNotTerminal", func(t *testing.T) {
+		originalStdout := os.Stdout
+
+		readEnd, writeEnd, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("PipeCreationFailed: %v", err)
+		}
+		defer func() { _ = writeEnd.Close() }()
+		defer func() { _ = readEnd.Close() }()
+		defer func() { os.Stdout = originalStdout }()
+
+		os.Stdout = readEnd
+		if IsStdoutTerminal() {
+			t.Errorf("PipeReportedAsTerminal")
 		}
 	})
 }
