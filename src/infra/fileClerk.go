@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
+	"time"
+
+	"golang.org/x/sys/unix"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
@@ -36,13 +40,16 @@ var (
 	ErrUnsupportedCompressionFormat = errors.New("UnsupportedCompressionFormat")
 	ErrTargetIsDirectory            = errors.New("TargetIsDirectory")
 	ErrSourceIsDirectory            = errors.New("SourceIsDirectory")
+	ErrFileTooLarge                 = errors.New("FileTooLarge")
+	ErrTargetIsSymlink              = errors.New("TargetIsSymlink")
+	ErrTargetNotDirectory           = errors.New("TargetNotDirectory")
 )
 
 type FileClerk struct{}
 
 func (FileClerk) FileExists(filePath string) bool {
 	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
+	return err == nil
 }
 
 func (clerk FileClerk) IsFile(filePath string) bool {
@@ -61,23 +68,89 @@ func (clerk FileClerk) IsDir(filePath string) bool {
 	return fileInfo.IsDir() && !clerk.IsSymlink(filePath)
 }
 
-func (clerk FileClerk) CreateFile(filePath string) error {
-	fileHandler, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer fileHandler.Close()
+// TouchFile refreshes timestamps or creates the file, like touch(1) — but a
+// dangling symlink at the path fails with ErrTargetIsSymlink instead of
+// creating the file behind the link.
+func (FileClerk) TouchFile(filePath string) error {
+	timestampNow := time.Now()
 
-	return nil
+	chtimesErr := os.Chtimes(filePath, timestampNow, timestampNow)
+	if chtimesErr == nil {
+		return nil
+	}
+	if !os.IsNotExist(chtimesErr) {
+		return chtimesErr
+	}
+
+	fileHandler, openErr := os.OpenFile(
+		filePath,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+		0666,
+	)
+	if openErr == nil {
+		return fileHandler.Close()
+	}
+	if !os.IsExist(openErr) {
+		return openErr
+	}
+
+	_, statErr := os.Stat(filePath)
+	fileAlreadyCreated := statErr == nil
+	if fileAlreadyCreated {
+		return nil
+	}
+
+	return ErrTargetIsSymlink
+}
+
+func (FileClerk) openNewFileHandler(
+	filePath string,
+	permissions os.FileMode,
+) (*os.File, error) {
+	fileHandler, openErr := os.OpenFile(
+		filePath,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+		permissions,
+	)
+	if openErr != nil {
+		if os.IsExist(openErr) {
+			return nil, ErrTargetFileExists
+		}
+		return nil, openErr
+	}
+
+	chmodErr := fileHandler.Chmod(permissions)
+	if chmodErr != nil {
+		closeErr := fileHandler.Close()
+		removeErr := os.Remove(filePath)
+		return nil, errors.Join(chmodErr, closeErr, removeErr)
+	}
+
+	return fileHandler, nil
+}
+
+func (clerk FileClerk) WriteNewFile(
+	filePath, content string,
+	permissions os.FileMode,
+) error {
+	fileHandler, createErr := clerk.openNewFileHandler(filePath, permissions)
+	if createErr != nil {
+		return createErr
+	}
+
+	_, writeErr := fileHandler.WriteString(content)
+	closeErr := fileHandler.Close()
+	if writeErr == nil {
+		return closeErr
+	}
+
+	removeErr := os.Remove(filePath)
+	return errors.Join(writeErr, closeErr, removeErr)
 }
 
 func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
 		return ErrSourceFileMissing
-	}
-
-	if clerk.IsFile(targetPath) {
-		return ErrTargetFileExists
 	}
 
 	sourceFile, openErr := os.Open(sourcePath)
@@ -86,7 +159,14 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 	}
 	defer func() { _ = sourceFile.Close() }()
 
-	targetFile, createErr := os.Create(targetPath)
+	sourceInfo, statErr := sourceFile.Stat()
+	if statErr != nil {
+		return statErr
+	}
+
+	targetFile, createErr := clerk.openNewFileHandler(
+		targetPath, sourceInfo.Mode().Perm(),
+	)
 	if createErr != nil {
 		return createErr
 	}
@@ -95,34 +175,60 @@ func (clerk FileClerk) CopyFile(sourcePath, targetPath string) error {
 	bufferReader := bufio.NewReader(sourceFile)
 	bufferWriter := bufio.NewWriter(targetFile)
 
-	_, readFromErr := bufferWriter.ReadFrom(bufferReader)
-	if readFromErr != nil {
-		return readFromErr
+	_, copyErr := bufferWriter.ReadFrom(bufferReader)
+	if copyErr == nil {
+		copyErr = bufferWriter.Flush()
+	}
+	if copyErr != nil {
+		closeErr := targetFile.Close()
+		removeErr := os.Remove(targetPath)
+		return errors.Join(copyErr, closeErr, removeErr)
 	}
 
-	flushErr := bufferWriter.Flush()
-	if flushErr != nil {
-		return flushErr
-	}
-
-	closeErr := targetFile.Close()
-	if closeErr != nil {
-		return closeErr
-	}
-
-	return nil
+	return targetFile.Close()
 }
 
+func (FileClerk) isTargetSource(sourcePath, targetPath string) bool {
+	sourceInfo, sourceErr := os.Stat(sourcePath)
+	targetInfo, targetErr := os.Stat(targetPath)
+	return sourceErr == nil && targetErr == nil && os.SameFile(sourceInfo, targetInfo)
+}
+
+// MoveFile never replaces an existing target. Cross-device moves fall back
+// to copy+delete: the two files briefly coexist, and an interrupted run
+// leaves a partial target next to an untouched source.
 func (clerk FileClerk) MoveFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
 		return ErrSourceFileMissing
 	}
 
-	if clerk.IsFile(targetPath) {
-		return ErrTargetFileExists
+	moveErr := unix.Renameat2(
+		unix.AT_FDCWD,
+		sourcePath,
+		unix.AT_FDCWD,
+		targetPath,
+		unix.RENAME_NOREPLACE,
+	)
+	if moveErr == nil {
+		return nil
+	}
+	moveCrossesDevices := errors.Is(moveErr, unix.EXDEV)
+	if moveCrossesDevices {
+		copyErr := clerk.CopyFile(sourcePath, targetPath)
+		if copyErr != nil {
+			return copyErr
+		}
+
+		return os.Remove(sourcePath)
+	}
+	if !errors.Is(moveErr, unix.EEXIST) {
+		return moveErr
+	}
+	if clerk.isTargetSource(sourcePath, targetPath) {
+		return nil
 	}
 
-	return os.Rename(sourcePath, targetPath)
+	return ErrTargetFileExists
 }
 
 func (clerk FileClerk) RenameFile(sourcePath, targetPath string) error {
@@ -164,12 +270,8 @@ func (clerk FileClerk) UpdateFileContent(
 }
 
 // OverwriteFile atomically replaces targetPath's underlying file with
-// sourcePath's content. If targetPath is a symlink, the chain is resolved
-// via filepath.EvalSymlinks so the rename modifies the underlying file's
-// content rather than replacing the symlink path entry (which would leave
-// the original target untouched and orphan any other references to it).
-// EvSymlinks also handles relative symlink targets and walks multi-level
-// chains, neither of which os.Readlink does on its own.
+// sourcePath's content. Symlink targets are written through, not replaced:
+// the original file and every other reference to it stay in place.
 func (clerk FileClerk) OverwriteFile(sourcePath, targetPath string) error {
 	sourceInfo, statErr := os.Stat(sourcePath)
 	if statErr != nil {
@@ -198,18 +300,29 @@ func (clerk FileClerk) OverwriteFile(sourcePath, targetPath string) error {
 	return os.Rename(sourcePath, actualFilePath)
 }
 
-func (clerk FileClerk) DeleteFile(filePath string) error {
-	if !clerk.IsFile(filePath) {
-		return nil
+// DeleteFile removes a file or symlink. A missing path is a no-op; a
+// directory is rejected.
+func (FileClerk) DeleteFile(filePath string) error {
+	fileInfo, lstatErr := os.Lstat(filePath)
+	if lstatErr != nil {
+		if os.IsNotExist(lstatErr) {
+			return nil
+		}
+		return lstatErr
+	}
+
+	if fileInfo.IsDir() {
+		return ErrTargetIsDirectory
 	}
 
 	return os.Remove(filePath)
 }
 
-// ReadFileContent reads a file's full content into memory, capped at
-// 500MiB by default. The entire file is loaded as a string, so callers
-// dealing with larger files should stream the file themselves
-// (io.Reader/bufio.Scanner) instead of raising the limit.
+// ReadFileContent loads a file's full content into memory, capped by
+// ReadFileContentDefaultMaxSizeBytes. Files over the cap fail with
+// ErrFileTooLarge rather than returning partially; callers facing larger
+// files should stream them (io.Reader/bufio.Scanner) instead of raising the
+// cap.
 func (clerk FileClerk) ReadFileContent(
 	filePath string,
 	maxContentSizeBytesPtr *int64,
@@ -221,17 +334,34 @@ func (clerk FileClerk) ReadFileContent(
 		}
 		return fileContent, openErr
 	}
-	defer fileHandler.Close()
+	defer func() { _ = fileHandler.Close() }()
 
 	maxContentSizeBytes := ReadFileContentDefaultMaxSizeBytes
 	if maxContentSizeBytesPtr != nil {
 		maxContentSizeBytes = *maxContentSizeBytesPtr
+	}
+	if maxContentSizeBytes < 0 {
+		maxContentSizeBytes = 0
 	}
 
 	limitedReader := io.LimitedReader{R: fileHandler, N: maxContentSizeBytes}
 	fileContentBytes, err := io.ReadAll(&limitedReader)
 	if err != nil {
 		return fileContent, err
+	}
+
+	sizeCapReached := limitedReader.N == 0
+	if !sizeCapReached {
+		return string(fileContentBytes), nil
+	}
+
+	trailingByte := make([]byte, 1)
+	trailingCount, trailingErr := fileHandler.Read(trailingByte)
+	if trailingCount > 0 {
+		return fileContent, ErrFileTooLarge
+	}
+	if trailingErr != nil && !errors.Is(trailingErr, io.EOF) {
+		return fileContent, trailingErr
 	}
 
 	return string(fileContentBytes), nil
@@ -315,7 +445,7 @@ func (clerk FileClerk) regexSearchStreaming(
 		}
 		return regexSearchFindings, osOpenErr
 	}
-	defer fileHandler.Close()
+	defer func() { _ = fileHandler.Close() }()
 
 	fileScanner := bufio.NewScanner(fileHandler)
 	for currentLineNumber := 1; fileScanner.Scan(); currentLineNumber++ {
@@ -336,16 +466,12 @@ func (clerk FileClerk) regexSearchStreaming(
 	return regexSearchFindings, fileScanner.Err()
 }
 
-// FileContentRegexSearch finds every regex match in a file and returns
-// each match's 1-based inclusive line range plus capture groups.
-//
-// Files below RegexLargeFileThresholdBytes are matched in a single
-// regex pass; patterns with per-line anchors (^ / $) need the (?m) flag.
-// Multi-line matches get a proper LineNumRange spanning every line they touch.
-//
-// Larger files fall back to bufio.Scanner streaming, which splits on
-// newlines — multi-line patterns only match within a single line and
-// LineNumRange is always [n, n].
+// FileContentRegexSearch finds every regex match in a file, returning each
+// match's 1-based inclusive line range and capture groups. Files under
+// RegexLargeFileThresholdBytes are matched in one pass — per-line anchors
+// need the (?m) flag — and multi-line matches span every line they touch.
+// Larger files stream line-by-line: multi-line patterns then match within a
+// single line only, and LineNumRange is always [n, n].
 func (clerk FileClerk) FileContentRegexSearch(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	regexPattern *regexp.Regexp,
@@ -461,7 +587,7 @@ func (clerk FileClerk) regexReplaceStreaming(
 		}
 		return 0, osOpenErr
 	}
-	defer fileHandler.Close()
+	defer func() { _ = fileHandler.Close() }()
 
 	if clerk.IsSymlink(filePathStr) {
 		actualFilePath, evalErr := filepath.EvalSymlinks(filePathStr)
@@ -556,15 +682,12 @@ func (clerk FileClerk) regexReplaceStreaming(
 	return replacementCount, nil
 }
 
-// FileContentRegexReplace atomically substitutes regex matches in a file's
-// content. Empty source files and directories are rejected; symlinks are
-// followed. Replacing everything with "" is rejected as a call-site bug
-// because it would silently truncate the source. Use TruncateFileContent to
-// intentionally empty a file or strip only non-whitespace content.
-//
-// Files at or above RegexLargeFileThresholdBytes are processed line-by-line,
-// so multi-line patterns only match in smaller files. Original line
-// terminators are preserved unchanged.
+// FileContentRegexReplace atomically substitutes regex matches in a file.
+// Empty files and directories are rejected; symlinks are followed.
+// Replacing everything with "" fails as a call-site bug — use
+// TruncateFileContent to empty a file on purpose. Files at or above
+// RegexLargeFileThresholdBytes are processed line-by-line, so multi-line
+// patterns only match in smaller files; original line terminators are kept.
 func (clerk FileClerk) FileContentRegexReplace(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	regexPattern *regexp.Regexp,
@@ -629,12 +752,28 @@ func (clerk FileClerk) UpdateFileOwnership(
 	return os.Lchown(filePath, userId, groupId)
 }
 
-func (clerk FileClerk) UpdateFilePermissions(
+// UpdateFilePermissions never chmods through a symlink. Unlike chmod(2), it
+// requires read permission on the target; root is exempt.
+func (FileClerk) UpdateFilePermissions(
 	filePath string,
-	permissionsPtr *int,
+	permissionsPtr *os.FileMode,
 ) error {
-	defaultFilePermission := int(0644)
-	if clerk.IsDir(filePath) {
+	fileHandler, openErr := os.OpenFile(filePath, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if openErr != nil {
+		if errors.Is(openErr, syscall.ELOOP) {
+			return ErrTargetIsSymlink
+		}
+		return openErr
+	}
+	defer func() { _ = fileHandler.Close() }()
+
+	fileInfo, statErr := fileHandler.Stat()
+	if statErr != nil {
+		return statErr
+	}
+
+	defaultFilePermission := os.FileMode(0644)
+	if fileInfo.IsDir() {
 		defaultFilePermission = 0755
 	}
 
@@ -642,12 +781,17 @@ func (clerk FileClerk) UpdateFilePermissions(
 		permissionsPtr = &defaultFilePermission
 	}
 
-	return os.Chmod(filePath, os.FileMode(*permissionsPtr))
+	return fileHandler.Chmod(*permissionsPtr)
 }
 
+// CompressFile compresses sourcePath (file or directory) next to it and
+// returns the compressed path. A file source is removed on success unless
+// shouldKeepSourceFilePtr requests otherwise; directory sources are never
+// removed.
 func (clerk FileClerk) CompressFile(
 	sourcePath string,
 	compressionFormatPtr *string,
+	shouldKeepSourceFilePtr *bool,
 ) (compressedFilePath string, err error) {
 	compressionCmd := "tar"
 	compressionArgs := []string{"--create", "--file"}
@@ -658,19 +802,19 @@ func (clerk FileClerk) CompressFile(
 		case "br", "brotli":
 			compressionSuffix = ".br"
 			compressionCmd = "brotli"
-			compressionArgs = []string{"--quality=4", "--rm"}
+			compressionArgs = []string{"--quality=4", "--keep"}
 		case "gz", "gzip":
 			compressionSuffix = ".gz"
 			compressionCmd = "gzip"
-			compressionArgs = []string{"-6"}
+			compressionArgs = []string{"-6", "--keep"}
 		case "zip":
 			compressionSuffix = ".zip"
 			compressionCmd = "zip"
-			compressionArgs = []string{"-6", "--quiet", "--move", "--test"}
+			compressionArgs = []string{"-6", "--quiet", "--test"}
 		case "xz":
 			compressionSuffix = ".xz"
 			compressionCmd = "xz"
-			compressionArgs = []string{"-1", "--memlimit=10%"}
+			compressionArgs = []string{"-1", "--keep", "--memlimit=10%"}
 		default:
 			return compressedFilePath, ErrUnsupportedCompressionFormat
 		}
@@ -706,9 +850,24 @@ func (clerk FileClerk) CompressFile(
 		return compressedFilePath, ErrCompressedFileMissing
 	}
 
+	shouldKeepSourceFile := false
+	if shouldKeepSourceFilePtr != nil {
+		shouldKeepSourceFile = *shouldKeepSourceFilePtr
+	}
+	if !shouldKeepSourceFile && clerk.IsFile(sourcePath) {
+		removeErr := os.Remove(sourcePath)
+		if removeErr != nil && !os.IsNotExist(removeErr) {
+			return targetPath, removeErr
+		}
+	}
+
 	return targetPath, nil
 }
 
+// DecompressFile expands sourcePath (optionally into targetPathPtr) and
+// removes the archive unless shouldKeepSourceFilePtr requests otherwise.
+// Zip extraction overwrites existing files at the destination without
+// warning: only decompress archives you trust.
 func (clerk FileClerk) DecompressFile(
 	sourcePath string,
 	targetPathPtr *string,
@@ -852,9 +1011,20 @@ func (clerk FileClerk) MoveDir(sourcePath, targetPath string) error {
 	return os.RemoveAll(sourcePath)
 }
 
-func (clerk FileClerk) DeleteDir(dirPath string) error {
-	if !clerk.IsDir(dirPath) {
-		return nil
+// DeleteDir removes a directory tree. A missing path is a no-op; a path that
+// is not a directory (file or symlink) is rejected instead of silently
+// ignored.
+func (FileClerk) DeleteDir(dirPath string) error {
+	dirInfo, lstatErr := os.Lstat(dirPath)
+	if lstatErr != nil {
+		if os.IsNotExist(lstatErr) {
+			return nil
+		}
+		return lstatErr
+	}
+
+	if !dirInfo.IsDir() {
+		return ErrTargetNotDirectory
 	}
 
 	return os.RemoveAll(dirPath)
@@ -868,7 +1038,7 @@ func (clerk FileClerk) CompressDir(
 		return compressedFilePath, ErrSourceDirMissing
 	}
 
-	tarCompressedFilePath, err := clerk.CompressFile(sourcePath, nil)
+	tarCompressedFilePath, err := clerk.CompressFile(sourcePath, nil, nil)
 	if err != nil {
 		return compressedFilePath, err
 	}
@@ -881,15 +1051,7 @@ func (clerk FileClerk) CompressDir(
 		compressionFormat = *compressionFormatPtr
 	}
 
-	compressedFilePath, err = clerk.CompressFile(
-		tarCompressedFilePath, &compressionFormat,
-	)
-	if err != nil {
-		return compressedFilePath, err
-	}
-
-	err = os.Remove(tarCompressedFilePath)
-	return compressedFilePath, err
+	return clerk.CompressFile(tarCompressedFilePath, &compressionFormat, nil)
 }
 
 func (clerk FileClerk) DecompressDir(

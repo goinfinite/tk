@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; creation is exclusive (`WriteNewFile`/`CopyFile` reject taken paths with `ErrTargetFileExists`, `CopyFile` preserves the source mode; `TouchFile` carries the touch(1) idempotent contract), `MoveFile` relocates via renameat2(2) RENAME_NOREPLACE without replacing a foreign target (same-file moves succeed as no-ops; cross-device moves fall back to mv(1)-style copy+delete); `CompressFile` and `DecompressFile` share one `shouldKeepSourceFilePtr` contract where the external tool always keeps its input and FileClerk performs the deletion; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
 
 ---
 

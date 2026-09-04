@@ -177,8 +177,8 @@ func TestEnvsInspectorInspect(t *testing.T) {
 			t.Errorf("InspectSucceededWhenItShouldFail: InvalidEnvFilePath")
 		}
 
-		if !strings.Contains(err.Error(), "EnvsInspectorEnvCreateFileError") {
-			t.Errorf("UnexpectedError: expected EnvsInspectorEnvCreateFileError, got %v", err)
+		if !strings.Contains(err.Error(), "EnvsInspectorEnvTouchFileError") {
+			t.Errorf("UnexpectedError: expected EnvsInspectorEnvTouchFileError, got %v", err)
 		}
 	})
 }
