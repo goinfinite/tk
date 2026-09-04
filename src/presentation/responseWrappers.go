@@ -10,7 +10,8 @@ import (
 	"github.com/alecthomas/chroma/lexers"
 	"github.com/alecthomas/chroma/styles"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/term"
+
+	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
 type ApiResponseWrapper struct {
@@ -34,17 +35,20 @@ func NewApiResponseWrapper(
 type LiaisonResponseStatus string
 
 const (
-	LiaisonResponseStatusSuccess      LiaisonResponseStatus = "success"
-	LiaisonResponseStatusCreated      LiaisonResponseStatus = "created"
-	LiaisonResponseStatusMultiStatus  LiaisonResponseStatus = "multiStatus"
-	LiaisonResponseStatusUserError    LiaisonResponseStatus = "userError"
-	LiaisonResponseStatusUnauthorized LiaisonResponseStatus = "unauthorized"
-	LiaisonResponseStatusForbidden    LiaisonResponseStatus = "forbidden"
-	LiaisonResponseStatusNotFound     LiaisonResponseStatus = "notFound"
-	LiaisonResponseStatusTimeout      LiaisonResponseStatus = "timeout"
-	LiaisonResponseStatusRateLimited  LiaisonResponseStatus = "rateLimited"
-	LiaisonResponseStatusInfraError   LiaisonResponseStatus = "infraError"
-	LiaisonResponseStatusUnknownError LiaisonResponseStatus = "unknownError"
+	LiaisonResponseStatusSuccess            LiaisonResponseStatus = "success"
+	LiaisonResponseStatusCreated            LiaisonResponseStatus = "created"
+	LiaisonResponseStatusAccepted           LiaisonResponseStatus = "accepted"
+	LiaisonResponseStatusMultiStatus        LiaisonResponseStatus = "multiStatus"
+	LiaisonResponseStatusUserError          LiaisonResponseStatus = "userError"
+	LiaisonResponseStatusUnauthorized       LiaisonResponseStatus = "unauthorized"
+	LiaisonResponseStatusForbidden          LiaisonResponseStatus = "forbidden"
+	LiaisonResponseStatusNotFound           LiaisonResponseStatus = "notFound"
+	LiaisonResponseStatusTimeout            LiaisonResponseStatus = "timeout"
+	LiaisonResponseStatusConflict           LiaisonResponseStatus = "conflict"
+	LiaisonResponseStatusRateLimited        LiaisonResponseStatus = "rateLimited"
+	LiaisonResponseStatusInfraError         LiaisonResponseStatus = "infraError"
+	LiaisonResponseStatusUnknownError       LiaisonResponseStatus = "unknownError"
+	LiaisonResponseStatusServiceUnavailable LiaisonResponseStatus = "serviceUnavailable"
 )
 
 type LiaisonResponse struct {
@@ -89,6 +93,8 @@ func LiaisonApiResponseEmitter(
 	switch liaisonResponse.Status {
 	case LiaisonResponseStatusCreated:
 		httpStatus = http.StatusCreated
+	case LiaisonResponseStatusAccepted:
+		httpStatus = http.StatusAccepted
 	case LiaisonResponseStatusMultiStatus:
 		httpStatus = http.StatusMultiStatus
 	case LiaisonResponseStatusUserError:
@@ -101,10 +107,14 @@ func LiaisonApiResponseEmitter(
 		httpStatus = http.StatusNotFound
 	case LiaisonResponseStatusTimeout:
 		httpStatus = http.StatusRequestTimeout
+	case LiaisonResponseStatusConflict:
+		httpStatus = http.StatusConflict
 	case LiaisonResponseStatusRateLimited:
 		httpStatus = http.StatusTooManyRequests
 	case LiaisonResponseStatusInfraError, LiaisonResponseStatusUnknownError:
 		httpStatus = http.StatusInternalServerError
+	case LiaisonResponseStatusServiceUnavailable:
+		httpStatus = http.StatusServiceUnavailable
 	}
 
 	return echoContext.JSON(httpStatus, NewApiResponseWrapper(
@@ -124,11 +134,13 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 		exitCodeNoPerm      = 77
 	)
 
-	exitCode := exitCodeOk
+	var exitCode int
 	switch liaisonResponse.Status {
 	case LiaisonResponseStatusSuccess:
 		exitCode = exitCodeOk
 	case LiaisonResponseStatusCreated:
+		exitCode = exitCodeOk
+	case LiaisonResponseStatusAccepted:
 		exitCode = exitCodeOk
 	case LiaisonResponseStatusUserError:
 		exitCode = exitCodeUsage
@@ -136,7 +148,11 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 		exitCode = exitCodeDataErr
 	case LiaisonResponseStatusNotFound:
 		exitCode = exitCodeNoInput
+	case LiaisonResponseStatusConflict:
+		exitCode = exitCodeDataErr
 	case LiaisonResponseStatusInfraError:
+		exitCode = exitCodeUnavailable
+	case LiaisonResponseStatusServiceUnavailable:
 		exitCode = exitCodeUnavailable
 	case LiaisonResponseStatusUnknownError:
 		exitCode = exitCodeSoftware
@@ -152,12 +168,10 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 		exitCode = exitCodeSoftware
 	}
 
-	stdoutFileDescriptor := int(os.Stdout.Fd())
-	isNonInteractiveSession := !term.IsTerminal(stdoutFileDescriptor)
-	if isNonInteractiveSession {
+	if !tkInfra.IsStdoutTerminal() {
 		jsonBytes, err := json.Marshal(liaisonResponse)
 		if err != nil {
-			fmt.Println("ResponseEncodingError")
+			fmt.Fprintln(os.Stderr, "ResponseEncodingError")
 			os.Exit(exitCodeSoftware)
 		}
 
@@ -167,7 +181,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	prettyJsonBytes, err := json.MarshalIndent(liaisonResponse, "", "  ")
 	if err != nil {
-		fmt.Println("ResponseEncodingError")
+		fmt.Fprintln(os.Stderr, "ResponseEncodingError")
 		os.Exit(exitCodeSoftware)
 	}
 
@@ -178,7 +192,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	shIterator, err := syntaxHighlightingLexer.Tokenise(nil, string(prettyJsonBytes))
 	if err != nil {
-		fmt.Println("SyntaxHighlightingTokenizingError")
+		fmt.Fprintln(os.Stderr, "SyntaxHighlightingTokenizingError")
 		os.Exit(exitCodeSoftware)
 	}
 
@@ -189,7 +203,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	err = shFormatter.Format(os.Stdout, styles.Vulcan, shIterator)
 	if err != nil {
-		fmt.Println("SyntaxHighlightingFormatError")
+		fmt.Fprintln(os.Stderr, "SyntaxHighlightingFormatError")
 		os.Exit(exitCodeSoftware)
 	}
 	fmt.Println()

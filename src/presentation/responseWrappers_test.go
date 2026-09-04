@@ -128,6 +128,18 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			},
 		},
 		{
+			name:               "AcceptedStatus",
+			liaisonStatus:      LiaisonResponseStatusAccepted,
+			readableMessage:    "TaskScheduledForProcessing",
+			body:               map[string]int{"taskId": 789},
+			expectedHttpStatus: http.StatusAccepted,
+			expectedResponseBody: ApiResponseWrapper{
+				Status:          http.StatusAccepted,
+				ReadableMessage: "TaskScheduledForProcessing",
+				Body:            map[string]int{"taskId": 789},
+			},
+		},
+		{
 			name:               "MultiStatus",
 			liaisonStatus:      LiaisonResponseStatusMultiStatus,
 			readableMessage:    "MultipleOperations",
@@ -176,6 +188,18 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			},
 		},
 		{
+			name:               "ConflictStatus",
+			liaisonStatus:      LiaisonResponseStatusConflict,
+			readableMessage:    "PhpVersionChangedAfterScheduling",
+			body:               nil,
+			expectedHttpStatus: http.StatusConflict,
+			expectedResponseBody: ApiResponseWrapper{
+				Status:          http.StatusConflict,
+				ReadableMessage: "PhpVersionChangedAfterScheduling",
+				Body:            nil,
+			},
+		},
+		{
 			name:               "InfraErrorStatus",
 			liaisonStatus:      LiaisonResponseStatusInfraError,
 			readableMessage:    "InternalServerErrorCode",
@@ -196,6 +220,18 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			expectedResponseBody: ApiResponseWrapper{
 				Status:          http.StatusInternalServerError,
 				ReadableMessage: "UnknownErrorCode",
+				Body:            nil,
+			},
+		},
+		{
+			name:               "ServiceUnavailableStatus",
+			liaisonStatus:      LiaisonResponseStatusServiceUnavailable,
+			readableMessage:    "PhpWebserverServiceStopped",
+			body:               nil,
+			expectedHttpStatus: http.StatusServiceUnavailable,
+			expectedResponseBody: ApiResponseWrapper{
+				Status:          http.StatusServiceUnavailable,
+				ReadableMessage: "PhpWebserverServiceStopped",
 				Body:            nil,
 			},
 		},
@@ -363,6 +399,24 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 			status:           LiaisonResponseStatusCreated,
 			readableMessage:  "ResourceCreated",
 			expectedExitCode: 0,
+		},
+		{
+			name:             "AcceptedStatus",
+			status:           LiaisonResponseStatusAccepted,
+			readableMessage:  "TaskScheduledForProcessing",
+			expectedExitCode: 0,
+		},
+		{
+			name:             "ConflictStatus",
+			status:           LiaisonResponseStatusConflict,
+			readableMessage:  "PhpVersionChangedAfterScheduling",
+			expectedExitCode: 65,
+		},
+		{
+			name:             "ServiceUnavailableStatus",
+			status:           LiaisonResponseStatusServiceUnavailable,
+			readableMessage:  "PhpWebserverServiceStopped",
+			expectedExitCode: 69,
 		},
 		{
 			name:             "MultiStatus",
