@@ -4,11 +4,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	slogZerolog "github.com/samber/slog-zerolog/v2"
-	"golang.org/x/term"
+
+	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
 const (
@@ -23,37 +25,45 @@ func (LogHandler) ReadLevel() string {
 }
 
 func (LogHandler) SetLevel(logLevel string) {
-	os.Setenv(LogHandlerLogLevelEnvVarName, logLevel)
+	setEnvErr := os.Setenv(LogHandlerLogLevelEnvVarName, logLevel)
+	if setEnvErr != nil {
+		slog.Error(
+			"LogLevelSetEnvError",
+			slog.String("error", setEnvErr.Error()),
+		)
+	}
+}
+
+func (LogHandler) logLevelParser(configuredLevel string) zerolog.Level {
+	switch strings.ToLower(configuredLevel) {
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn", "warning":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	case "fatal":
+		return zerolog.FatalLevel
+	case "panic":
+		return zerolog.PanicLevel
+	default:
+		return zerolog.WarnLevel
+	}
 }
 
 func (logHandler LogHandler) Init() {
-	var logWriter io.Writer = os.Stdout
 	logLevel := zerolog.WarnLevel
-
-	configuredLevel := logHandler.ReadLevel()
-	if configuredLevel != "" {
-		switch configuredLevel {
-		case "DEBUG", "debug":
-			stdoutFileDescriptor := int(os.Stdout.Fd())
-			isInteractiveSession := term.IsTerminal(stdoutFileDescriptor)
-			if isInteractiveSession {
-				logWriter = zerolog.ConsoleWriter{
-					Out: os.Stderr, TimeFormat: time.RFC3339,
-				}
-			}
-			logLevel = zerolog.DebugLevel
-		case "INFO", "info":
-			logLevel = zerolog.InfoLevel
-		case "WARN", "WARNING", "warn", "warning":
-			logLevel = zerolog.WarnLevel
-		case "ERROR", "error":
-			logLevel = zerolog.ErrorLevel
-		case "FATAL", "fatal":
-			logLevel = zerolog.FatalLevel
-		case "PANIC", "panic":
-			logLevel = zerolog.PanicLevel
-		}
+	if configuredLevel := logHandler.ReadLevel(); configuredLevel != "" {
+		logLevel = logHandler.logLevelParser(configuredLevel)
 	}
+
+	var logWriter io.Writer = os.Stderr
+	if tkInfra.IsStdoutTerminal() && logLevel == zerolog.DebugLevel {
+		logWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}
+	}
+
 	zerologLogger := zerolog.New(logWriter).Level(logLevel)
 
 	zerologHandler := slogZerolog.Option{Logger: &zerologLogger}.NewZerologHandler()
