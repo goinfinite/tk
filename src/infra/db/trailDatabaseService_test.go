@@ -71,7 +71,8 @@ func TestNewTrailDatabaseService(t *testing.T) {
 				t.Fatal("HandlerIsNil")
 			}
 
-			if _, err := os.Stat(dbFilePath); err != nil {
+			_, statErr := os.Stat(dbFilePath)
+			if statErr != nil {
 				t.Fatalf("DatabaseFileNotCreated: %s", dbFilePath)
 			}
 		})
