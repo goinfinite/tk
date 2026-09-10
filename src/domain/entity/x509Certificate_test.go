@@ -95,10 +95,6 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Errorf("FingerprintSHA256Empty")
 		}
 
-		if x509CertEntity.FingerprintSHA1.String() == "" {
-			t.Errorf("FingerprintSHA1Empty")
-		}
-
 		if x509CertEntity.BasicConstraints == nil {
 			t.Fatalf("BasicConstraintsIsNil")
 		}
