@@ -68,8 +68,8 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
 - **StringSliceVoParser**: Convert comma-separated, semicolon-separated, or array strings into value object slices.
 
   ```go
-  rawInput := "tag1,tag2;tag3"
-  parsedTags := StringSliceValueObjectParser(rawInput, tkValueObject.NewTag)
+  rawInput := "note1,note2;note3"
+  parsedNotes := StringSliceValueObjectParser(rawInput, tkValueObject.NewGenericNotes)
   ```
 
 - **TimeParamsParser**: Parse date ranges, timestamps, and relative times from request parameters.
@@ -89,6 +89,8 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   liaisonResponse := NewLiaisonResponse(
     LiaisonResponseStatusCreated, accountEntity, "AccountCreatedSuccessfully",
   )
+
+  err := errors.New("AccountNotFound")
 
   liaisonResponseNoMessage := NewLiaisonResponseNoMessage(
     LiaisonResponseStatusSuccess, err.Error(),

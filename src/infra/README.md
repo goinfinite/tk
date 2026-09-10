@@ -221,7 +221,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   }
 
   paginatedQuery, responsePagination, paginationBuildingErr := PaginationQueryBuilder(
-    databaseQuery, requestPagination,
+    databaseQuery, requestPagination, "",
   )
 
   modelRecords := []YourModel{}

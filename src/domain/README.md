@@ -4,7 +4,7 @@ Business logic layer of Infinite Toolkit _(TK)_. It holds validated value object
 
 ## Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IPAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, and many more. These components are thoroughly tested, ensuring 100% coverage.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IpAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, and many more. These components are thoroughly tested, ensuring 100% coverage.
 
 ## Value Object Utilities
 
