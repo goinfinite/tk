@@ -11,6 +11,19 @@ import (
 )
 
 func TestShell(t *testing.T) {
+	unresolvableUserIdFinder := func() uint32 {
+		for candidate := uint32(999999); candidate > 0; candidate-- {
+			_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
+			if lookupErr != nil {
+				return candidate
+			}
+		}
+
+		t.Fatal("NoUnresolvableUserIdFound")
+		return 0
+	}
+	unresolvableUserId := unresolvableUserIdFinder()
+
 	t.Run("BasicShell", func(t *testing.T) {
 		testCaseStructs := []struct {
 			command        string
@@ -194,11 +207,12 @@ func TestShell(t *testing.T) {
 		if uidErr != nil {
 			t.Fatalf("UidParseFailed: %v", uidErr)
 		}
+		nobodyUserId := uint32(nobodyUid)
 
 		uidStr, err := NewShell(ShellSettings{
 			Command: "id",
 			Args:    []string{"-u"},
-			UserId:  uint32(nobodyUid),
+			UserId:  &nobodyUserId,
 		}).Run()
 		if err != nil {
 			t.Fatalf("RunFailed: %v", err)
@@ -210,7 +224,7 @@ func TestShell(t *testing.T) {
 		gidStr, err := NewShell(ShellSettings{
 			Command: "id",
 			Args:    []string{"-g"},
-			UserId:  uint32(nobodyUid),
+			UserId:  &nobodyUserId,
 		}).Run()
 		if err != nil {
 			t.Fatalf("RunFailed: %v", err)
@@ -220,10 +234,30 @@ func TestShell(t *testing.T) {
 		}
 	})
 
+	t.Run("UserIdZeroRequestsRootAccount", func(t *testing.T) {
+		rootUserId := uint32(0)
+
+		runPlan := NewShell(ShellSettings{
+			Command: "true",
+			UserId:  &rootUserId,
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+
+		sysProcAttr := runPlan.ExecCmd.SysProcAttr
+		if sysProcAttr == nil || sysProcAttr.Credential == nil {
+			t.Fatalf("MissingSysCallCredentialsForRootUserId")
+		}
+		if sysProcAttr.Credential.Uid != 0 {
+			t.Errorf("UnexpectedCredentialUid: %d", sysProcAttr.Credential.Uid)
+		}
+	})
+
 	t.Run("UnresolvableUserIdFailsLoud", func(t *testing.T) {
 		_, err := NewShell(ShellSettings{
 			Command: "true",
-			UserId:  999999,
+			UserId:  &unresolvableUserId,
 		}).Run()
 		if err == nil {
 			t.Errorf("MissingErrorForUnresolvableUserId")
@@ -234,7 +268,7 @@ func TestShell(t *testing.T) {
 		stdoutStr, err := NewShell(ShellSettings{
 			Command:                         "id",
 			Args:                            []string{"-u"},
-			UserId:                          999999,
+			UserId:                          &unresolvableUserId,
 			ShouldIgnoreUsernameLookupError: true,
 		}).Run()
 		if err != nil {
@@ -254,7 +288,7 @@ func TestShell(t *testing.T) {
 			Command:  "id",
 			Args:     []string{"-u"},
 			Username: "root",
-			UserId:   999999,
+			UserId:   &unresolvableUserId,
 		}).Run()
 		if err != nil {
 			t.Fatalf("RunFailed: %v", err)

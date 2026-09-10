@@ -47,7 +47,7 @@ type ShellSettings struct {
 	ShouldDisableTimeout            bool
 	ShouldIgnoreUsernameLookupError bool
 	Username                        string
-	UserId                          uint32
+	UserId                          *uint32
 	WorkingDirectory                string
 	ExecutionTimeoutSecs            uint64
 	Envs                            []string
@@ -78,7 +78,7 @@ func (shell Shell) targetAccountResolver() (*user.User, error) {
 		return user.Lookup(shell.runtimeSettings.Username)
 	}
 
-	userIdStr := strconv.Itoa(int(shell.runtimeSettings.UserId))
+	userIdStr := strconv.FormatUint(uint64(*shell.runtimeSettings.UserId), 10)
 	return user.LookupId(userIdStr)
 }
 
@@ -174,7 +174,7 @@ func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan 
 
 	var targetUserPtr *user.User
 	targetAccountRequested := shell.runtimeSettings.Username != "" ||
-		shell.runtimeSettings.UserId != 0
+		shell.runtimeSettings.UserId != nil
 	if targetAccountRequested {
 		sysCallCredentials, targetUser, lookupErr := shell.sysCallCredentialsFactory()
 		lookupFailed := lookupErr != nil
