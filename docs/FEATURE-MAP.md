@@ -28,7 +28,7 @@ Queries activity records with filtering and pagination support. Returns a pagina
 2. `src/domain/useCase/readActivityRecords.go` — orchestrates the read; defines default pagination; delegates to the query repo
 3. `src/domain/repository/activityRecordQueryRepo.go` — interface declaring `Read` (paginated list) and `ReadFirst`
 4. `src/infra/activityRecord/activityRecordQueryRepo.go` — GORM implementation: builds filtered query, applies pagination, loads associated resources, transforms models to entities
-5. `src/infra/db/paginationQueryBuilder.go` — builds paginated GORM queries (page-number or last-seen-id mode, sorting, total count)
+5. `src/infra/db/paginationQueryBuilder.go` — builds paginated GORM queries (page-number or last-seen-id mode, sorting, total count); callers MUST set `.Model(...)` on the query — sort fields and the cursor default resolve through the parsed schema, and `.Table(...)`-only queries fail with ParseStatementSchemaError
 6. `src/infra/db/model/activityRecord.go` — GORM model with `ToEntity()` conversion to domain entity
 7. `src/domain/entity/activityRecord.go` — domain entity returned in the response
 
@@ -63,7 +63,7 @@ Generates a private key and self-signed X.509 certificate for TLS bootstrap.
 
 **Flow:**
 
-1. `src/infra/synthesizer.go` — `SynthesizePrivateKey` generates an RSA/ECDSA/Ed25519 key; `SynthesizeSelfSignedCert` creates a self-signed certificate from a private key
+1. `src/infra/synthesizer.go` — `PrivateKeyPemFactory` generates an RSA/ECDSA/DSA/Ed25519 key PEM; `CertificatePemFactory` and `CACertificatePemFactory` create self-signed certificate PEM pairs
 2. `src/infra/readThrough.go` — `CertPairFilePathsReader` attempts to read cert/key paths from environment variables, falls back to generating a self-signed pair and writing it to disk
 
 ---
@@ -84,7 +84,7 @@ Runs subprocess commands with configurable timeout, user, working directory, and
 
 **Flow:**
 
-1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under a context deadline (SIGTERM, SIGKILL after a grace; exit 124 `CommandDeadlineExceeded`), optional user switching, and stdout/stderr capture; when `ShouldUseCleanEnv` is set the child runs from a minimal environment (PATH of the resolved user's `~/.local/bin` plus the standard system directories, HOME — parent's for same-user runs or the target user's home on Username switch, PWD when a working directory is set, DEBIAN_FRONTEND, and explicit Envs) so the parent's other variables cannot leak
+1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under a context deadline (SIGTERM, SIGKILL after a grace; exit 124 `CommandDeadlineExceeded`) unless `ShouldDisableTimeout` removes the deadline entirely, with optional user switching by `Username` or `UserId` (Username wins when both are set; an unresolvable target fails unless `ShouldIgnoreUsernameLookupError` is set), and stdout/stderr capture; when `ShouldUseCleanEnv` is set the child runs from a minimal environment (PATH of the resolved user's `~/.local/bin` plus the standard system directories, HOME — parent's for same-user runs or the target user's home on user switch, PWD when a working directory is set, DEBIAN_FRONTEND, and explicit Envs) so the parent's other variables cannot leak
 2. `src/infra/shellEscape.go` — `Quote` escapes shell arguments for safe interpolation
 
 ---
@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; creation is exclusive (`WriteNewFile`/`CopyFile` reject taken paths with `ErrTargetFileExists`, `CopyFile` preserves the source mode; `TouchFile` carries the touch(1) idempotent contract), `MoveFile` relocates via renameat2(2) RENAME_NOREPLACE without replacing a foreign target (same-file moves succeed as no-ops; cross-device moves fall back to mv(1)-style copy+delete); `CompressFile` and `DecompressFile` share one `shouldKeepSourceFilePtr` contract where the external tool always keeps its input and FileClerk performs the deletion; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
+1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; creation is exclusive (`WriteNewFile`/`CopyFile` reject taken paths with `ErrTargetFileExists`, `CopyFile` preserves the source mode; `TouchFile` carries the touch(1) idempotent contract), `MoveFile` relocates via renameat2(2) RENAME_NOREPLACE without replacing a foreign target (same-file moves succeed as no-ops; cross-device moves fall back to mv(1)-style copy+delete); `CompressFile` and `DecompressFile` share one `shouldKeepSourceFilePtr` contract where the external tool always keeps its input and FileClerk performs the deletion; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `VerifyDirPathRedirectSafety(dirPath, ownerUsernamePtr, ownerUserIdPtr)` walks a directory chain with O_PATH|O_NOFOLLOW and reports the first surprise (`ErrDirPathTraversalInvalid`, `ErrSymlinkedPathInvalid`, `ErrTargetNotDirectory`, `ErrDirectoryOwnerInvalid`, `PathCheckFailed`; an omitted owner defaults to the process account, and dot and empty components are skipped); `UpsertFile` takes a `FileUpsertSettings` struct and the content bytes, resolves the owner account (defaulting to the process account) to uid/gid value objects, scouts the target's parent chain, stages a private temp file (hidden `.name.<entropy>.tk-tmp`), and swaps it in via openat/renameat2 relative to the scouted handle, so no component is re-resolved after the check; it replaces the target (symlink included, never followed) only when `ShouldOverwrite` is set, writes through symlinked final components and parent chains when `ShouldFollowSymlinks` is set, refuses a symlinked parent chain with `ErrSymlinkedPathInvalid` otherwise, refuses a taken target with `ErrTargetFileExists`, an unset `Permissions` mode with `ErrFilePermissionsInvalid`, a non-file-name final component with `ErrFileNameInvalid`, and a temp name beyond NAME_MAX with `ErrTempFileNameTooLong`, and chowns before it chmods (chown clears setuid/setgid bits); regex replace and `UpsertFile` share one `writeFileAtomically` staging path; `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
 
 ---
 
@@ -119,13 +119,13 @@ Deserializes JSON and YAML from files or readers into maps.
 
 ---
 
-## Random String / Password Generation
+## Password Generation
 
-Generates random strings with configurable charsets and cryptographic passwords.
+Generates cryptographic random integers, passwords with charset guarantees, and dummy identities.
 
 **Flow:**
 
-1. `src/infra/synthesizer.go` — `SynthesizeRandomString` generates from custom charset; `SynthesizePassword` generates passwords meeting complexity requirements
+1. `src/infra/synthesizer.go` — `RandomIntegerGenerator` draws a uniform crypto/rand integer between two inclusive bounds; `PasswordFactory` draws crypto/rand passwords, placing each requested character class at its own guaranteed position; `CharsetPresenceGuarantor` ensures a charset appears in a byte slice; `UsernameFactory`/`MailAddressFactory` generate dummy identities
 
 ---
 

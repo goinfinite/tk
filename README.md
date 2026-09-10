@@ -39,7 +39,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
 
-- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, and symlink handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, cautious atomic writes that refuse symlinked or stranger-owned directory paths and only replace an existing target when the caller asks, collision-safe temp file naming, and symlink handling.
 
   ```go
   clerk := FileClerk{}
@@ -52,7 +52,7 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   isSymlinkToTarget := clerk.IsSymlinkTo("symlink.txt", "target.txt")
 
   // FileCreation
-  fileCreationErr := clerk.CreateFile("example.txt")
+  fileCreationErr := clerk.TouchFile("example.txt")
 
   // FileContentOperations
   maxContentSize := int64(1024)
@@ -64,15 +64,12 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   replacementCount, regexReplaceErr := clerk.FileContentRegexReplace(
     regexSearchFilePath, regexPattern, regexReplacement,
   )
-  shouldOverwrite := true
-  fileUpdateErr := clerk.UpdateFileContent("example.txt", "new content", shouldOverwrite)
-  fileContentDeletionErr := clerk.DeleteFileContent("example.txt")
-  fileTruncationErr := clerk.TruncateFileContent("example.txt")
+  fileAppendErr := clerk.AppendFileContent(regexSearchFilePath, "new content")
+  fileTruncationErr := clerk.TruncateFileContent(regexSearchFilePath)
 
   // FileManipulation
   fileCopyErr := clerk.CopyFile("source.txt", "destination.txt")
   fileMoveErr := clerk.MoveFile("old.txt", "new.txt")
-  fileRenameErr := clerk.RenameFile("old.txt", "new.txt")
   fileOverwriteErr := clerk.OverwriteFile("source.tmp", "destination.txt")
   fileDeletionErr := clerk.DeleteFile("example.txt")
 
@@ -80,6 +77,21 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   fileOwnershipUpdateErr := clerk.UpdateFileOwnership("example.txt", 1000, 1000)
   filePermissions := 0755
   filePermissionsUpdateErr := clerk.UpdateFilePermissions("example.txt", &filePermissions)
+  ownerUsername, ownerUsernameErr := tkValueObject.NewUnixUsername("example")
+  systemdUserDir, systemdUserDirErr := tkValueObject.NewUnixAbsoluteFilePath(
+    "/home/example/.config/systemd/user", false,
+  )
+  dirPathRedirectSafetyErr := clerk.VerifyDirPathRedirectSafety(
+    systemdUserDir, &ownerUsername, nil,
+  )
+  serviceFilePath, serviceFilePathErr := tkValueObject.NewUnixAbsoluteFilePath(
+    "/home/example/.config/systemd/user/service.service", false,
+  )
+  fileUpsertErr := clerk.UpsertFile(FileUpsertSettings{
+    FilePath:     serviceFilePath,
+    Permissions:  0644,
+    OwnerUsername: &ownerUsername,
+  }, []byte("unit content"))
 
   // CompressionOperations
   compressionFormat := "gzip"
@@ -126,12 +138,14 @@ Infinite Toolkit _(TK)_ provides various infrastructure helpers for common tasks
   fmt.Println(commandOutput)
   ```
 
-- **Synthesizer**: Generate secure passwords with charset guarantees, random usernames/emails, private keys, and TLS certificates (including CA certificates).
+- **Synthesizer**: Generate cryptographically secure random integers, passwords with charset guarantees, filler usernames/emails, private keys, and TLS certificates (including CA certificates).
 
   ```go
   synthesizer := &Synthesizer{}
 
-  securePassword := synthesizer.PasswordFactory(12, true)
+  randomInteger := synthesizer.RandomIntegerGenerator(1, 100)
+
+  password := synthesizer.PasswordFactory(16, true)
 
   randomUsername := synthesizer.UsernameFactory()
   randomEmail := synthesizer.MailAddressFactory(nil)
