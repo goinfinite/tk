@@ -7,111 +7,134 @@ import (
 	"testing"
 )
 
+// Note: Setup/teardown are intentionally inline — test independence
+// requires each file to own its preconditions, even if it duplicates code.
+
 func TestNewTrailDatabaseService(t *testing.T) {
-	t.Run("EnvVarNotSet", func(t *testing.T) {
-		originalValue := os.Getenv(TrailDatabaseFilePathEnvVarName)
-		defer func() { os.Setenv(TrailDatabaseFilePathEnvVarName, originalValue) }()
-		os.Unsetenv(TrailDatabaseFilePathEnvVarName)
+	unixAbsoluteFilePathMaxLength := 4096
+	overlongFilePath := "/tmp/" + strings.Repeat(
+		"a", unixAbsoluteFilePathMaxLength+1,
+	) + ".db"
 
-		_, err := NewTrailDatabaseService([]any{})
-		if err == nil {
-			t.Errorf("MissingExpectedError: %s", errTrailDatabaseFilePathNotSet)
-		}
-		if err != nil && err.Error() != errTrailDatabaseFilePathNotSet {
-			t.Errorf("UnexpectedErrorMessage: '%s' vs '%s'", err.Error(), errTrailDatabaseFilePathNotSet)
-		}
-	})
+	testCases := []struct {
+		name              string
+		envValue          string
+		shouldUseTempPath bool
+		expectedError     string
+	}{
+		{
+			name:          "EnvVarEmpty",
+			envValue:      "",
+			expectedError: errTrailDatabaseFilePathNotSet,
+		},
+		{
+			name:          "OverlongPath",
+			envValue:      overlongFilePath,
+			expectedError: errTrailDatabaseFilePathNotValid,
+		},
+		{
+			name:              "ValidPath",
+			shouldUseTempPath: true,
+		},
+	}
 
-	t.Run("InvalidPath", func(t *testing.T) {
-		longPath := "/tmp/" + strings.Repeat("a", 4100) + ".db"
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			dbFilePath := filepath.Join(t.TempDir(), "trail.db")
+			envValue := testCase.envValue
+			if testCase.shouldUseTempPath {
+				envValue = dbFilePath
+			}
+			t.Setenv(TrailDatabaseFilePathEnvVarName, envValue)
 
-		originalValue := os.Getenv(TrailDatabaseFilePathEnvVarName)
-		defer func() { os.Setenv(TrailDatabaseFilePathEnvVarName, originalValue) }()
-		os.Setenv(TrailDatabaseFilePathEnvVarName, longPath)
+			dbSvc, err := NewTrailDatabaseService([]any{})
+			if testCase.expectedError != "" {
+				if err == nil {
+					t.Fatalf("MissingExpectedError: %s", testCase.expectedError)
+				}
+				if err.Error() != testCase.expectedError {
+					t.Fatalf(
+						"UnexpectedErrorMessage: '%s' vs '%s'",
+						err.Error(), testCase.expectedError,
+					)
+				}
+				return
+			}
 
-		_, err := NewTrailDatabaseService([]any{})
-		if err == nil {
-			t.Errorf("MissingExpectedError: %s", errTrailDatabaseFilePathNotValid)
-		}
-		if err != nil && err.Error() != errTrailDatabaseFilePathNotValid {
-			t.Errorf("UnexpectedErrorMessage: '%s' vs '%s'", err.Error(), errTrailDatabaseFilePathNotValid)
-		}
-	})
+			if err != nil {
+				t.Fatalf("UnexpectedError: '%s'", err.Error())
+			}
+			if dbSvc == nil {
+				t.Fatal("ServiceIsNil")
+			}
+			if dbSvc.Handler == nil {
+				t.Fatal("HandlerIsNil")
+			}
 
-	t.Run("ValidPath", func(t *testing.T) {
-		tempDir := t.TempDir()
-		dbFilePath := filepath.Join(tempDir, "trail.db")
-
-		originalValue := os.Getenv(TrailDatabaseFilePathEnvVarName)
-		defer func() { os.Setenv(TrailDatabaseFilePathEnvVarName, originalValue) }()
-		os.Setenv(TrailDatabaseFilePathEnvVarName, dbFilePath)
-
-		dbSvc, err := NewTrailDatabaseService([]any{})
-		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
-		}
-		if dbSvc == nil {
-			t.Errorf("ServiceIsNil")
-		}
-		if dbSvc != nil && dbSvc.Handler == nil {
-			t.Errorf("HandlerIsNil")
-		}
-
-		if _, err := os.Stat(dbFilePath); os.IsNotExist(err) {
-			t.Errorf("DatabaseFileNotCreated: %s", dbFilePath)
-		}
-	})
+			_, statErr := os.Stat(dbFilePath)
+			if statErr != nil {
+				t.Fatalf("DatabaseFileNotCreated: %s", dbFilePath)
+			}
+		})
+	}
 }
 
-func TestDbMigrate(t *testing.T) {
-	type TestValidModel struct {
+func TestNewTrailDatabaseServiceWithExtraModels(t *testing.T) {
+	type testValidModel struct {
 		ID   uint   `gorm:"primaryKey"`
 		Name string `gorm:"column:name"`
 	}
 
 	testCases := []struct {
-		name        string
-		extraModels []any
-		expectError bool
+		name             string
+		extraModels      []any
+		expectedError    string
+		expectedTablePtr any
 	}{
 		{
 			name:        "NoExtraModels",
 			extraModels: []any{},
-			expectError: false,
 		},
 		{
-			name:        "WithValidExtraModel",
-			extraModels: []any{&TestValidModel{}},
-			expectError: false,
+			name:             "ValidExtraModel",
+			extraModels:      []any{&testValidModel{}},
+			expectedTablePtr: &testValidModel{},
 		},
 		{
-			name:        "WithInvalidExtraModel",
-			extraModels: []any{"invalid_string"},
-			expectError: true,
+			name:          "InvalidExtraModel",
+			extraModels:   []any{"invalid_string"},
+			expectedError: errTrailDatabaseMigrationError,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			dbFilePath := filepath.Join(tempDir, "trail.db")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			dbFilePath := filepath.Join(t.TempDir(), "trail.db")
+			t.Setenv(TrailDatabaseFilePathEnvVarName, dbFilePath)
 
-			originalValue := os.Getenv(TrailDatabaseFilePathEnvVarName)
-			defer func() { os.Setenv(TrailDatabaseFilePathEnvVarName, originalValue) }()
-			os.Setenv(TrailDatabaseFilePathEnvVarName, dbFilePath)
-
-			dbSvc, err := NewTrailDatabaseService([]any{})
-			if err != nil {
-				t.Errorf("SetupFailed: '%s'", err.Error())
+			dbSvc, err := NewTrailDatabaseService(testCase.extraModels)
+			if testCase.expectedError != "" {
+				if err == nil {
+					t.Fatalf("MissingExpectedError: %s", testCase.expectedError)
+				}
+				if !strings.HasPrefix(err.Error(), testCase.expectedError) {
+					t.Fatalf(
+						"UnexpectedErrorMessage: '%s' vs '%s'",
+						err.Error(), testCase.expectedError,
+					)
+				}
 				return
 			}
 
-			err = dbSvc.dbMigrate(tc.extraModels)
-			if tc.expectError && err == nil {
-				t.Errorf("MissingExpectedError")
+			if err != nil {
+				t.Fatalf("UnexpectedError: '%s'", err.Error())
 			}
-			if !tc.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s'", err.Error())
+
+			if testCase.expectedTablePtr == nil {
+				return
+			}
+			if !dbSvc.Handler.Migrator().HasTable(testCase.expectedTablePtr) {
+				t.Fatalf("ExpectedTableMissing: %T", testCase.expectedTablePtr)
 			}
 		})
 	}

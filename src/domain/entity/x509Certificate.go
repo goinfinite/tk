@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -34,7 +33,6 @@ type X509Certificate struct {
 	SignatureValue     *tkValueObject.X509SignatureValue    `json:"signatureValue"`
 
 	FingerprintSHA256 tkValueObject.X509Fingerprint `json:"fingerprintSha256"`
-	FingerprintSHA1   tkValueObject.X509Fingerprint `json:"fingerprintSha1"`
 
 	KeyUsage               []tkValueObject.X509KeyUsage         `json:"keyUsage"`
 	ExtendedKeyUsage       []tkValueObject.X509ExtendedKeyUsage `json:"extendedKeyUsage"`
@@ -61,7 +59,7 @@ func NewX509Certificate(
 	publicKeyValue tkValueObject.X509PublicKeyValue,
 	signatureAlgorithm tkValueObject.X509SignatureAlgorithm,
 	signatureValue *tkValueObject.X509SignatureValue,
-	fingerprintSHA256, fingerprintSHA1 tkValueObject.X509Fingerprint,
+	fingerprintSHA256 tkValueObject.X509Fingerprint,
 	keyUsage []tkValueObject.X509KeyUsage,
 	extendedKeyUsage []tkValueObject.X509ExtendedKeyUsage,
 	basicConstraints *tkValueObject.X509BasicConstraints,
@@ -85,7 +83,6 @@ func NewX509Certificate(
 		SignatureAlgorithm:       signatureAlgorithm,
 		SignatureValue:           signatureValue,
 		FingerprintSHA256:        fingerprintSHA256,
-		FingerprintSHA1:          fingerprintSHA1,
 		KeyUsage:                 keyUsage,
 		ExtendedKeyUsage:         extendedKeyUsage,
 		BasicConstraints:         basicConstraints,
@@ -232,13 +229,6 @@ func NewX509CertificateFromEnvelopedCertificate(
 		return x509CertEntity, err
 	}
 
-	sha1HashBytes := sha1.Sum(stdlibCert.Raw)
-	sha1FingerprintHex := hex.EncodeToString(sha1HashBytes[:])
-	fingerprintSHA1, err := tkValueObject.NewX509Fingerprint(sha1FingerprintHex)
-	if err != nil {
-		return x509CertEntity, err
-	}
-
 	keyUsageSlice, err := tkValueObject.NewX509KeyUsageSliceFromStdlib(
 		stdlibCert.KeyUsage,
 	)
@@ -316,7 +306,7 @@ func NewX509CertificateFromEnvelopedCertificate(
 		subjectDistinguishedNamePtr, issuerCommonNamePtr,
 		issuerDistinguishedNamePtr, validityNotBefore, validityNotAfter,
 		publicKeyAlgorithm, publicKeySize, publicKeyValue, signatureAlgorithm,
-		signatureValuePtr, fingerprintSHA256, fingerprintSHA1, keyUsageSlice,
+		signatureValuePtr, fingerprintSHA256, keyUsageSlice,
 		extendedKeyUsageSlice, basicConstraintsPtr, subjectKeyIdentifierPtr,
 		authorityKeyIdentifierPtr, certificatePolicies, envelopedCertificate,
 	), nil

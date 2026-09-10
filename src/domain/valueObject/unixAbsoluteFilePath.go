@@ -73,19 +73,40 @@ func (vo UnixAbsoluteFilePath) ReadWithoutExtension(allowUnsafeChars bool) UnixA
 	return filePathWithoutExt
 }
 
-func (vo UnixAbsoluteFilePath) ReadFileName(allowUnsafeChars bool) UnixFileName {
-	unixFileBase := filepath.Base(string(vo))
-	unixFileName, _ := NewUnixFileName(unixFileBase, allowUnsafeChars)
-	return unixFileName
+func (vo UnixAbsoluteFilePath) ReadFileName(
+	allowUnsafeChars bool,
+) (UnixFileName, error) {
+	_, rawFileName := filepath.Split(string(vo))
+	return NewUnixFileName(rawFileName, allowUnsafeChars)
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileExtension() (UnixFileExtension, error) {
+	fileName, fileNameErr := vo.ReadFileName(true)
+	if fileNameErr != nil {
+		return "", fileNameErr
+	}
+
+	fileNameWithoutLeadingDots := strings.TrimLeft(fileName.String(), ".")
+	isExtensionlessDotfile := strings.HasPrefix(fileName.String(), ".") &&
+		fileNameWithoutLeadingDots != "" &&
+		!strings.Contains(fileNameWithoutLeadingDots, ".")
+	if isExtensionlessDotfile {
+		return NewUnixFileExtension("")
+	}
+
 	unixFileExtensionStr := filepath.Ext(string(vo))
 	return NewUnixFileExtension(unixFileExtensionStr)
 }
 
 func (vo UnixAbsoluteFilePath) ReadCompoundFileExtension() (UnixFileExtension, error) {
-	fileNameParts := strings.Split(vo.ReadFileName(true).String(), ".")
+	fileName, fileNameErr := vo.ReadFileName(true)
+	if fileNameErr != nil {
+		return "", fileNameErr
+	}
+
+	fileNameParts := strings.Split(
+		strings.TrimPrefix(fileName.String(), "."), ".",
+	)
 	if len(fileNameParts) < 3 {
 		return vo.ReadFileExtension()
 	}
@@ -93,15 +114,23 @@ func (vo UnixAbsoluteFilePath) ReadCompoundFileExtension() (UnixFileExtension, e
 	return NewUnixFileExtension(strings.Join(extensionsOnly, "."))
 }
 
-func (vo UnixAbsoluteFilePath) ReadFileNameWithoutExtension(allowUnsafeChars bool) UnixFileName {
-	fileBase := filepath.Base(string(vo))
-	fileExt, err := vo.ReadCompoundFileExtension()
-	if err != nil {
-		return vo.ReadFileName(allowUnsafeChars)
+func (vo UnixAbsoluteFilePath) ReadFileNameWithoutExtension(
+	allowUnsafeChars bool,
+) (UnixFileName, error) {
+	fileName, fileNameErr := vo.ReadFileName(allowUnsafeChars)
+	if fileNameErr != nil {
+		return "", fileNameErr
 	}
-	rawFileBaseWithoutExt := strings.TrimSuffix(fileBase, "."+fileExt.String())
-	fileNameWithoutExt, _ := NewUnixFileName(rawFileBaseWithoutExt, allowUnsafeChars)
-	return fileNameWithoutExt
+
+	fileExt, extErr := vo.ReadCompoundFileExtension()
+	if extErr != nil {
+		return fileName, nil
+	}
+
+	rawFileBaseWithoutExt := strings.TrimSuffix(
+		fileName.String(), "."+fileExt.String(),
+	)
+	return NewUnixFileName(rawFileBaseWithoutExt, allowUnsafeChars)
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileDir() UnixAbsoluteFilePath {

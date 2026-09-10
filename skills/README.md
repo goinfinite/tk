@@ -1,19 +1,20 @@
 # Skills
 
-Agentic workflows distributed via Infinite Toolkit (TK) for use in dependent projects. These skills produce deterministic artifacts (shell scripts, configs) that can run independently once generated.
+Agentic workflows distributed via Infinite Toolkit (TK) for use in dependent projects. These skills guide agents working in dependent projects. Some generate deterministic artifacts (shell scripts, configs) that can run independently once generated; others orient agents before they write code.
 
 Agents working on projects that import TK can reference these skills directly from the Go module cache — no copying required.
 
 ## Available Skills
 
-- `openapi-test.md` — OpenAPI/Swagger spec testing with agent-assisted script generation
+- `openapi-test/SKILL.md` — OpenAPI/Swagger spec testing with agent-assisted script generation
+- `tk-usage/SKILL.md` — orientation and component-selection guide for agents using TK in dependent projects
 
 ## Using These Skills
 
 Skills live in the Go module cache. Reference them by version from your project's `go.mod`:
 
 ```sh
-$(go env GOMODCACHE)/github.com/goinfinite/tk@vX.Y.Z/skills/openapi-test.md
+$(go env GOMODCACHE)/github.com/goinfinite/tk@vX.Y.Z/skills/openapi-test/SKILL.md
 ```
 
 Replace `vX.Y.Z` with the version your project imports. Generated artifacts (config files, test scripts) are created in your project directory — not in the TK module cache.
@@ -27,15 +28,26 @@ Extract a skill when:
 
 Do not extract when the procedure is short and intuitive.
 
-## File Naming
+## Directory Layout
 
-Lowercase, hyphenated: `openapi-test.md`, `db-migration.md`
+Each skill lives in its own directory. The main file MUST be named `SKILL.md`, following the OpenCode standard:
 
-## Schema (v0.0.2 // 2026-06-30)
+```text
+skills/
+├── openapi-test/
+│   └── SKILL.md
+└── tk-usage/
+    └── SKILL.md
+```
+
+Directory names are lowercase and hyphenated: `openapi-test`, `db-migration`. The directory name MUST match the skill's `name` field.
+
+## Schema (v0.1.0 // 2026-09-10)
 
 ### Frontmatter
 
-- `shortDescription` (Required) — what the skill does in one sentence
+- `name` (Required) — lowercase, hyphen-separated skill identifier; MUST match the directory name
+- `description` (Required) — one sentence covering what the skill does AND when to use it; write in third person and front-load trigger keywords
 - `version` (Required) — semantic version
 - `lastUpdated` (Required) — last modification date
 

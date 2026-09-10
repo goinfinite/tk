@@ -28,7 +28,7 @@ Queries activity records with filtering and pagination support. Returns a pagina
 2. `src/domain/useCase/readActivityRecords.go` — orchestrates the read; defines default pagination; delegates to the query repo
 3. `src/domain/repository/activityRecordQueryRepo.go` — interface declaring `Read` (paginated list) and `ReadFirst`
 4. `src/infra/activityRecord/activityRecordQueryRepo.go` — GORM implementation: builds filtered query, applies pagination, loads associated resources, transforms models to entities
-5. `src/infra/db/paginationQueryBuilder.go` — builds paginated GORM queries (page-number or last-seen-id mode, sorting, total count)
+5. `src/infra/db/paginationQueryBuilder.go` — builds paginated GORM queries (page-number or last-seen-id mode); callers MUST set `.Model(...)` because sort fields and the cursor default resolve through the parsed schema
 6. `src/infra/db/model/activityRecord.go` — GORM model with `ToEntity()` conversion to domain entity
 7. `src/domain/entity/activityRecord.go` — domain entity returned in the response
 
@@ -63,7 +63,7 @@ Generates a private key and self-signed X.509 certificate for TLS bootstrap.
 
 **Flow:**
 
-1. `src/infra/synthesizer.go` — `SynthesizePrivateKey` generates an RSA/ECDSA/Ed25519 key; `SynthesizeSelfSignedCert` creates a self-signed certificate from a private key
+1. `src/infra/synthesizer.go` — `PrivateKeyPemFactory` generates a key PEM; `CertificatePemFactory` and `CACertificatePemFactory` create self-signed certificate PEM pairs
 2. `src/infra/readThrough.go` — `CertPairFilePathsReader` attempts to read cert/key paths from environment variables, falls back to generating a self-signed pair and writing it to disk
 
 ---
@@ -84,7 +84,7 @@ Runs subprocess commands with configurable timeout, user, working directory, and
 
 **Flow:**
 
-1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under a context deadline (SIGTERM, SIGKILL after a grace; exit 124 `CommandDeadlineExceeded`), optional user switching, and stdout/stderr capture; when `ShouldUseCleanEnv` is set the child runs from a minimal environment (PATH of the resolved user's `~/.local/bin` plus the standard system directories, HOME — parent's for same-user runs or the target user's home on Username switch, PWD when a working directory is set, DEBIAN_FRONTEND, and explicit Envs) so the parent's other variables cannot leak
+1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under an optional context deadline (SIGTERM, then SIGKILL; exit 124 `CommandDeadlineExceeded`), with optional user switching and clean-environment support, capturing stdout/stderr
 2. `src/infra/shellEscape.go` — `Quote` escapes shell arguments for safe interpolation
 
 ---
@@ -105,7 +105,7 @@ Provides filesystem utilities: existence checks, read/write, copy, move, compres
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` struct with methods for all filesystem operations; creation is exclusive (`WriteNewFile`/`CopyFile` reject taken paths with `ErrTargetFileExists`, `CopyFile` preserves the source mode; `TouchFile` carries the touch(1) idempotent contract), `MoveFile` relocates via renameat2(2) RENAME_NOREPLACE without replacing a foreign target (same-file moves succeed as no-ops; cross-device moves fall back to mv(1)-style copy+delete); `CompressFile` and `DecompressFile` share one `shouldKeepSourceFilePtr` contract where the external tool always keeps its input and FileClerk performs the deletion; `FileClerk.OverwriteFile` atomically replaces a target file (resolving symlink chains via filepath.EvalSymlinks); `FileContentRegexSearch` and `FileContentRegexReplace` use size-based routing at 10MiB (whole-file pass / bufio.Scanner streaming), follow symlinks, and reject directories and would-empty results (`ErrTargetIsDirectory`, `ErrSourceIsDirectory`, `ErrReplacementWouldTruncateFile`)
+1. `src/infra/fileClerk.go` — `FileClerk` provides filesystem operations: exclusive create, atomic move and upsert, copy, compress/decompress, permission management, symlink-safe directory-chain verification, and regex search
 
 ---
 
@@ -119,13 +119,13 @@ Deserializes JSON and YAML from files or readers into maps.
 
 ---
 
-## Random String / Password Generation
+## Password Generation
 
-Generates random strings with configurable charsets and cryptographic passwords.
+Generates cryptographic random integers, passwords with charset guarantees, and dummy identities.
 
 **Flow:**
 
-1. `src/infra/synthesizer.go` — `SynthesizeRandomString` generates from custom charset; `SynthesizePassword` generates passwords meeting complexity requirements
+1. `src/infra/synthesizer.go` — `RandomIntegerGenerator`, `PasswordFactory` (with `CharsetPresenceGuarantor`), and `UsernameFactory`/`MailAddressFactory` draw crypto/rand integers, passwords, and dummy identities
 
 ---
 
@@ -141,11 +141,21 @@ Reads the server's private and public IP addresses.
 
 ## Trusted IPs Reader
 
-Reads a list of trusted IP addresses from the TRUSTED_IPS environment variable.
+Reads trusted IP addresses and CIDR blocks from the TRUSTED_IPS and TRUSTED_CIDRS environment variables.
 
 **Flow:**
 
-1. `src/infra/trustedIpsReader.go` — `TrustedIpsReader` parses comma-separated IPs from the environment variable into validated value objects
+1. `src/infra/trustedCidrsReader.go` — `TrustedCidrsReader` parses comma-separated entries from both env vars into validated `CidrBlock` value objects
+
+---
+
+## Requester IP Extraction
+
+Extracts the real requester IP from an HTTP request by walking an ordered header chain and skipping trusted addresses.
+
+**Flow:**
+
+1. `src/presentation/requesterIpExtractor.go` — `NewRequesterIpExtractor` reads the `IP_EXTRACT_HEADER` chain and trusted CIDRs from `TrustedCidrsReader`; `Execute(*http.Request)` walks each header right-to-left and returns the first untrusted IP, falling back to `RemoteAddr`
 
 ---
 
@@ -165,7 +175,7 @@ Wraps responses in a standard envelope for API consumers and provides syntax-hig
 
 **Flow:**
 
-1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON responses; `LiaisonCliResponseRenderer` for terminal output with chroma syntax highlighting; `SimpleCliResponseRenderer(isSuccess, message)` for simplified CLI usage — maps isSuccess to a LiaisonResponse status and delegates to LiaisonCliResponseRenderer for JSON envelope output; `LiaisonApiResponseEmitter` and `LiaisonCliResponseRenderer` translate each curated `LiaisonResponseStatus` (success, created, accepted/202, multiStatus, userError, unauthorized, forbidden, notFound, timeout, conflict/409, rateLimited, infraError, unknownError, serviceUnavailable/503) to its HTTP code and sysexits CLI code
+1. `src/presentation/responseWrappers.go` — `ApiResponseWrapper` for HTTP JSON; `LiaisonCliResponseRenderer` and `SimpleCliResponseRenderer` for terminal output; each `LiaisonResponseStatus` maps to an HTTP code and a sysexits CLI code
 
 ---
 
@@ -179,13 +189,43 @@ Parses pagination parameters from untrusted input into a typed Pagination DTO.
 
 ---
 
-## Environment Variable Inspection
+## Required Params Inspection
 
-Loads .env files, validates that required environment variables are set, and auto-fills derivable values (e.g., server IP).
+Checks that all required parameters are present in a request input map before further parsing.
 
 **Flow:**
 
-1. `src/presentation/envsInspector.go` — `NewEnvsInspector` configures required and auto-fillable vars; `InspectEnvs` loads the .env file and validates; `AutoFillRequiredEnvVars` populates derivable values
+1. `src/presentation/requiredParamsInspector.go` — `RequiredParamsInspector(inputMap, requiredNames)` returns an error listing any missing parameter names
+
+---
+
+## String Slice Value Object Parsing
+
+Parses raw request input (string, slice, or single value) into a slice of typed value objects.
+
+**Flow:**
+
+1. `src/presentation/stringSliceVoParser.go` — `StringSliceValueObjectParser` splits `;`/`,` strings or iterates slices, runs each element through a value-object constructor, and skips invalid values
+
+---
+
+## Time Params Parsing
+
+Parses optional time parameters from untrusted input into `UnixTime` pointers.
+
+**Flow:**
+
+1. `src/presentation/timeParamsParser.go` — `TimeParamsParser(names, inputMap)` returns a `*UnixTime` for each name present in the input; an unparsable value yields a nil entry
+
+---
+
+## Environment Variable Inspection
+
+Loads .env files, validates that required environment variables are set, and auto-fills missing auto-fillable variables with generated secret keys.
+
+**Flow:**
+
+1. `src/presentation/envsInspector.go` — `NewEnvsInspector` configures required and auto-fillable vars; `Inspect` loads the .env file, validates required vars, and appends generated secret keys for missing auto-fillable vars
 
 ---
 
@@ -195,7 +235,7 @@ Configures structured logging level at application startup.
 
 **Flow:**
 
-1. `src/presentation/middleware/logHandler.go` — `LogHandler.Init` reads LOG_LEVEL env var and configures slog with zerolog backend; supports Debug, Info, Warn, Error levels case-insensitively; logs always go to stderr so the CLI's stdout carries only the JSON response, and interactive debug sessions get the console writer formatting (tkInfra.IsStdoutTerminal)
+1. `src/presentation/middleware/logHandler.go` — `LogHandler.Init` reads LOG_LEVEL and configures slog over a zerolog backend; logs go to stderr so CLI stdout carries only the JSON response
 
 ---
 
@@ -206,5 +246,15 @@ Catches panics, logs stack traces, and returns safe error responses.
 **Flow:**
 
 1. `src/presentation/middleware/panicHandler.go` — `ApiPanicHandler` is Echo middleware that catches panics, writes stack traces to `logs/panic.log`, filters domain-layer frames, and returns HTTP 500 with masked error for untrusted clients; `CliPanicHandler` does the same for CLI via `defer`
+
+---
+
+## Transient Key-Value Store
+
+Keeps ephemeral key-value pairs in a shared in-memory SQLite database. The data vanishes when the process ends.
+
+**Flow:**
+
+1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Read` returns `ErrKeyNotFound` for a missing key
 
 ---

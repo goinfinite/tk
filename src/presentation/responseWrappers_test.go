@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -497,7 +498,7 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 	}
 
 	fileClerk := tkInfra.FileClerk{}
-	err = fileClerk.UpdateFileContent(workingDir+"/go.mod", testProgramGoMod, true)
+	err = os.WriteFile(workingDir+"/go.mod", []byte(testProgramGoMod), 0644)
 	if err != nil {
 		t.Fatalf("WriteGoModFailed: %v", err)
 	}
@@ -520,7 +521,7 @@ func main() {
 	tkPresentation.LiaisonCliResponseRenderer(liaisonResponse)
 }`
 
-			err = fileClerk.UpdateFileContent(testFile, testProgramMain, true)
+			err = os.WriteFile(testFile, []byte(testProgramMain), 0644)
 			if err != nil {
 				t.Fatalf("WriteTestProgramFailed: %v", err)
 			}
@@ -624,8 +625,8 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 	}
 
 	fileClerk := tkInfra.FileClerk{}
-	err = fileClerk.UpdateFileContent(
-		workingDir+"/go.mod", testProgramGoMod, true,
+	err = os.WriteFile(
+		workingDir+"/go.mod", []byte(testProgramGoMod), 0644,
 	)
 	if err != nil {
 		t.Fatalf("WriteGoModFailed: %v", err)
@@ -651,8 +652,8 @@ func main() {
 	)
 }`
 
-			err = fileClerk.UpdateFileContent(
-				testFile, testProgramMain, true,
+			err = os.WriteFile(
+				testFile, []byte(testProgramMain), 0644,
 			)
 			if err != nil {
 				t.Fatalf("WriteTestProgramFailed: %v", err)

@@ -69,19 +69,38 @@ func (vo UnixRelativeFilePath) ReadWithoutExtension() UnixRelativeFilePath {
 	return filePathWithoutExt
 }
 
-func (vo UnixRelativeFilePath) ReadFileName() UnixFileName {
-	unixFileBase := filepath.Base(string(vo))
-	unixFileName, _ := NewUnixFileName(unixFileBase, true)
-	return unixFileName
+func (vo UnixRelativeFilePath) ReadFileName() (UnixFileName, error) {
+	_, rawFileName := filepath.Split(string(vo))
+	return NewUnixFileName(rawFileName, true)
 }
 
 func (vo UnixRelativeFilePath) ReadFileExtension() (UnixFileExtension, error) {
+	fileName, fileNameErr := vo.ReadFileName()
+	if fileNameErr != nil {
+		return "", fileNameErr
+	}
+
+	fileNameWithoutLeadingDots := strings.TrimLeft(fileName.String(), ".")
+	isExtensionlessDotfile := strings.HasPrefix(fileName.String(), ".") &&
+		fileNameWithoutLeadingDots != "" &&
+		!strings.Contains(fileNameWithoutLeadingDots, ".")
+	if isExtensionlessDotfile {
+		return NewUnixFileExtension("")
+	}
+
 	unixFileExtensionStr := filepath.Ext(string(vo))
 	return NewUnixFileExtension(unixFileExtensionStr)
 }
 
 func (vo UnixRelativeFilePath) ReadCompoundFileExtension() (UnixFileExtension, error) {
-	fileNameParts := strings.Split(vo.ReadFileName().String(), ".")
+	fileName, fileNameErr := vo.ReadFileName()
+	if fileNameErr != nil {
+		return "", fileNameErr
+	}
+
+	fileNameParts := strings.Split(
+		strings.TrimPrefix(fileName.String(), "."), ".",
+	)
 	if len(fileNameParts) < 3 {
 		return vo.ReadFileExtension()
 	}
@@ -89,15 +108,21 @@ func (vo UnixRelativeFilePath) ReadCompoundFileExtension() (UnixFileExtension, e
 	return NewUnixFileExtension(strings.Join(extensionsOnly, "."))
 }
 
-func (vo UnixRelativeFilePath) ReadFileNameWithoutExtension() UnixFileName {
-	fileBase := filepath.Base(string(vo))
-	fileExt, err := vo.ReadCompoundFileExtension()
-	if err != nil {
-		return vo.ReadFileName()
+func (vo UnixRelativeFilePath) ReadFileNameWithoutExtension() (UnixFileName, error) {
+	fileName, fileNameErr := vo.ReadFileName()
+	if fileNameErr != nil {
+		return "", fileNameErr
 	}
-	fileBaseWithoutExtStr := strings.TrimSuffix(fileBase, "."+fileExt.String())
-	fileNameWithoutExt, _ := NewUnixFileName(fileBaseWithoutExtStr, true)
-	return fileNameWithoutExt
+
+	fileExt, extErr := vo.ReadCompoundFileExtension()
+	if extErr != nil {
+		return fileName, nil
+	}
+
+	fileBaseWithoutExtStr := strings.TrimSuffix(
+		fileName.String(), "."+fileExt.String(),
+	)
+	return NewUnixFileName(fileBaseWithoutExtStr, true)
 }
 
 func (vo UnixRelativeFilePath) ReadFileDir() UnixRelativeFilePath {

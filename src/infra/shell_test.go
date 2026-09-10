@@ -6,10 +6,24 @@ import (
 	"os/user"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 )
 
 func TestShell(t *testing.T) {
+	unresolvableUserIdFinder := func() uint32 {
+		for candidate := uint32(999999); candidate > 0; candidate-- {
+			_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
+			if lookupErr != nil {
+				return candidate
+			}
+		}
+
+		t.Fatal("NoUnresolvableUserIdFound")
+		return 0
+	}
+	unresolvableUserId := unresolvableUserIdFinder()
+
 	t.Run("BasicShell", func(t *testing.T) {
 		testCaseStructs := []struct {
 			command        string
@@ -122,7 +136,7 @@ func TestShell(t *testing.T) {
 		runCapture()
 		baselineDescriptors := openDescriptorCount()
 
-		for runIndex := 0; runIndex < 9; runIndex++ {
+		for range 9 {
 			runCapture()
 		}
 
@@ -165,6 +179,122 @@ func TestShell(t *testing.T) {
 		}
 		if shellErr.StdErr != "boom\n" {
 			t.Errorf("Natural124MisreportedAsTimeout: '%s'", shellErr.StdErr)
+		}
+	})
+
+	t.Run("ShouldDisableTimeoutLetsLongCommandFinish", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command:              "sleep",
+			Args:                 []string{"2"},
+			ExecutionTimeoutSecs: 1,
+			ShouldDisableTimeout: true,
+		}).Run()
+		if err != nil {
+			t.Errorf("CommandKilledDespiteDisabledTimeout: %v", err)
+		}
+	})
+
+	t.Run("UserIdRunsCommandAsTargetAccount", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		nobodyUserId := uint32(nobodyUid)
+
+		uidStr, err := NewShell(ShellSettings{
+			Command: "id",
+			Args:    []string{"-u"},
+			UserId:  &nobodyUserId,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if uidStr != nobody.Uid {
+			t.Errorf("UidMismatch: %s vs %s", uidStr, nobody.Uid)
+		}
+
+		gidStr, err := NewShell(ShellSettings{
+			Command: "id",
+			Args:    []string{"-g"},
+			UserId:  &nobodyUserId,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if gidStr != nobody.Gid {
+			t.Errorf("GidMismatch: %s vs %s", gidStr, nobody.Gid)
+		}
+	})
+
+	t.Run("UserIdZeroRequestsRootAccount", func(t *testing.T) {
+		rootUserId := uint32(0)
+
+		runPlan := NewShell(ShellSettings{
+			Command: "true",
+			UserId:  &rootUserId,
+		}).executionPlanner(context.Background())
+		if runPlan.Err != nil {
+			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+		}
+
+		sysProcAttr := runPlan.ExecCmd.SysProcAttr
+		if sysProcAttr == nil || sysProcAttr.Credential == nil {
+			t.Fatalf("MissingSysCallCredentialsForRootUserId")
+		}
+		if sysProcAttr.Credential.Uid != 0 {
+			t.Errorf("UnexpectedCredentialUid: %d", sysProcAttr.Credential.Uid)
+		}
+	})
+
+	t.Run("UnresolvableUserIdFailsLoud", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command: "true",
+			UserId:  &unresolvableUserId,
+		}).Run()
+		if err == nil {
+			t.Errorf("MissingErrorForUnresolvableUserId")
+		}
+	})
+
+	t.Run("UnresolvableUserIdIgnoredByFlag", func(t *testing.T) {
+		stdoutStr, err := NewShell(ShellSettings{
+			Command:                         "id",
+			Args:                            []string{"-u"},
+			UserId:                          &unresolvableUserId,
+			ShouldIgnoreUsernameLookupError: true,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if stdoutStr != strconv.Itoa(os.Getuid()) {
+			t.Errorf("ExpectedCurrentUser: %s vs %d", stdoutStr, os.Getuid())
+		}
+	})
+
+	t.Run("UsernameWinsOverUserId", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		stdoutStr, err := NewShell(ShellSettings{
+			Command:  "id",
+			Args:     []string{"-u"},
+			Username: "root",
+			UserId:   &unresolvableUserId,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if stdoutStr != "0" {
+			t.Errorf("ExpectedRootUid: %s", stdoutStr)
 		}
 	})
 }

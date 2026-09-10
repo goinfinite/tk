@@ -84,9 +84,20 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		}
 		envVarStr := envVarName + "=" + envVarValue + "\n"
 
-		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
+		envFileContent, readErr := fileClerk.ReadFileContent(envFilePathStr, nil)
+		if readErr != nil {
+			return errors.New("EnvsInspectorEnvReadFileError: " + readErr.Error())
+		}
+		separator := ""
+		if len(envFileContent) > 0 && !strings.HasSuffix(envFileContent, "\n") {
+			separator = "\n"
+		}
+
+		err = fileClerk.AppendFileContent(
+			*envsInspector.envFilePath, separator+envVarStr,
+		)
 		if err != nil {
-			return errors.New("EnvsInspectorEnvWriteFileError")
+			return errors.New("EnvsInspectorEnvAppendFileError")
 		}
 
 		os.Setenv(envVarName, envVarValue)

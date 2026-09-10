@@ -92,6 +92,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.tar.gz"), UnixRelativeFilePath("./file")},
 			{UnixRelativeFilePath("./file"), UnixRelativeFilePath("./file")},
 			{UnixRelativeFilePath("./файл.txt"), UnixRelativeFilePath("./файл")},
+			{UnixRelativeFilePath("./.hidden"), UnixRelativeFilePath("./.hidden")},
+			{UnixRelativeFilePath("./.config.json"), UnixRelativeFilePath("./.config")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -106,16 +108,26 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileName
+			expectError    bool
 		}{
-			{UnixRelativeFilePath("./file.php"), UnixFileName("file.php")},
-			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file.txt")},
-			{UnixRelativeFilePath("./subdir/file.txt"), UnixFileName("file.txt")},
-			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл.txt")},
+			{UnixRelativeFilePath("./file.php"), UnixFileName("file.php"), false},
+			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file.txt"), false},
+			{UnixRelativeFilePath("./subdir/file.txt"), UnixFileName("file.txt"), false},
+			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл.txt"), false},
+			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
+			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
+			{UnixRelativeFilePath("./dir/.."), UnixFileName(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput := testCase.inputValue.ReadFileName()
-			if actualOutput != testCase.expectedOutput {
+			actualOutput, err := testCase.inputValue.ReadFileName()
+			if testCase.expectError && err == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && err != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
@@ -179,16 +191,27 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileName
+			expectError    bool
 		}{
-			{UnixRelativeFilePath("./file.php"), UnixFileName("file")},
-			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file")},
-			{UnixRelativeFilePath("./file.tar.gz"), UnixFileName("file")},
-			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл")},
+			{UnixRelativeFilePath("./file.php"), UnixFileName("file"), false},
+			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file"), false},
+			{UnixRelativeFilePath("./file.tar.gz"), UnixFileName("file"), false},
+			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл"), false},
+			{UnixRelativeFilePath("./.hidden"), UnixFileName(".hidden"), false},
+			{UnixRelativeFilePath("./.config.json"), UnixFileName(".config"), false},
+			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
+			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput := testCase.inputValue.ReadFileNameWithoutExtension()
-			if actualOutput != testCase.expectedOutput {
+			actualOutput, err := testCase.inputValue.ReadFileNameWithoutExtension()
+			if testCase.expectError && err == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && err != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}

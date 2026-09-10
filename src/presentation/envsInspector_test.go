@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joho/godotenv"
+
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
@@ -37,7 +39,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\nDB_PORT=5432\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -68,7 +70,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -82,7 +84,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		autoFillableEnvVars := []string{"DB_PASSWORD"}
 		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
 
-		os.Unsetenv("DB_PASSWORD")
+		t.Setenv("DB_PASSWORD", "")
 
 		err = envsInspector.Inspect()
 		if err != nil {
@@ -108,11 +110,48 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		}
 	})
 
+	t.Run("AutoFillAfterFileWithoutTrailingNewline", func(t *testing.T) {
+		tempDir := t.TempDir()
+		rawEnvFilePath := filepath.Join(tempDir, ".env")
+		envFileContent := "DB_HOST=localhost"
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
+		if err != nil {
+			t.Fatalf("CreateTestEnvFileFailed: %v", err)
+		}
+
+		envFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(rawEnvFilePath, false)
+		if err != nil {
+			t.Fatalf("CreateFilePathVoFailed: %v", err)
+		}
+
+		requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD"}
+		autoFillableEnvVars := []string{"DB_PASSWORD"}
+		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
+
+		t.Setenv("DB_PASSWORD", "")
+
+		err = envsInspector.Inspect()
+		if err != nil {
+			t.Errorf("InspectFailedWhenItShouldSucceed: %v", err)
+		}
+
+		loadedVars, loadErr := godotenv.Read(rawEnvFilePath)
+		if loadErr != nil {
+			t.Fatalf("ReloadEnvFileFailed: %v", loadErr)
+		}
+		if loadedVars["DB_HOST"] != "localhost" {
+			t.Errorf("ExistingLineCorrupted: DB_HOST=%q", loadedVars["DB_HOST"])
+		}
+		if loadedVars["DB_PASSWORD"] == "" {
+			t.Errorf("AutoFilledVarNotSeparatelyLoadable")
+		}
+	})
+
 	t.Run("MissingRequiredEnvVar", func(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -126,7 +165,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		autoFillableEnvVars := []string{}
 		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
 
-		os.Unsetenv("DB_USER")
+		t.Setenv("DB_USER", "")
 
 		err = envsInspector.Inspect()
 		if err == nil {
@@ -143,7 +182,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "API_KEY=secret\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}

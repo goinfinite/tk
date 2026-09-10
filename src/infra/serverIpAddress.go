@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	mathRand "math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -61,7 +60,7 @@ func (resolver *PublicIpAddressResolver) resolverFetcher(
 	if requestSendError != nil {
 		return rawIpAddress, requestSendError
 	}
-	defer httpResponse.Body.Close()
+	defer func() { _ = httpResponse.Body.Close() }()
 
 	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
 		return rawIpAddress, errors.New(
@@ -92,13 +91,13 @@ func (resolver *PublicIpAddressResolver) Resolve() (
 		return ipAddress, errors.New("PublicIpResolverHasNoEndpoints")
 	}
 
-	randomOrderedResolvers := make([]tkValueObject.Url, resolverUrlsCount)
-	for shuffledPosition, originalPosition := range mathRand.Perm(resolverUrlsCount) {
-		randomOrderedResolvers[shuffledPosition] =
-			resolver.resolverUrls[originalPosition]
-	}
+	shuffledIndices := (&Synthesizer{}).shuffledIndicesGenerator(
+		resolverUrlsCount,
+	)
 
-	for _, resolverUrl := range randomOrderedResolvers {
+	for _, resolverIndex := range shuffledIndices {
+		resolverUrl := resolver.resolverUrls[resolverIndex]
+
 		rawIpAddress, fetchError := resolver.resolverFetcher(resolverUrl)
 		if fetchError != nil {
 			slog.Debug("PublicIpResolverEndpointFailed",

@@ -257,7 +257,7 @@ go 1.25.3
 require github.com/goinfinite/tk v0.1.2
 `
 	fileClerk := tkInfra.FileClerk{}
-	err = fileClerk.UpdateFileContent(workingDir+"/go.mod", goModContent, true)
+	err = os.WriteFile(workingDir+"/go.mod", []byte(goModContent), 0644)
 	if err != nil {
 		t.Errorf("GoModFileCreationFailed: %v", err)
 		return
@@ -274,7 +274,7 @@ func main() {
 `
 
 	programFilePath := tempDir + "/testCliPanicHandler.go"
-	err = fileClerk.UpdateFileContent(programFilePath, mainContent, true)
+	err = os.WriteFile(programFilePath, []byte(mainContent), 0644)
 	if err != nil {
 		t.Errorf("TestProgramFileCreationFailed: %v", err)
 		return

@@ -173,6 +173,8 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.txt"), UnixAbsoluteFilePath("/home/file")},
 			{UnixAbsoluteFilePath("/home/file"), UnixAbsoluteFilePath("/home/file")},
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixAbsoluteFilePath("/home/file")},
+			{UnixAbsoluteFilePath("/home/.hidden"), UnixAbsoluteFilePath("/home/.hidden")},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixAbsoluteFilePath("/home/.config")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -187,15 +189,26 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixAbsoluteFilePath
 			expectedOutput UnixFileName
+			expectError    bool
 		}{
-			{UnixAbsoluteFilePath("/home/file.php"), UnixFileName("file.php")},
-			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName("dir")},
-			{UnixAbsoluteFilePath("/file.txt"), UnixFileName("file.txt")},
+			{UnixAbsoluteFilePath("/home/file.php"), UnixFileName("file.php"), false},
+			{UnixAbsoluteFilePath("/file.txt"), UnixFileName("file.txt"), false},
+			{UnixAbsoluteFilePath("/"), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/home/user/~"), UnixFileName(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput := testCase.inputValue.ReadFileName(false)
-			if actualOutput != testCase.expectedOutput {
+			actualOutput, err := testCase.inputValue.ReadFileName(false)
+			if testCase.expectError && err == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && err != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
@@ -257,16 +270,28 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixAbsoluteFilePath
 			expectedOutput UnixFileName
+			expectError    bool
 		}{
-			{UnixAbsoluteFilePath("/home/file.php"), UnixFileName("file")},
-			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileName("file")},
-			{UnixAbsoluteFilePath("/home/file"), UnixFileName("file")},
-			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileName("file")},
+			{UnixAbsoluteFilePath("/home/file.php"), UnixFileName("file"), false},
+			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileName("file"), false},
+			{UnixAbsoluteFilePath("/home/file"), UnixFileName("file"), false},
+			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileName("file"), false},
+			{UnixAbsoluteFilePath("/home/.hidden"), UnixFileName(".hidden"), false},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixFileName(".config"), false},
+			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput := testCase.inputValue.ReadFileNameWithoutExtension(false)
-			if actualOutput != testCase.expectedOutput {
+			actualOutput, err := testCase.inputValue.ReadFileNameWithoutExtension(false)
+			if testCase.expectError && err == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && err != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
