@@ -3,13 +3,86 @@ package tkInfra
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
+
+func TestRandomIntegerGenerator(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("ValuesStayWithinInclusiveBounds", func(t *testing.T) {
+		testCases := []struct {
+			lowestValue  int
+			highestValue int
+		}{
+			{3, 7},
+			{-10, -5},
+			{0, 0},
+			{-2, 2},
+			{100, 257},
+			{math.MinInt, math.MaxInt},
+		}
+
+		for _, testCase := range testCases {
+			for range 200 {
+				randomValue := synth.RandomIntegerGenerator(
+					testCase.lowestValue, testCase.highestValue,
+				)
+
+				valueIsInRange := randomValue >= testCase.lowestValue &&
+					randomValue <= testCase.highestValue
+				if !valueIsInRange {
+					t.Errorf(
+						"ValueOutsideBounds: %d [%d, %d]",
+						randomValue, testCase.lowestValue,
+						testCase.highestValue,
+					)
+				}
+			}
+		}
+	})
+
+	t.Run("EveryValueInSmallRangeIsReachable", func(t *testing.T) {
+		lowestValue := 3
+		highestValue := 7
+
+		seenValues := map[int]bool{}
+		for range 200 {
+			seenValues[synth.RandomIntegerGenerator(
+				lowestValue, highestValue,
+			)] = true
+		}
+
+		for expectedValue := lowestValue; expectedValue <= highestValue; expectedValue++ {
+			if !seenValues[expectedValue] {
+				t.Errorf(
+					"UnreachedValue: %d [%d, %d]",
+					expectedValue, lowestValue, highestValue,
+				)
+			}
+		}
+	})
+
+	t.Run("InvertedRangePanics", func(t *testing.T) {
+		defer func() {
+			recoveredValue := recover()
+			if recoveredValue == nil {
+				t.Fatal("ExpectedPanicForInvertedRange")
+			}
+			if recoveredValue != "RandomIntegerRangeInvalid" {
+				t.Errorf("UnexpectedPanicValue: %v", recoveredValue)
+			}
+		}()
+
+		synth.RandomIntegerGenerator(10, 5)
+	})
+}
 
 func TestCharsetPresenceGuarantor(t *testing.T) {
 	synth := &Synthesizer{}
@@ -102,6 +175,14 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 				"CharsetNotAdded: Output '%s' does not contain any character from charset '%s'",
 				string(actualOutput), charset,
 			)
+		}
+	})
+
+	t.Run("InputLargerThanOneByteRange", func(t *testing.T) {
+		longInput := []byte(strings.Repeat("a", 300))
+		actualOutput := synth.CharsetPresenceGuarantor(longInput, "9")
+		if !strings.ContainsAny(string(actualOutput), "9") {
+			t.Errorf("CharsetNotAddedTo300ByteInput")
 		}
 	})
 }
@@ -847,6 +928,213 @@ func TestCACertificatePemFactory(t *testing.T) {
 
 		if !cert.IsCA {
 			t.Error("CACertificatePemFactoryShouldAlwaysSetIsCATrue")
+		}
+	})
+}
+
+func TestRandomStringFactory(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("LengthAndCharsetMembership", func(t *testing.T) {
+		testCases := []struct {
+			length  int
+			charset string
+		}{
+			{1, CharsetLowercaseLetters},
+			{8, CharsetLowercaseLetters + CharsetUppercaseLetters + CharsetNumbers},
+			{64, CharsetSymbols},
+			{256, CharsetNumbers},
+		}
+
+		for _, testCase := range testCases {
+			generated := synth.randomStringFactory(
+				testCase.length,
+				testCase.charset,
+			)
+
+			if len(generated) != testCase.length {
+				t.Errorf(
+					"LengthMismatch: expected %d, got %d",
+					testCase.length, len(generated),
+				)
+			}
+
+			for _, generatedChar := range generated {
+				charsetContainsChar := strings.ContainsRune(
+					testCase.charset, generatedChar,
+				)
+				if !charsetContainsChar {
+					t.Errorf(
+						"CharOutsideCharset: '%c' not in %s",
+						generatedChar, testCase.charset,
+					)
+				}
+			}
+		}
+	})
+
+	t.Run("NonPositiveLength", func(t *testing.T) {
+		for _, invalidLength := range []int{0, -1, -128} {
+			generated := synth.randomStringFactory(
+				invalidLength,
+				CharsetLowercaseLetters,
+			)
+			if generated != "" {
+				t.Errorf("UnexpectedValueForLength %d: '%s'", invalidLength, generated)
+			}
+		}
+	})
+
+	t.Run("EmptyCharsetYieldsEmptyString", func(t *testing.T) {
+		generated := synth.randomStringFactory(8, "")
+		if generated != "" {
+			t.Errorf("UnexpectedValueForEmptyCharset: '%s'", generated)
+		}
+	})
+
+	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+		alphanumeric := CharsetLowercaseLetters +
+			CharsetUppercaseLetters + CharsetNumbers
+
+		first := synth.randomStringFactory(32, alphanumeric)
+		second := synth.randomStringFactory(32, alphanumeric)
+
+		if first == second {
+			t.Errorf("IdenticalValuesAcrossCalls: %s", first)
+		}
+	})
+
+	t.Run("NoPerCharacterBias", func(t *testing.T) {
+		charset := "abcd"
+		samplesTotal := 400
+		sampleLength := 250
+
+		bucketCounts := map[rune]int{}
+		for range samplesTotal {
+			generated := synth.randomStringFactory(sampleLength, charset)
+			for _, generatedChar := range generated {
+				bucketCounts[generatedChar]++
+			}
+		}
+
+		drawsTotal := samplesTotal * sampleLength
+		expectedPerChar := drawsTotal / len(charset)
+		tolerance := expectedPerChar / 10
+		for _, charsetChar := range charset {
+			charCount := bucketCounts[charsetChar]
+			countInsideTolerance := charCount >= expectedPerChar-tolerance &&
+				charCount <= expectedPerChar+tolerance
+			if !countInsideTolerance {
+				t.Errorf(
+					"CharacterCountOutsideTolerance: '%c' got %d, expected %d±%d",
+					charsetChar, charCount, expectedPerChar, tolerance,
+				)
+			}
+		}
+	})
+}
+
+func TestShuffledIndicesGenerator(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("ContainsEveryIndexExactlyOnce", func(t *testing.T) {
+		for _, size := range []int{0, 1, 2, 3, 8, 64} {
+			shuffledIndices := synth.shuffledIndicesGenerator(size)
+
+			if len(shuffledIndices) != size {
+				t.Errorf(
+					"UnexpectedIndicesCount: expected %d, got %d",
+					size, len(shuffledIndices),
+				)
+				continue
+			}
+
+			seenIndices := make(map[int]bool, size)
+			for _, index := range shuffledIndices {
+				indexIsInRange := index >= 0 && index < size
+				if !indexIsInRange {
+					t.Errorf("IndexOutsideRange: %d [size %d]", index, size)
+				}
+				if seenIndices[index] {
+					t.Errorf("RepeatedIndex: %d [size %d]", index, size)
+				}
+				seenIndices[index] = true
+			}
+		}
+	})
+
+	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+		size := 16
+		first := synth.shuffledIndicesGenerator(size)
+		second := synth.shuffledIndicesGenerator(size)
+		if slices.Equal(first, second) {
+			t.Errorf("IdenticalOrderingsAcrossCalls: %v", first)
+		}
+	})
+}
+
+func TestPasswordFactoryClassGuarantees(t *testing.T) {
+	synth := &Synthesizer{}
+
+	t.Run("EveryClassPresentAboveMinimumLength", func(t *testing.T) {
+		for range 20 {
+			password := synth.PasswordFactory(16, true)
+
+			if len(password) != 16 {
+				t.Errorf("UnexpectedPasswordLength: %d", len(password))
+			}
+			for _, requiredCharset := range []string{
+				CharsetLowercaseLetters,
+				CharsetUppercaseLetters,
+				CharsetNumbers,
+				CharsetSymbols,
+			} {
+				if !strings.ContainsAny(password, requiredCharset) {
+					t.Errorf("RequiredCharsetMissing: %s from %s", requiredCharset, password)
+				}
+			}
+		}
+	})
+
+	t.Run("AlphanumericOnlyWhenSymbolsExcluded", func(t *testing.T) {
+		alphanumeric := CharsetLowercaseLetters +
+			CharsetUppercaseLetters + CharsetNumbers
+		for range 20 {
+			password := synth.PasswordFactory(12, false)
+			if strings.ContainsAny(password, CharsetSymbols) {
+				t.Errorf("UnexpectedSymbol: %s", password)
+			}
+			if !strings.ContainsAny(password, alphanumeric) {
+				t.Errorf("UnexpectedCharacter: %s", password)
+			}
+		}
+	})
+
+	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+		first := synth.PasswordFactory(16, true)
+		second := synth.PasswordFactory(16, true)
+		if first == second {
+			t.Errorf("IdenticalPasswordsAcrossCalls")
+		}
+	})
+
+	t.Run("LengthAboveOneByteRange", func(t *testing.T) {
+		password := synth.PasswordFactory(257, true)
+		if len(password) != 257 {
+			t.Errorf("UnexpectedPasswordLength: %d", len(password))
+		}
+		for _, requiredCharset := range []string{
+			CharsetLowercaseLetters,
+			CharsetUppercaseLetters,
+			CharsetNumbers,
+			CharsetSymbols,
+		} {
+			if !strings.ContainsAny(password, requiredCharset) {
+				t.Errorf(
+					"RequiredCharsetMissing: %s from 257-char password",
+					requiredCharset,
+				)
+			}
 		}
 	})
 }

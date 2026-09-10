@@ -1,7 +1,8 @@
 package tkInfra
 
 import (
-	"crypto/dsa"
+	//lint:ignore SA1019 DSA remains a supported generator algorithm.
+	"crypto/dsa" //nolint:staticcheck // DSA support is intentional.
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -14,7 +15,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
-	mathRand "math/rand"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,31 @@ const (
 
 type Synthesizer struct{}
 
+func (synth *Synthesizer) RandomIntegerGenerator(
+	lowestValue, highestValue int,
+) int {
+	lowestValueBig := big.NewInt(int64(lowestValue))
+	highestValueBig := big.NewInt(int64(highestValue))
+
+	possibleValuesCount := new(big.Int).Sub(highestValueBig, lowestValueBig)
+	possibleValuesCount.Add(possibleValuesCount, big.NewInt(1))
+	if possibleValuesCount.Sign() <= 0 {
+		panic("RandomIntegerRangeInvalid")
+	}
+
+	randomOffset, drawErr := cryptoRand.Int(
+		cryptoRand.Reader, possibleValuesCount,
+	)
+	if drawErr != nil {
+		// Go's crypto/rand treats a failed system random source as fatal.
+		// A fallback would emit predictable secrets, so we panic too.
+		panic("RandomIntegerDrawFailed: " + drawErr.Error())
+	}
+
+	randomValue := new(big.Int).Add(lowestValueBig, randomOffset)
+	return int(randomValue.Int64())
+}
+
 func (synth *Synthesizer) CharsetPresenceGuarantor(
 	originalString []byte,
 	charset string,
@@ -37,8 +63,11 @@ func (synth *Synthesizer) CharsetPresenceGuarantor(
 	if strings.ContainsAny(string(originalString), charset) {
 		return originalString
 	}
+	if len(originalString) == 0 || len(charset) == 0 {
+		return originalString
+	}
 
-	randomStringIndex := mathRand.Intn(len(originalString))
+	randomStringIndex := synth.RandomIntegerGenerator(0, len(originalString)-1)
 	isFirstChar := randomStringIndex == 0
 	if isFirstChar {
 		randomStringIndex++
@@ -51,32 +80,98 @@ func (synth *Synthesizer) CharsetPresenceGuarantor(
 		randomStringIndex = len(originalString) - 1
 	}
 
-	randomCharsetIndex := mathRand.Intn(len(charset))
+	randomCharsetIndex := synth.RandomIntegerGenerator(0, len(charset)-1)
 	originalString[randomStringIndex] = charset[randomCharsetIndex]
 
 	return originalString
+}
+
+func (synth *Synthesizer) randomStringFactory(
+	length int,
+	charset string,
+) string {
+	if length <= 0 || len(charset) == 0 {
+		return ""
+	}
+
+	randomBytes := make([]byte, length)
+	for byteIdx := range randomBytes {
+		randomBytes[byteIdx] = charset[synth.RandomIntegerGenerator(0, len(charset)-1)]
+	}
+
+	return string(randomBytes)
+}
+
+func (synth *Synthesizer) unclaimedPositionPicker(
+	rangeSize int,
+	claimedPositions []int,
+) (positionIdx int, hasFreePosition bool) {
+	freePositions := make([]int, 0, rangeSize)
+	for candidateIdx := range rangeSize {
+		positionIsFree := !slices.Contains(claimedPositions, candidateIdx)
+		if positionIsFree {
+			freePositions = append(freePositions, candidateIdx)
+		}
+	}
+
+	hasNoFreePosition := len(freePositions) == 0
+	if hasNoFreePosition {
+		return 0, false
+	}
+
+	freePositionOrdinal := synth.RandomIntegerGenerator(0, len(freePositions)-1)
+	return freePositions[freePositionOrdinal], true
+}
+
+func (synth *Synthesizer) shuffledIndicesGenerator(size int) []int {
+	shuffledIndices := make([]int, 0, size)
+	for {
+		positionIdx, hasFreePosition := synth.unclaimedPositionPicker(
+			size, shuffledIndices,
+		)
+		if !hasFreePosition {
+			break
+		}
+		shuffledIndices = append(shuffledIndices, positionIdx)
+	}
+	return shuffledIndices
 }
 
 func (synth *Synthesizer) PasswordFactory(
 	desiredLength int,
 	shouldIncludeSymbols bool,
 ) string {
-	alphanumericCharset := CharsetLowercaseLetters + CharsetUppercaseLetters + CharsetNumbers
-	alphanumericCharsetLength := len(alphanumericCharset)
-
-	passwordBytes := make([]byte, desiredLength)
-	for charIdx := 0; charIdx < desiredLength; charIdx++ {
-		passwordBytes[charIdx] = alphanumericCharset[mathRand.Intn(alphanumericCharsetLength)]
+	if desiredLength <= 0 {
+		return ""
 	}
 
-	if desiredLength > 4 {
-		passwordBytes = synth.CharsetPresenceGuarantor(passwordBytes, CharsetLowercaseLetters)
-		passwordBytes = synth.CharsetPresenceGuarantor(passwordBytes, CharsetUppercaseLetters)
-		passwordBytes = synth.CharsetPresenceGuarantor(passwordBytes, CharsetNumbers)
+	requiredCharsets := []string{
+		CharsetLowercaseLetters,
+		CharsetUppercaseLetters,
+		CharsetNumbers,
 	}
-
 	if shouldIncludeSymbols {
-		passwordBytes = synth.CharsetPresenceGuarantor(passwordBytes, CharsetSymbols)
+		requiredCharsets = append(requiredCharsets, CharsetSymbols)
+	}
+
+	alphanumericCharset := CharsetLowercaseLetters +
+		CharsetUppercaseLetters + CharsetNumbers
+	passwordBytes := []byte(
+		synth.randomStringFactory(desiredLength, alphanumericCharset),
+	)
+
+	claimedPositions := make([]int, 0, len(requiredCharsets))
+	for _, requiredCharset := range requiredCharsets {
+		positionIdx, hasFreePosition := synth.unclaimedPositionPicker(
+			desiredLength, claimedPositions,
+		)
+		if !hasFreePosition {
+			break
+		}
+		claimedPositions = append(claimedPositions, positionIdx)
+
+		requiredCharIdx := synth.RandomIntegerGenerator(0, len(requiredCharset)-1)
+		passwordBytes[positionIdx] = requiredCharset[requiredCharIdx]
 	}
 
 	return string(passwordBytes)
@@ -86,7 +181,7 @@ func (synth *Synthesizer) UsernameFactory() string {
 	dummyUsernames := []string{
 		"pike", "spock", "kirk", "scotty", "bones", "uhura", "sulu", "chekov",
 	}
-	return dummyUsernames[mathRand.Intn(len(dummyUsernames))]
+	return dummyUsernames[synth.RandomIntegerGenerator(0, len(dummyUsernames)-1)]
 }
 
 func (synth *Synthesizer) MailAddressFactory(username *string) string {
@@ -98,7 +193,7 @@ func (synth *Synthesizer) MailAddressFactory(username *string) string {
 	atDomains := []string{
 		"@ufp.gov", "@starfleet.gov", "@academy.edu", "@terran.gov",
 	}
-	return *username + atDomains[mathRand.Intn(len(atDomains))]
+	return *username + atDomains[synth.RandomIntegerGenerator(0, len(atDomains)-1)]
 }
 
 type PrivateKeySettings struct {
@@ -142,7 +237,7 @@ func (synth *Synthesizer) privateKeyGenerator(
 			return generatedKey, generateErr
 		}
 		dsaKey := new(dsa.PrivateKey)
-		dsaKey.PublicKey.Parameters = *dsaParameters
+		dsaKey.Parameters = *dsaParameters
 		generateErr = dsa.GenerateKey(dsaKey, cryptoRand.Reader)
 		if generateErr != nil {
 			return generatedKey, generateErr
