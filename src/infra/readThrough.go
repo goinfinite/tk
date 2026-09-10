@@ -2,6 +2,7 @@ package tkInfra
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -103,13 +104,30 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 		return certPath, keyPath, err
 	}
 
-	err = fileClerk.UpdateFileContent(certPathStr, selfSignedCertPem, true)
+	certificateFilePermissions := os.FileMode(0644)
+	err = fileClerk.UpsertFile(FileUpsertSettings{
+		FilePath:             certPath,
+		Permissions:          certificateFilePermissions,
+		ShouldFollowSymlinks: true,
+		ShouldOverwrite:      true,
+	}, []byte(selfSignedCertPem))
 	if err != nil {
-		return certPath, keyPath, errors.New("SelfSignedCertContentUpdateFailed")
+		return certPath, keyPath, fmt.Errorf(
+			"SelfSignedCertContentUpsertFailed: %w", err,
+		)
 	}
-	err = fileClerk.UpdateFileContent(keyPathStr, selfSignedKeyPem, true)
+
+	privateKeyFilePermissions := os.FileMode(0600)
+	err = fileClerk.UpsertFile(FileUpsertSettings{
+		FilePath:             keyPath,
+		Permissions:          privateKeyFilePermissions,
+		ShouldFollowSymlinks: true,
+		ShouldOverwrite:      true,
+	}, []byte(selfSignedKeyPem))
 	if err != nil {
-		return certPath, keyPath, errors.New("SelfSignedKeyContentUpdateFailed")
+		return certPath, keyPath, fmt.Errorf(
+			"SelfSignedKeyContentUpsertFailed: %w", err,
+		)
 	}
 
 	return certPath, keyPath, nil

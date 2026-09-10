@@ -37,7 +37,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\nDB_PORT=5432\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -68,7 +68,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -112,7 +112,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "DB_HOST=localhost\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}
@@ -143,7 +143,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		tempDir := t.TempDir()
 		rawEnvFilePath := filepath.Join(tempDir, ".env")
 		envFileContent := "API_KEY=secret\n"
-		err := fileClerk.UpdateFileContent(rawEnvFilePath, envFileContent, true)
+		err := os.WriteFile(rawEnvFilePath, []byte(envFileContent), 0644)
 		if err != nil {
 			t.Fatalf("CreateTestEnvFileFailed: %v", err)
 		}

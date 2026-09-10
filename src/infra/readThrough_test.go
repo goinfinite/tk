@@ -187,5 +187,21 @@ func TestReadThrough_CertPairFilePathsReader(t *testing.T) {
 		if !fileClerk.FileExists(expectedKeyPathStr) {
 			t.Errorf("KeyFileNotCreated")
 		}
+
+		certFileInfo, certStatErr := os.Stat(expectedCertPathStr)
+		if certStatErr != nil {
+			t.Fatalf("CertStatFailed: %v", certStatErr)
+		}
+		if certFileInfo.Mode().Perm() != 0644 {
+			t.Errorf("CertPermissionsMismatch: %v", certFileInfo.Mode().Perm())
+		}
+
+		keyFileInfo, keyStatErr := os.Stat(expectedKeyPathStr)
+		if keyStatErr != nil {
+			t.Fatalf("KeyStatFailed: %v", keyStatErr)
+		}
+		if keyFileInfo.Mode().Perm() != 0600 {
+			t.Errorf("KeyPermissionsMismatch: %v", keyFileInfo.Mode().Perm())
+		}
 	})
 }

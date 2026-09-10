@@ -84,9 +84,9 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		}
 		envVarStr := envVarName + "=" + envVarValue + "\n"
 
-		err = fileClerk.UpdateFileContent(envFilePathStr, envVarStr, false)
+		err = fileClerk.AppendFileContent(*envsInspector.envFilePath, envVarStr)
 		if err != nil {
-			return errors.New("EnvsInspectorEnvWriteFileError")
+			return errors.New("EnvsInspectorEnvAppendFileError")
 		}
 
 		os.Setenv(envVarName, envVarValue)
