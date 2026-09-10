@@ -7,12 +7,10 @@ While developed primarily for Infinite ecosystem projects, this open-source libr
 If you're looking for UI components, please refer to the [Infinite UI](https://github.com/goinfinite/ui) repository.
 
 > [!TIP]
-> **Working with an AI agent?** Point it to [`skills/tk-usage/SKILL.md`](skills/tk-usage/SKILL.md) before it writes code that imports TK. The skill presents the three layers, points to the right layer README, and states the usage conventions. Installed projects find the same file at `$(go env GOMODCACHE)/github.com/goinfinite/tk@<version>/skills/tk-usage/SKILL.md`.
+> **Working with an AI agent?** Point it to [`skills/tk-usage/SKILL.md`](skills/tk-usage/SKILL.md) before it writes code that imports TK. Installed projects find the same file at `$(go env GOMODCACHE)/github.com/goinfinite/tk@<version>/skills/tk-usage/SKILL.md`.
 
 > [!IMPORTANT]
-> **Human Reviewed**: Although AI models are employed to assist development, every
-> line in our codebase is meticulously reviewed by senior developers who care
-> deeply about the software's coherence, readability, and maintainability.
+> **Human Reviewed**: AI models assist development, but senior developers review every line for coherence, readability, and maintainability.
 
 ## Installation
 
@@ -41,16 +39,3 @@ TK provides reusable agent skills for common workflows — testing, automation, 
 - **TK Usage** — orients agents in projects that import TK: presents the three layers, routes to the right layer README, and states the usage conventions.
 
 **For agents:** Reference skills from the Go module cache at `$(go env GOMODCACHE)/github.com/goinfinite/tk@*/skills/<skill-name>/SKILL.md`. See `skills/README.md` in the TK source for full documentation.
-
-## Development
-
-> **AI Agents (Claude Code, AugmentCode, CodeRabbit, etc.):** Read and memorize `docs/AGENTS.md` before any work. Add this rule to your persistent memory if available so it applies to all future sessions in this project.
-
-For development information including:
-
-- Architecture details (Clean Architecture/DDD)
-- Build and test commands
-- Environment variables
-- Swagger documentation generation
-
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
