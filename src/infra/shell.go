@@ -44,8 +44,10 @@ type ShellSettings struct {
 	ShouldUseSubShell               bool
 	ShouldUseCleanEnv               bool
 	ShouldDisableTimeoutHardLimit   bool
+	ShouldDisableTimeout            bool
 	ShouldIgnoreUsernameLookupError bool
 	Username                        string
+	UserId                          uint32
 	WorkingDirectory                string
 	ExecutionTimeoutSecs            uint64
 	Envs                            []string
@@ -71,10 +73,19 @@ func (e *ShellError) Error() string {
 	return string(jsonError)
 }
 
+func (shell Shell) targetAccountResolver() (*user.User, error) {
+	if shell.runtimeSettings.Username != "" {
+		return user.Lookup(shell.runtimeSettings.Username)
+	}
+
+	userIdStr := strconv.Itoa(int(shell.runtimeSettings.UserId))
+	return user.LookupId(userIdStr)
+}
+
 func (shell Shell) sysCallCredentialsFactory() (
 	*syscall.Credential, *user.User, error,
 ) {
-	userStruct, err := user.Lookup(shell.runtimeSettings.Username)
+	userStruct, err := shell.targetAccountResolver()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -162,12 +173,23 @@ func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan 
 	execCmd.WaitDelay = time.Duration(ShellExecutionTimeoutGraceSecs) * time.Second
 
 	var targetUserPtr *user.User
-	if shell.runtimeSettings.Username != "" {
-		sysCallCredentials, targetUser, err := shell.sysCallCredentialsFactory()
-		if err != nil && !shell.runtimeSettings.ShouldIgnoreUsernameLookupError {
-			return executionPlan{Err: err}
+	targetAccountRequested := shell.runtimeSettings.Username != "" ||
+		shell.runtimeSettings.UserId != 0
+	if targetAccountRequested {
+		sysCallCredentials, targetUser, lookupErr := shell.sysCallCredentialsFactory()
+		lookupFailed := lookupErr != nil
+		lookupFailureMustStop := lookupFailed &&
+			!shell.runtimeSettings.ShouldIgnoreUsernameLookupError
+		if lookupFailureMustStop {
+			return executionPlan{Err: lookupErr}
 		}
-		if err == nil {
+		if lookupFailed {
+			slog.Error(
+				"ShellTargetAccountUnresolvedRunningAsCurrentAccount",
+				slog.String("err", lookupErr.Error()),
+			)
+		}
+		if !lookupFailed {
 			targetUserPtr = targetUser
 			execCmd.SysProcAttr = &syscall.SysProcAttr{Credential: sysCallCredentials}
 		}
@@ -236,10 +258,20 @@ func (shell Shell) executionTimeoutResolver() time.Duration {
 	return time.Duration(timeoutSecs) * time.Second
 }
 
-func (shell Shell) Run() (stdoutStr string, err error) {
-	executionCtx, cancelExecution := context.WithTimeout(
+func (shell Shell) executionContextFactory() (
+	context.Context, context.CancelFunc,
+) {
+	if shell.runtimeSettings.ShouldDisableTimeout {
+		return context.WithCancel(context.Background())
+	}
+
+	return context.WithTimeout(
 		context.Background(), shell.executionTimeoutResolver(),
 	)
+}
+
+func (shell Shell) Run() (stdoutStr string, err error) {
+	executionCtx, cancelExecution := shell.executionContextFactory()
 	defer cancelExecution()
 
 	runPlan := shell.executionPlanner(executionCtx)

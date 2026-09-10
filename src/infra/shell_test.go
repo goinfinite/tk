@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 )
 
@@ -122,7 +123,7 @@ func TestShell(t *testing.T) {
 		runCapture()
 		baselineDescriptors := openDescriptorCount()
 
-		for runIndex := 0; runIndex < 9; runIndex++ {
+		for range 9 {
 			runCapture()
 		}
 
@@ -165,6 +166,101 @@ func TestShell(t *testing.T) {
 		}
 		if shellErr.StdErr != "boom\n" {
 			t.Errorf("Natural124MisreportedAsTimeout: '%s'", shellErr.StdErr)
+		}
+	})
+
+	t.Run("ShouldDisableTimeoutLetsLongCommandFinish", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command:              "sleep",
+			Args:                 []string{"2"},
+			ExecutionTimeoutSecs: 1,
+			ShouldDisableTimeout: true,
+		}).Run()
+		if err != nil {
+			t.Errorf("CommandKilledDespiteDisabledTimeout: %v", err)
+		}
+	})
+
+	t.Run("UserIdRunsCommandAsTargetAccount", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+
+		uidStr, err := NewShell(ShellSettings{
+			Command: "id",
+			Args:    []string{"-u"},
+			UserId:  uint32(nobodyUid),
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if uidStr != nobody.Uid {
+			t.Errorf("UidMismatch: %s vs %s", uidStr, nobody.Uid)
+		}
+
+		gidStr, err := NewShell(ShellSettings{
+			Command: "id",
+			Args:    []string{"-g"},
+			UserId:  uint32(nobodyUid),
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if gidStr != nobody.Gid {
+			t.Errorf("GidMismatch: %s vs %s", gidStr, nobody.Gid)
+		}
+	})
+
+	t.Run("UnresolvableUserIdFailsLoud", func(t *testing.T) {
+		_, err := NewShell(ShellSettings{
+			Command: "true",
+			UserId:  999999,
+		}).Run()
+		if err == nil {
+			t.Errorf("MissingErrorForUnresolvableUserId")
+		}
+	})
+
+	t.Run("UnresolvableUserIdIgnoredByFlag", func(t *testing.T) {
+		stdoutStr, err := NewShell(ShellSettings{
+			Command:                         "id",
+			Args:                            []string{"-u"},
+			UserId:                          999999,
+			ShouldIgnoreUsernameLookupError: true,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if stdoutStr != strconv.Itoa(os.Getuid()) {
+			t.Errorf("ExpectedCurrentUser: %s vs %d", stdoutStr, os.Getuid())
+		}
+	})
+
+	t.Run("UsernameWinsOverUserId", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		stdoutStr, err := NewShell(ShellSettings{
+			Command:  "id",
+			Args:     []string{"-u"},
+			Username: "root",
+			UserId:   999999,
+		}).Run()
+		if err != nil {
+			t.Fatalf("RunFailed: %v", err)
+		}
+		if stdoutStr != "0" {
+			t.Errorf("ExpectedRootUid: %s", stdoutStr)
 		}
 	})
 }
