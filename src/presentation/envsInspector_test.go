@@ -84,9 +84,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		autoFillableEnvVars := []string{"DB_PASSWORD"}
 		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
 
-		if unsetErr := os.Unsetenv("DB_PASSWORD"); unsetErr != nil {
-			t.Fatalf("UnsetenvFailed: %v", unsetErr)
-		}
+		t.Setenv("DB_PASSWORD", "")
 
 		err = envsInspector.Inspect()
 		if err != nil {
@@ -130,9 +128,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		autoFillableEnvVars := []string{"DB_PASSWORD"}
 		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
 
-		if unsetErr := os.Unsetenv("DB_PASSWORD"); unsetErr != nil {
-			t.Fatalf("UnsetenvFailed: %v", unsetErr)
-		}
+		t.Setenv("DB_PASSWORD", "")
 
 		err = envsInspector.Inspect()
 		if err != nil {
@@ -169,9 +165,7 @@ func TestEnvsInspectorInspect(t *testing.T) {
 		autoFillableEnvVars := []string{}
 		envsInspector := NewEnvsInspector(&envFilePath, requiredEnvVars, autoFillableEnvVars)
 
-		if unsetErr := os.Unsetenv("DB_USER"); unsetErr != nil {
-			t.Fatalf("UnsetenvFailed: %v", unsetErr)
-		}
+		t.Setenv("DB_USER", "")
 
 		err = envsInspector.Inspect()
 		if err == nil {
