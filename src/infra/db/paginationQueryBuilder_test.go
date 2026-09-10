@@ -12,8 +12,9 @@ import (
 )
 
 type testPaginationModel struct {
-	ID   uint64 `gorm:"primaryKey"`
-	Name string
+	ID        uint64 `gorm:"primaryKey"`
+	Name      string
+	LastRunAt *time.Time
 }
 
 type testPaginationCustomPkModel struct {
@@ -21,8 +22,15 @@ type testPaginationCustomPkModel struct {
 	Name     string
 }
 
+type testPaginationCapitalIdModel struct {
+	ID   uint64 `gorm:"column:ID;primaryKey"`
+	Name string
+}
+
 func TestPaginationQueryBuilder(t *testing.T) {
 	sortByName, _ := tkValueObject.NewPaginationSortBy("name")
+	sortByLastRunAt, _ := tkValueObject.NewPaginationSortBy("lastRunAt")
+	sortByUnknown, _ := tkValueObject.NewPaginationSortBy("notAField")
 	lastSeenId5, _ := tkValueObject.NewPaginationLastSeenId("5")
 
 	testCases := []struct {
@@ -42,7 +50,7 @@ func TestPaginationQueryBuilder(t *testing.T) {
 				PageNumber:   0,
 				ItemsPerPage: 0,
 			},
-			expectedError: errItemsPerPageCannotBeZero,
+			expectedError: ErrItemsPerPageCannotBeZero.Error(),
 		},
 		{
 			name:             "FirstPage",
@@ -130,6 +138,30 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			expectedPagesTotal:    4,
 			expectedResultCount:   3,
 			expectedFirstItemName: "item6",
+		},
+		{
+			name:             "SortByCamelCaseMultiWordDesc",
+			primaryKeyColumn: "id",
+			requestPagination: tkDto.Pagination{
+				PageNumber:    0,
+				ItemsPerPage:  3,
+				SortBy:        &sortByLastRunAt,
+				SortDirection: &tkValueObject.PaginationSortDirectionDesc,
+			},
+			expectedItemsTotal:    10,
+			expectedPagesTotal:    4,
+			expectedResultCount:   3,
+			expectedFirstItemName: "item10",
+		},
+		{
+			name:             "SortByUnknownField",
+			primaryKeyColumn: "id",
+			requestPagination: tkDto.Pagination{
+				PageNumber:   0,
+				ItemsPerPage: 3,
+				SortBy:       &sortByUnknown,
+			},
+			expectedError: "UnknownPaginationSortFieldError: notAField",
 		},
 	}
 
@@ -255,6 +287,100 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			)
 		}
 	})
+
+	t.Run("LastSeenIdWithCustomPrimaryKeySchemaDefault", func(t *testing.T) {
+		dbSvc := setupTestDb(t)
+		dbQuery := dbSvc.Model(&testPaginationCustomPkModel{})
+
+		paginatedQuery, _, err := PaginationQueryBuilder(
+			dbQuery,
+			tkDto.Pagination{
+				ItemsPerPage: 3,
+				LastSeenId:   &lastSeenId5,
+			},
+			"",
+		)
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		var queryResults []testPaginationCustomPkModel
+		err = paginatedQuery.Find(&queryResults).Error
+		if err != nil {
+			t.Fatalf("ExecuteQueryFailed: %v", err)
+		}
+
+		if len(queryResults) != 3 || queryResults[0].Name != "item6" {
+			t.Errorf(
+				"UnexpectedResults: count %d, first %v",
+				len(queryResults), queryResults,
+			)
+		}
+	})
+
+	t.Run("SortByCustomPrimaryKeyColumn", func(t *testing.T) {
+		dbSvc := setupTestDb(t)
+		dbQuery := dbSvc.Model(&testPaginationCustomPkModel{})
+		sortByCustomId, _ := tkValueObject.NewPaginationSortBy("customId")
+
+		paginatedQuery, _, err := PaginationQueryBuilder(
+			dbQuery,
+			tkDto.Pagination{
+				ItemsPerPage:  3,
+				SortBy:        &sortByCustomId,
+				SortDirection: &tkValueObject.PaginationSortDirectionDesc,
+			},
+			"",
+		)
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		var queryResults []testPaginationCustomPkModel
+		err = paginatedQuery.Find(&queryResults).Error
+		if err != nil {
+			t.Fatalf("ExecuteQueryFailed: %v", err)
+		}
+
+		if len(queryResults) != 3 || queryResults[0].Name != "item10" {
+			t.Errorf(
+				"UnexpectedResults: count %d, first %v",
+				len(queryResults), queryResults,
+			)
+		}
+	})
+
+	t.Run("SortByCapitalIdPrimaryKeyColumn", func(t *testing.T) {
+		dbSvc := setupTestDb(t)
+		dbQuery := dbSvc.Model(&testPaginationCapitalIdModel{})
+		sortByCapitalId, _ := tkValueObject.NewPaginationSortBy("ID")
+
+		paginatedQuery, _, err := PaginationQueryBuilder(
+			dbQuery,
+			tkDto.Pagination{
+				ItemsPerPage:  3,
+				SortBy:        &sortByCapitalId,
+				SortDirection: &tkValueObject.PaginationSortDirectionAsc,
+			},
+			"",
+		)
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		var queryResults []testPaginationCapitalIdModel
+		err = paginatedQuery.Find(&queryResults).Error
+		if err != nil {
+			t.Fatalf("ExecuteQueryFailed: %v", err)
+		}
+
+		if len(queryResults) != 3 || queryResults[0].Name != "item1" {
+			t.Errorf(
+				"UnexpectedResults: count %d, first %v",
+				len(queryResults), queryResults,
+			)
+		}
+	})
 }
 
 func setupTestDb(t *testing.T) *gorm.DB {
@@ -271,6 +397,7 @@ func setupTestDb(t *testing.T) *gorm.DB {
 	err = dbSvc.AutoMigrate(
 		&testPaginationModel{},
 		&testPaginationCustomPkModel{},
+		&testPaginationCapitalIdModel{},
 	)
 	if err != nil {
 		t.Fatalf("MigrateTestDbFailed: %v", err)
@@ -278,9 +405,10 @@ func setupTestDb(t *testing.T) *gorm.DB {
 
 	for itemIndex := 1; itemIndex <= 10; itemIndex++ {
 		itemName := fmt.Sprintf("item%d", itemIndex)
+		lastRunAt := time.Unix(int64(1700000000+itemIndex*60), 0).UTC()
 		err = dbSvc.Create(
 			&testPaginationModel{
-				ID: uint64(itemIndex), Name: itemName,
+				ID: uint64(itemIndex), Name: itemName, LastRunAt: &lastRunAt,
 			},
 		).Error
 		if err != nil {
@@ -289,6 +417,14 @@ func setupTestDb(t *testing.T) *gorm.DB {
 		err = dbSvc.Create(
 			&testPaginationCustomPkModel{
 				CustomID: uint64(itemIndex), Name: itemName,
+			},
+		).Error
+		if err != nil {
+			t.Fatalf("InsertTestDataFailed: %v", err)
+		}
+		err = dbSvc.Create(
+			&testPaginationCapitalIdModel{
+				ID: uint64(itemIndex), Name: itemName,
 			},
 		).Error
 		if err != nil {

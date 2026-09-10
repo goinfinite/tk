@@ -2,32 +2,54 @@ package tkInfraDb
 
 import (
 	"errors"
-	"math"
-	"strings"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
-	"github.com/iancoleman/strcase"
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	"gorm.io/gorm"
 )
 
 const (
-	errItemsPerPageCannotBeZero string = "ItemsPerPageCannotBeZero"
-	errCountItemsTotalError     string = "CountItemsTotalError"
+	errCountItemsTotalError            string = "CountItemsTotalError"
+	errParseStatementSchemaError       string = "ParseStatementSchemaError"
+	errUnknownPaginationSortFieldError string = "UnknownPaginationSortFieldError"
+	errModelWithoutPrimaryKeyError     string = "ModelWithoutPrimaryKeyError"
 )
+
+func resolveOrderStatement(
+	statement *gorm.Statement,
+	sortBy tkValueObject.PaginationSortBy,
+	sortDirectionPtr *tkValueObject.PaginationSortDirection,
+) (orderStatement string, err error) {
+	sortField := statement.Schema.LookUpField(sortBy.String())
+	if sortField == nil {
+		return "", errors.New(
+			errUnknownPaginationSortFieldError + ": " + sortBy.String(),
+		)
+	}
+
+	orderStatement = statement.Quote(sortField.DBName)
+	if sortDirectionPtr != nil {
+		orderStatement += " " + sortDirectionPtr.String()
+	}
+	return orderStatement, nil
+}
 
 func PaginationQueryBuilder(
 	dbQuery *gorm.DB,
 	requestPagination tkDto.Pagination,
 	primaryKeyColumn string,
 ) (paginatedQuery *gorm.DB, responsePagination tkDto.Pagination, err error) {
-	if requestPagination.ItemsPerPage == 0 {
-		return paginatedQuery, responsePagination, errors.New(errItemsPerPageCannotBeZero)
+	err = dbQuery.Statement.Parse(dbQuery.Statement.Model)
+	if err != nil {
+		return paginatedQuery, responsePagination,
+			errors.New(errParseStatementSchemaError + ": " + err.Error())
 	}
 
 	var itemsTotal int64
 	err = dbQuery.Count(&itemsTotal).Error
 	if err != nil {
-		return paginatedQuery, responsePagination, errors.New(errCountItemsTotalError + ": " + err.Error())
+		return paginatedQuery, responsePagination,
+			errors.New(errCountItemsTotalError + ": " + err.Error())
 	}
 
 	paginatedQuery = dbQuery.Limit(int(requestPagination.ItemsPerPage))
@@ -38,30 +60,40 @@ func PaginationQueryBuilder(
 			paginatedQuery = paginatedQuery.Offset(offset)
 		}
 	default:
-		cursorColumn := "id"
-		if primaryKeyColumn != "" {
-			cursorColumn = primaryKeyColumn
+		cursorColumn := primaryKeyColumn
+		if cursorColumn == "" {
+			primaryField := dbQuery.Statement.Schema.PrioritizedPrimaryField
+			if primaryField == nil {
+				return paginatedQuery, responsePagination,
+					errors.New(errModelWithoutPrimaryKeyError)
+			}
+			cursorColumn = primaryField.DBName
 		}
 		paginatedQuery = paginatedQuery.Where(
-			cursorColumn+" > ?",
+			dbQuery.Statement.Quote(cursorColumn)+" > ?",
 			requestPagination.LastSeenId.String(),
 		)
 	}
 
 	if requestPagination.SortBy != nil {
-		orderStatement := requestPagination.SortBy.String()
-		orderStatement = strings.ToLower(orderStatement)
-		orderStatement = strcase.ToSnake(orderStatement)
-		if requestPagination.SortDirection != nil {
-			orderStatement += " " + requestPagination.SortDirection.String()
+		orderStatement, resolveErr := resolveOrderStatement(
+			dbQuery.Statement,
+			*requestPagination.SortBy,
+			requestPagination.SortDirection,
+		)
+		if resolveErr != nil {
+			return paginatedQuery, responsePagination, resolveErr
 		}
 		paginatedQuery = paginatedQuery.Order(orderStatement)
 	}
 
 	itemsTotalUint := uint64(itemsTotal)
-	pagesTotal := uint32(
-		math.Ceil(float64(itemsTotal) / float64(requestPagination.ItemsPerPage)),
+	pagesTotal, err := PaginationPagesTotalResolver(
+		itemsTotalUint, requestPagination.ItemsPerPage,
 	)
+	if err != nil {
+		return paginatedQuery, responsePagination, err
+	}
 
 	return paginatedQuery, tkDto.Pagination{
 		PageNumber:    requestPagination.PageNumber,
