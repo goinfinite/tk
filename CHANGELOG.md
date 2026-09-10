@@ -20,6 +20,7 @@ fix: UnixAbsoluteFilePath and UnixRelativeFilePath no longer treat a dotfile's l
 refactor: extract the page-count rule to PaginationPagesTotalResolver(itemsTotal, itemsPerPage). A partial page counts as a page. Zero page size fails with ErrItemsPerPageCannotBeZero; a page count beyond uint32 fails with ErrPagesTotalOverflow, both checked only in the resolver.
 fix: EnvsInspector separates an auto-filled variable from a .env file that lacks a trailing newline.
 test: cover UpsertFile, AppendFileContent, VerifyDirPathRedirectSafety, the temp-name factories, PaginationPagesTotalResolver, PasswordFactory class guarantees, schema-resolved sorting, custom primary key cursors, and the ShouldDisableTimeout and UserId shell settings.
+test: modernize trailDatabaseService_test.go. t.Setenv replaces the manual env save/restore and clears the errcheck findings; critical failures use t.Fatalf; extra-model migration is verified through NewTrailDatabaseService and the created table, not the private dbMigrate.
 
 0.3.3 - 2026/09/03
 fix: CLI logs no longer corrupt the machine-readable stdout channel. All logs go to stderr, so stdout carries only the JSON response in every session mode, LOG_LEVEL=debug included. LOG_LEVEL matching is case-insensitive.
