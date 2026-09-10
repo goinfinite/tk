@@ -3334,6 +3334,36 @@ func TestVerifyDirPathRedirectSafety(t *testing.T) {
 		}
 	})
 
+	t.Run("AcceptsUserIdWithoutAccountEntry", func(t *testing.T) {
+		unresolvableUserIdFinder := func() uint32 {
+			for candidate := uint32(999999); candidate > 0; candidate-- {
+				_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
+				if lookupErr != nil {
+					return candidate
+				}
+			}
+
+			t.Fatal("NoUnresolvableUserIdFound")
+			return 0
+		}
+
+		unresolvableUserIdVo, userIdErr := tkValueObject.NewUnixUserId(
+			unresolvableUserIdFinder(),
+		)
+		if userIdErr != nil {
+			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
+		}
+
+		err := clerk.VerifyDirPathRedirectSafety(
+			absoluteFilePathForTest(t, tempDir), nil, &unresolvableUserIdVo,
+		)
+		if err != nil && !errors.Is(err, ErrDirectoryOwnerInvalid) {
+			t.Errorf(
+				"ExpectedOwnershipComparisonNotAccountLookup, got: %v", err,
+			)
+		}
+	})
+
 	t.Run("HandleStaysOnOriginalInodeAfterPathSwap", func(t *testing.T) {
 		parentDir := filepath.Join(tempDir, "pinning")
 		originalDir := filepath.Join(parentDir, "original")

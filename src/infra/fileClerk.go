@@ -1166,47 +1166,57 @@ func (FileClerk) RemoveSymlink(symlinkPath string) error {
 	return os.Remove(symlinkPath)
 }
 
-func (FileClerk) ownerIdsResolver(
+func (FileClerk) ownerUserIdResolver(
 	ownerUsernamePtr *tkValueObject.UnixUsername,
 	ownerUserIdPtr *tkValueObject.UnixUserId,
-) (tkValueObject.UnixUserId, tkValueObject.UnixGroupId, error) {
-	if ownerUsernamePtr == nil && ownerUserIdPtr == nil {
-		processUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
-		processGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
-		if userIdErr != nil || groupIdErr != nil {
-			return 0, 0, errors.Join(userIdErr, groupIdErr)
-		}
-
-		return processUserId, processGroupId, nil
-	}
-
-	accountIdentifier := ""
-	var account *user.User
-	var lookupErr error
+) (tkValueObject.UnixUserId, error) {
 	switch {
 	case ownerUsernamePtr != nil:
-		accountIdentifier = ownerUsernamePtr.String()
-		account, lookupErr = user.Lookup(accountIdentifier)
+		account, lookupErr := user.Lookup(ownerUsernamePtr.String())
+		if lookupErr != nil {
+			return 0, fmt.Errorf(
+				"OwnerLookupFailed: %s: %w", ownerUsernamePtr.String(), lookupErr,
+			)
+		}
+
+		resolvedUserId, userIdErr := tkValueObject.NewUnixUserId(account.Uid)
+		if userIdErr != nil {
+			return 0, fmt.Errorf(
+				"OwnerIdParseFailed: %s: %w", account.Username, userIdErr,
+			)
+		}
+
+		return resolvedUserId, nil
+	case ownerUserIdPtr != nil:
+		return *ownerUserIdPtr, nil
 	default:
-		accountIdentifier = ownerUserIdPtr.String()
-		account, lookupErr = user.LookupId(accountIdentifier)
+		processUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
+		if userIdErr != nil {
+			return 0, userIdErr
+		}
+
+		return processUserId, nil
 	}
+}
+
+func (FileClerk) ownerGroupIdResolver(
+	ownerUserId tkValueObject.UnixUserId,
+) (tkValueObject.UnixGroupId, error) {
+	account, lookupErr := user.LookupId(ownerUserId.String())
 	if lookupErr != nil {
-		return 0, 0, fmt.Errorf(
-			"OwnerLookupFailed: %s: %w", accountIdentifier, lookupErr,
+		return 0, fmt.Errorf(
+			"OwnerLookupFailed: %s: %w", ownerUserId.String(), lookupErr,
 		)
 	}
 
-	resolvedUserId, userIdErr := tkValueObject.NewUnixUserId(account.Uid)
 	resolvedGroupId, groupIdErr := tkValueObject.NewUnixGroupId(account.Gid)
-	if userIdErr != nil || groupIdErr != nil {
-		return 0, 0, fmt.Errorf(
-			"OwnerIdParseFailed: %s: %w",
-			account.Username, errors.Join(userIdErr, groupIdErr),
+	if groupIdErr != nil {
+		return 0, fmt.Errorf(
+			"OwnerIdParseFailed: %s: %w", account.Username, groupIdErr,
 		)
 	}
 
-	return resolvedUserId, resolvedGroupId, nil
+	return resolvedGroupId, nil
 }
 
 func (FileClerk) openRedirectProofDirChain(
@@ -1284,7 +1294,7 @@ func (clerk FileClerk) VerifyDirPathRedirectSafety(
 	ownerUsernamePtr *tkValueObject.UnixUsername,
 	ownerUserIdPtr *tkValueObject.UnixUserId,
 ) error {
-	ownerUserId, _, resolveErr := clerk.ownerIdsResolver(
+	ownerUserId, resolveErr := clerk.ownerUserIdResolver(
 		ownerUsernamePtr, ownerUserIdPtr,
 	)
 	if resolveErr != nil {
@@ -1307,7 +1317,7 @@ func (clerk FileClerk) AppendFileContent(
 		return ErrFileNameInvalid
 	}
 
-	ownerUserId, _, resolveErr := clerk.ownerIdsResolver(nil, nil)
+	ownerUserId, resolveErr := clerk.ownerUserIdResolver(nil, nil)
 	if resolveErr != nil {
 		return resolveErr
 	}
@@ -1393,7 +1403,7 @@ func (clerk FileClerk) UpsertFile(
 		return ErrFileNameInvalid
 	}
 
-	ownerUserId, ownerGroupId, resolveErr := clerk.ownerIdsResolver(
+	ownerUserId, resolveErr := clerk.ownerUserIdResolver(
 		settings.OwnerUsername, settings.OwnerUserId,
 	)
 	if resolveErr != nil {
@@ -1415,6 +1425,11 @@ func (clerk FileClerk) UpsertFile(
 	}
 	shouldChown := settings.OwnerUsername != nil || settings.OwnerUserId != nil
 	if shouldChown {
+		ownerGroupId, groupResolveErr := clerk.ownerGroupIdResolver(ownerUserId)
+		if groupResolveErr != nil {
+			return groupResolveErr
+		}
+
 		writeSettings.OwnerUserId = &ownerUserId
 		writeSettings.OwnerGroupId = &ownerGroupId
 	}
