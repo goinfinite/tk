@@ -22,6 +22,7 @@ fix: EnvsInspector separates an auto-filled variable from a .env file that lacks
 test: cover UpsertFile, AppendFileContent, VerifyDirPathRedirectSafety, the temp-name factories, PaginationPagesTotalResolver, PasswordFactory class guarantees, schema-resolved sorting, custom primary key cursors, and the ShouldDisableTimeout and UserId shell settings.
 test: modernize trailDatabaseService_test.go with t.Setenv, t.Fatalf for critical failures, and extra-model migration coverage through NewTrailDatabaseService instead of the private dbMigrate.
 refactor: remove FingerprintSHA1 from X509Certificate (weak hash, go:S4790); FingerprintSHA256 remains. Breaking change to the constructor and the fingerprintSha1 JSON field.
+docs: split the component catalog into layer READMEs (domain, infra, presentation) and restructure skills into the OpenCode layout with a new tk-usage skill.
 
 0.3.3 - 2026/09/03
 fix: CLI logs no longer corrupt the machine-readable stdout channel. All logs go to stderr, so stdout carries only the JSON response in every session mode, LOG_LEVEL=debug included. LOG_LEVEL matching is case-insensitive.
