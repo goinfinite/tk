@@ -248,3 +248,13 @@ Catches panics, logs stack traces, and returns safe error responses.
 1. `src/presentation/middleware/panicHandler.go` — `ApiPanicHandler` is Echo middleware that catches panics, writes stack traces to `logs/panic.log`, filters domain-layer frames, and returns HTTP 500 with masked error for untrusted clients; `CliPanicHandler` does the same for CLI via `defer`
 
 ---
+
+## Transient Key-Value Store
+
+Keeps ephemeral key-value pairs in a shared in-memory SQLite database. The data vanishes when the process ends.
+
+**Flow:**
+
+1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Read` returns `ErrKeyNotFound` for a missing key
+
+---
