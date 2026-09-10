@@ -2,7 +2,10 @@ package tkInfraDb
 
 import "errors"
 
-var ErrItemsPerPageCannotBeZero = errors.New("ItemsPerPageCannotBeZero")
+var (
+	ErrItemsPerPageCannotBeZero = errors.New("ItemsPerPageCannotBeZero")
+	ErrPagesTotalOverflow       = errors.New("PagesTotalOverflow")
+)
 
 func PaginationPagesTotalResolver(
 	itemsTotal uint64,
@@ -13,6 +16,15 @@ func PaginationPagesTotalResolver(
 	}
 
 	perPage := uint64(itemsPerPage)
-	fullPagesIncludingPartialLast := (itemsTotal + perPage - 1) / perPage
-	return uint32(fullPagesIncludingPartialLast), nil
+	fullPages := itemsTotal / perPage
+	if itemsTotal%perPage != 0 {
+		fullPages++
+	}
+
+	maxUint32 := uint64(^uint32(0))
+	if fullPages > maxUint32 {
+		return 0, ErrPagesTotalOverflow
+	}
+
+	return uint32(fullPages), nil
 }

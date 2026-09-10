@@ -43,6 +43,18 @@ func TestPaginationPagesTotalResolver(t *testing.T) {
 			itemsPerPage:  0,
 			expectedError: ErrItemsPerPageCannotBeZero,
 		},
+		{
+			name:          "PagesTotalOverflow",
+			itemsTotal:    1 << 32,
+			itemsPerPage:  1,
+			expectedError: ErrPagesTotalOverflow,
+		},
+		{
+			name:          "PagesTotalOverflowAtMaxItemsTotal",
+			itemsTotal:    ^uint64(0),
+			itemsPerPage:  2,
+			expectedError: ErrPagesTotalOverflow,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -64,10 +76,10 @@ func TestPaginationPagesTotalResolver(t *testing.T) {
 						testCase.expectedError, err,
 					)
 				}
-				if err.Error() != ErrItemsPerPageCannotBeZero.Error() {
+				if err.Error() != testCase.expectedError.Error() {
 					t.Errorf(
 						"UnexpectedErrorMessage: expected %s, got %v",
-						ErrItemsPerPageCannotBeZero.Error(), err,
+						testCase.expectedError.Error(), err,
 					)
 				}
 				return
