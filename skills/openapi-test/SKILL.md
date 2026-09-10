@@ -1,7 +1,8 @@
 ---
-shortDescription: Tests OpenAPI/Swagger specs by generating and maintaining deterministic shell scripts.
+name: openapi-test
+description: Use when testing OpenAPI/Swagger specs in a project — generates and maintains deterministic curl-based shell scripts.
 version: 1.0.0
-lastUpdated: 2026-06-30
+lastUpdated: 2026-09-10
 ---
 
 ## Purpose
