@@ -3,6 +3,7 @@ package tkInfra
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -185,13 +186,18 @@ func TestDnsLookupExecute(t *testing.T) {
 		}
 	})
 
-	t.Run("LocalhostReturnsLoopbackViaLocalResolver", func(t *testing.T) {
+	t.Run("LocalhostReturnsLoopbackWithoutDnsServer", func(t *testing.T) {
 		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
 		if err != nil {
 			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
 		}
 
-		lookup := NewDnsLookup(DnsLookupSettings{})
+		lookup := NewDnsLookup(DnsLookupSettings{
+			PrimaryResolver:   nonRoutableTestNetOneIpAddress,
+			SecondaryResolver: nonRoutableTestNetOneIpAddress,
+			QueryTimeoutSecs:  1,
+			DialTimeoutMs:     500,
+		})
 
 		results, lookupErr := lookup.Execute(
 			localhostHostname, &tkValueObject.DnsRecordTypeA,
@@ -200,14 +206,7 @@ func TestDnsLookupExecute(t *testing.T) {
 			t.Fatalf("LocalhostLookupFailed: %v", lookupErr)
 		}
 
-		foundLoopback := false
-		for _, result := range results {
-			if result == localhostLoopbackIpAddress {
-				foundLoopback = true
-				break
-			}
-		}
-		if !foundLoopback {
+		if !slices.Contains(results, localhostLoopbackIpAddress) {
 			t.Errorf(
 				"LocalResolverShouldReturnLoopback: got %v, expected to contain '%s'",
 				results, localhostLoopbackIpAddress,
@@ -215,32 +214,35 @@ func TestDnsLookupExecute(t *testing.T) {
 		}
 	})
 
-	t.Run("LocalhostBypassedSkipsLocalLookup", func(t *testing.T) {
+	t.Run("LocalhostBypassedSkipsHostsFile", func(t *testing.T) {
 		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
 		if err != nil {
 			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
+			PrimaryResolver:           nonRoutableTestNetOneIpAddress,
+			SecondaryResolver:         nonRoutableTestNetOneIpAddress,
+			QueryTimeoutSecs:          1,
+			DialTimeoutMs:             500,
 			ShouldBypassLocalResolver: true,
 		})
 
 		results, lookupErr := lookup.Execute(
 			localhostHostname, &tkValueObject.DnsRecordTypeA,
 		)
-		if lookupErr != nil &&
-			lookupErr.Error() != ErrDnsLookupResponseNameError.Error() {
-			t.Fatalf("BypassedLocalhostLookupFailed: %v", lookupErr)
+		if lookupErr == nil {
+			t.Errorf(
+				"BypassedLocalhostShouldNotResolveWithoutDnsServer: got %v",
+				results,
+			)
 		}
 
-		for _, result := range results {
-			if result == localhostLoopbackIpAddress {
-				t.Errorf(
-					"BypassedLocalhostNotContainLoopback: %v contains '%s'",
-					results, localhostLoopbackIpAddress,
-				)
-				break
-			}
+		if slices.Contains(results, localhostLoopbackIpAddress) {
+			t.Errorf(
+				"BypassedLocalhostNotContainLoopback: %v contains '%s'",
+				results, localhostLoopbackIpAddress,
+			)
 		}
 	})
 
@@ -319,14 +321,7 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 				return
 			}
 
-			foundKnownAddress := false
-			for _, result := range results {
-				if result == testCase.expectKnownIp {
-					foundKnownAddress = true
-					break
-				}
-			}
-			if !foundKnownAddress {
+			if !slices.Contains(results, testCase.expectKnownIp) {
 				t.Errorf(
 					"ExpectedIpMissing: got %v, expected to contain '%s'",
 					results, testCase.expectKnownIp,
