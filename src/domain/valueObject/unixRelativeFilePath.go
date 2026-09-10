@@ -75,6 +75,19 @@ func (vo UnixRelativeFilePath) ReadFileName() (UnixFileName, error) {
 }
 
 func (vo UnixRelativeFilePath) ReadFileExtension() (UnixFileExtension, error) {
+	fileName, fileNameErr := vo.ReadFileName()
+	if fileNameErr != nil {
+		return "", fileNameErr
+	}
+
+	fileNameWithoutLeadingDots := strings.TrimLeft(fileName.String(), ".")
+	isExtensionlessDotfile := strings.HasPrefix(fileName.String(), ".") &&
+		fileNameWithoutLeadingDots != "" &&
+		!strings.Contains(fileNameWithoutLeadingDots, ".")
+	if isExtensionlessDotfile {
+		return NewUnixFileExtension("")
+	}
+
 	unixFileExtensionStr := filepath.Ext(string(vo))
 	return NewUnixFileExtension(unixFileExtensionStr)
 }
@@ -85,7 +98,9 @@ func (vo UnixRelativeFilePath) ReadCompoundFileExtension() (UnixFileExtension, e
 		return "", fileNameErr
 	}
 
-	fileNameParts := strings.Split(fileName.String(), ".")
+	fileNameParts := strings.Split(
+		strings.TrimPrefix(fileName.String(), "."), ".",
+	)
 	if len(fileNameParts) < 3 {
 		return vo.ReadFileExtension()
 	}

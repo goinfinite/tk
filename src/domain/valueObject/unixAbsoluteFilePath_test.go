@@ -173,6 +173,8 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.txt"), UnixAbsoluteFilePath("/home/file")},
 			{UnixAbsoluteFilePath("/home/file"), UnixAbsoluteFilePath("/home/file")},
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixAbsoluteFilePath("/home/file")},
+			{UnixAbsoluteFilePath("/home/.hidden"), UnixAbsoluteFilePath("/home/.hidden")},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixAbsoluteFilePath("/home/.config")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -274,6 +276,8 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileName("file"), false},
 			{UnixAbsoluteFilePath("/home/file"), UnixFileName("file"), false},
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileName("file"), false},
+			{UnixAbsoluteFilePath("/home/.hidden"), UnixFileName(".hidden"), false},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixFileName(".config"), false},
 			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},

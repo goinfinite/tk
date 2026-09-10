@@ -92,6 +92,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.tar.gz"), UnixRelativeFilePath("./file")},
 			{UnixRelativeFilePath("./file"), UnixRelativeFilePath("./file")},
 			{UnixRelativeFilePath("./файл.txt"), UnixRelativeFilePath("./файл")},
+			{UnixRelativeFilePath("./.hidden"), UnixRelativeFilePath("./.hidden")},
+			{UnixRelativeFilePath("./.config.json"), UnixRelativeFilePath("./.config")},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -195,6 +197,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file"), false},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixFileName("file"), false},
 			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл"), false},
+			{UnixRelativeFilePath("./.hidden"), UnixFileName(".hidden"), false},
+			{UnixRelativeFilePath("./.config.json"), UnixFileName(".config"), false},
 			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
 			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
 		}
