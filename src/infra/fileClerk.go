@@ -26,6 +26,15 @@ const (
 	tempFileNameEntropyChars                 = 8
 )
 
+// A swap can land a FIFO at the target name. A blocking open would wait for a
+// peer and never reach the swap verifier, so target opens never block.
+const (
+	targetFileReadOpenFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC |
+		unix.O_NONBLOCK
+	targetFileAppendOpenFlags = unix.O_WRONLY | unix.O_APPEND | unix.O_NOFOLLOW |
+		unix.O_CLOEXEC | unix.O_NONBLOCK
+)
+
 var (
 	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
 	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
@@ -46,6 +55,7 @@ var (
 	ErrFileTooLarge                 = errors.New("FileTooLarge")
 	ErrTargetIsSymlink              = errors.New("TargetIsSymlink")
 	ErrTargetNotDirectory           = errors.New("TargetNotDirectory")
+	ErrTargetNotRegularFile         = errors.New("TargetNotRegularFile")
 	ErrDirPathTraversalInvalid      = errors.New("DirPathParentTraversalNotAllowed")
 	ErrSymlinkedPathInvalid         = errors.New("PathComponentIsSymlink")
 	ErrDirectoryOwnerInvalid        = errors.New("DirectoryNotOwnedByExpectedOwner")
@@ -58,6 +68,7 @@ var (
 	ErrOwnerSourceInvalid           = errors.New("OwnerSourceInvalid")
 	ErrOwnerSourceConflict          = errors.New("OwnerSourceConflictsWithStatedOwner")
 	ErrFileOwnerChangeFailed        = errors.New("FileOwnerChangeFailed")
+	ErrTargetFileChanged            = errors.New("TargetFileChanged")
 )
 
 type FileClerkSymlinkPolicy string
@@ -658,6 +669,8 @@ type targetFileState struct {
 	OwnerGroupId tkValueObject.UnixGroupId
 	Permissions  os.FileMode
 	SizeBytes    int64
+	DeviceId     uint64
+	InodeId      uint64
 }
 
 func (clerk FileClerk) targetFileStateReader(
@@ -675,13 +688,6 @@ func (clerk FileClerk) targetFileStateReader(
 		return fileState, statErr
 	}
 
-	fileState.Exists = true
-	entryFormat := entryStat.Mode & unix.S_IFMT
-	fileState.IsSymlink = entryFormat == unix.S_IFLNK
-	fileState.IsDirectory = entryFormat == unix.S_IFDIR
-	fileState.Permissions = clerk.unixFileModeConverter(entryStat.Mode)
-	fileState.SizeBytes = entryStat.Size
-
 	ownerUserId, userIdErr := tkValueObject.NewUnixUserId(entryStat.Uid)
 	if userIdErr != nil {
 		return fileState, userIdErr
@@ -690,8 +696,19 @@ func (clerk FileClerk) targetFileStateReader(
 	if groupIdErr != nil {
 		return fileState, groupIdErr
 	}
-	fileState.OwnerUserId = ownerUserId
-	fileState.OwnerGroupId = ownerGroupId
+
+	entryFormat := entryStat.Mode & unix.S_IFMT
+	fileState = targetFileState{
+		Exists:       true,
+		IsSymlink:    entryFormat == unix.S_IFLNK,
+		IsDirectory:  entryFormat == unix.S_IFDIR,
+		OwnerUserId:  ownerUserId,
+		OwnerGroupId: ownerGroupId,
+		Permissions:  clerk.unixFileModeConverter(entryStat.Mode),
+		SizeBytes:    entryStat.Size,
+		DeviceId:     entryStat.Dev,
+		InodeId:      entryStat.Ino,
+	}
 
 	return fileState, nil
 }
@@ -1366,6 +1383,53 @@ func (FileClerk) targetFileStateValidator(
 	return nil
 }
 
+func (FileClerk) targetFileSwapVerifier(
+	fileHandle int,
+	targetState targetFileState,
+) error {
+	openedFileStat := unix.Stat_t{}
+	statErr := unix.Fstat(fileHandle, &openedFileStat)
+	if statErr != nil {
+		return statErr
+	}
+
+	identityChanged := openedFileStat.Dev != targetState.DeviceId ||
+		openedFileStat.Ino != targetState.InodeId
+	if identityChanged {
+		return ErrTargetFileChanged
+	}
+
+	return nil
+}
+
+func (clerk FileClerk) targetFileReadHandleOpener(
+	dirHandle int,
+	targetFileName tkValueObject.UnixFileName,
+	targetState targetFileState,
+) (fileHandle int, err error) {
+	fileHandle, openErr := unix.Openat(
+		dirHandle, targetFileName.String(), targetFileReadOpenFlags, 0,
+	)
+	if openErr != nil {
+		switch {
+		case errors.Is(openErr, unix.ELOOP):
+			return 0, ErrTargetIsSymlink
+		case errors.Is(openErr, unix.ENOENT):
+			return 0, ErrFileMissing
+		default:
+			return 0, openErr
+		}
+	}
+
+	identityErr := clerk.targetFileSwapVerifier(fileHandle, targetState)
+	if identityErr != nil {
+		_ = unix.Close(fileHandle)
+		return 0, identityErr
+	}
+
+	return fileHandle, nil
+}
+
 type FileRegexReplaceSettings struct {
 	FilePath tkValueObject.UnixAbsoluteFilePath
 
@@ -1482,12 +1546,12 @@ func (clerk FileClerk) regexReplaceStreaming(
 
 // FileContentRegexReplace atomically substitutes regex matches in a file. It
 // preserves the target's owner, group, and mode, including special bits. The
-// parent chain is verified through a held handle, so a swapped path cannot
-// redirect the read or the write. Symlinks are refused unless the policy
-// resolves them. A result with zero bytes fails as a call-site bug; use
+// parent chain and the opened inode are verified against the inspected target,
+// so a swap cannot redirect the read. Symlinks are refused unless the policy
+// resolves them. A zero-byte result fails as a call-site bug; use
 // TruncateFileContent to empty a file on purpose. Files at or above
-// RegexLargeFileThresholdBytes are processed line-by-line, so multi-line
-// patterns only match in smaller files.
+// RegexLargeFileThresholdBytes stream line-by-line, so multi-line patterns
+// only match in smaller files.
 func (clerk FileClerk) FileContentRegexReplace(
 	settings FileRegexReplaceSettings,
 	regexPattern *regexp.Regexp,
@@ -1528,19 +1592,10 @@ func (clerk FileClerk) FileContentRegexReplace(
 		return 0, ErrFileEmpty
 	}
 
-	fileHandle, openErr := unix.Openat(
-		target.DirHandle,
-		target.FileName.String(),
-		unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
-		0,
+	fileHandle, openErr := clerk.targetFileReadHandleOpener(
+		target.DirHandle, target.FileName, targetState,
 	)
 	if openErr != nil {
-		if errors.Is(openErr, unix.ELOOP) {
-			return 0, ErrTargetIsSymlink
-		}
-		if errors.Is(openErr, unix.ENOENT) {
-			return 0, ErrFileMissing
-		}
 		return 0, openErr
 	}
 	fileHandler := os.NewFile(uintptr(fileHandle), target.FileName.String())
@@ -1613,20 +1668,22 @@ func (clerk FileClerk) AppendFileContent(
 	fileHandle, openErr := unix.Openat(
 		target.DirHandle,
 		target.FileName.String(),
-		unix.O_WRONLY|unix.O_APPEND|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		targetFileAppendOpenFlags,
 		0,
 	)
 	if openErr != nil {
-		if errors.Is(openErr, unix.ELOOP) {
+		switch {
+		case errors.Is(openErr, unix.ELOOP):
 			return ErrTargetIsSymlink
-		}
-		if errors.Is(openErr, unix.ENOENT) {
+		case errors.Is(openErr, unix.ENOENT):
 			return ErrFileMissing
-		}
-		if errors.Is(openErr, unix.EISDIR) {
+		case errors.Is(openErr, unix.EISDIR):
 			return ErrTargetIsDirectory
+		case errors.Is(openErr, unix.ENXIO):
+			return ErrTargetNotRegularFile
+		default:
+			return openErr
 		}
-		return openErr
 	}
 	targetFile := os.NewFile(uintptr(fileHandle), target.FileName.String())
 
@@ -1662,16 +1719,20 @@ type fileUpsertOwnership struct {
 func (clerk FileClerk) runningProcessOwnershipResolver() (
 	ownership fileUpsertOwnership, err error,
 ) {
-	ownership.UserId, err = clerk.ownerUserIdResolver(nil, nil)
-	if err != nil {
-		return ownership, err
+	processUserId, userIdErr := clerk.ownerUserIdResolver(nil, nil)
+	if userIdErr != nil {
+		return ownership, userIdErr
 	}
 
 	processGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
 	if groupIdErr != nil {
 		return ownership, groupIdErr
 	}
-	ownership.GroupId = processGroupId
+
+	ownership = fileUpsertOwnership{
+		UserId:  processUserId,
+		GroupId: processGroupId,
+	}
 
 	return ownership, nil
 }
@@ -1684,18 +1745,31 @@ func (clerk FileClerk) fileUpsertSourceOwnershipResolver(
 	switch ownerSource {
 	case FileClerkOwnerSourceExistingFile:
 		if targetState.Exists {
-			ownership.UserId = targetState.OwnerUserId
-			ownership.GroupId = targetState.OwnerGroupId
+			ownership = fileUpsertOwnership{
+				UserId:  targetState.OwnerUserId,
+				GroupId: targetState.OwnerGroupId,
+			}
 			return ownership, nil
 		}
 		return clerk.runningProcessOwnershipResolver()
 	case FileClerkOwnerSourceContainingDirectory:
-		ownership.UserId, err = tkValueObject.NewUnixUserId(containingDirStat.Uid)
-		if err != nil {
-			return ownership, err
+		containingDirUserId, userIdErr := tkValueObject.NewUnixUserId(
+			containingDirStat.Uid,
+		)
+		if userIdErr != nil {
+			return ownership, userIdErr
 		}
-		ownership.GroupId, err = tkValueObject.NewUnixGroupId(containingDirStat.Gid)
-		return ownership, err
+		containingDirGroupId, groupIdErr := tkValueObject.NewUnixGroupId(
+			containingDirStat.Gid,
+		)
+		if groupIdErr != nil {
+			return ownership, groupIdErr
+		}
+		ownership = fileUpsertOwnership{
+			UserId:  containingDirUserId,
+			GroupId: containingDirGroupId,
+		}
+		return ownership, nil
 	case FileClerkOwnerSourceRunningProcess:
 		return clerk.runningProcessOwnershipResolver()
 	default:
@@ -1720,19 +1794,29 @@ func (clerk FileClerk) fileUpsertOwnerResolver(
 			return ownership, ErrOwnerSourceConflict
 		}
 
-		ownership.UserId, err = clerk.ownerUserIdResolver(
+		statedUserId, userIdErr := clerk.ownerUserIdResolver(
 			ownerUsername, ownerUserId,
 		)
-		if err != nil {
-			return ownership, err
+		if userIdErr != nil {
+			return ownership, userIdErr
 		}
 		if ownerGroupId != nil {
-			ownership.GroupId = *ownerGroupId
+			ownership = fileUpsertOwnership{
+				UserId:  statedUserId,
+				GroupId: *ownerGroupId,
+			}
 			return ownership, nil
 		}
 
-		ownership.GroupId, err = clerk.ownerGroupIdResolver(ownership.UserId)
-		return ownership, err
+		statedGroupId, groupIdErr := clerk.ownerGroupIdResolver(statedUserId)
+		if groupIdErr != nil {
+			return ownership, groupIdErr
+		}
+		ownership = fileUpsertOwnership{
+			UserId:  statedUserId,
+			GroupId: statedGroupId,
+		}
+		return ownership, nil
 	}
 
 	ownership, err = clerk.fileUpsertSourceOwnershipResolver(

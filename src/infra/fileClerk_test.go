@@ -1192,6 +1192,31 @@ func TestAppendFileContent(t *testing.T) {
 		}
 	})
 
+	t.Run("RefusesFifoWithoutReader", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "append.fifo")
+		fifoErr := unix.Mkfifo(testFile, 0o600)
+		if fifoErr != nil {
+			t.Fatalf("MkfifoFailed: %v", fifoErr)
+		}
+		targetPath := absoluteFilePathForTest(t, testFile)
+
+		appendResultChan := make(chan error, 1)
+		go func() {
+			appendResultChan <- clerk.AppendFileContent(
+				FileAppendSettings{FilePath: targetPath}, "content",
+			)
+		}()
+
+		select {
+		case appendErr := <-appendResultChan:
+			if !errors.Is(appendErr, ErrTargetNotRegularFile) {
+				t.Fatalf("ExpectedErrTargetNotRegularFile, got: %v", appendErr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("AppendBlockedOnFifo")
+		}
+	})
+
 	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
 		testDir := filepath.Join(tempDir, "writableAppendDir")
 		err := os.MkdirAll(testDir, 0755)
@@ -2939,6 +2964,99 @@ func absoluteFilePathForTest(
 		t.Fatalf("FilePathInvalid: %v", pathErr)
 	}
 	return filePath
+}
+
+func TestTargetFileReadHandleOpener(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	targetFileName, fileNameErr := tkValueObject.NewUnixFileName(
+		"verified.txt", true,
+	)
+	if fileNameErr != nil {
+		t.Fatalf("FileNameInvalid: %v", fileNameErr)
+	}
+	targetFilePath := filepath.Join(tempDir, targetFileName.String())
+	writeErr := os.WriteFile(targetFilePath, []byte("alpha=1"), 0644)
+	if writeErr != nil {
+		t.Fatalf("WriteFileFailed: %v", writeErr)
+	}
+
+	dirHandle, openErr := unix.Open(
+		tempDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0,
+	)
+	if openErr != nil {
+		t.Fatalf("OpenDirFailed: %v", openErr)
+	}
+	defer func() { _ = unix.Close(dirHandle) }()
+
+	targetState, stateErr := clerk.targetFileStateReader(
+		dirHandle, targetFileName,
+	)
+	if stateErr != nil {
+		t.Fatalf("TargetFileStateReadFailed: %v", stateErr)
+	}
+
+	t.Run("AcceptsTheInspectedInode", func(t *testing.T) {
+		fileHandle, openErr := clerk.targetFileReadHandleOpener(
+			dirHandle, targetFileName, targetState,
+		)
+		if openErr != nil {
+			t.Fatalf("UnexpectedOpenError: %v", openErr)
+		}
+		_ = unix.Close(fileHandle)
+	})
+
+	t.Run("RefusesSwappedRegularFile", func(t *testing.T) {
+		swappedFilePath := filepath.Join(tempDir, "swapped.txt")
+		writeErr := os.WriteFile(swappedFilePath, []byte("bravo=2"), 0644)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		renameErr := os.Rename(swappedFilePath, targetFilePath)
+		if renameErr != nil {
+			t.Fatalf("RenameFailed: %v", renameErr)
+		}
+
+		_, openErr := clerk.targetFileReadHandleOpener(
+			dirHandle, targetFileName, targetState,
+		)
+		if !errors.Is(openErr, ErrTargetFileChanged) {
+			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+		}
+	})
+
+	t.Run("RefusesFifoSwap", func(t *testing.T) {
+		fifoPath := filepath.Join(tempDir, "swapped.fifo")
+		fifoErr := unix.Mkfifo(fifoPath, 0o600)
+		if fifoErr != nil {
+			t.Fatalf("MkfifoFailed: %v", fifoErr)
+		}
+		renameErr := os.Rename(fifoPath, targetFilePath)
+		if renameErr != nil {
+			t.Fatalf("RenameFailed: %v", renameErr)
+		}
+
+		openResultChan := make(chan error, 1)
+		go func() {
+			fileHandle, openErr := clerk.targetFileReadHandleOpener(
+				dirHandle, targetFileName, targetState,
+			)
+			if fileHandle != 0 {
+				_ = unix.Close(fileHandle)
+			}
+			openResultChan <- openErr
+		}()
+
+		select {
+		case openErr := <-openResultChan:
+			if !errors.Is(openErr, ErrTargetFileChanged) {
+				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("OpenBlockedOnFifo")
+		}
+	})
 }
 
 func TestTempFileNameFactory(t *testing.T) {
