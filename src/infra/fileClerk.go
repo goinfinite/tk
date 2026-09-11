@@ -1148,9 +1148,42 @@ func (FileClerk) ownerGroupIdResolver(
 	return resolvedGroupId, nil
 }
 
+type trustedDirOwnerIdSet map[uint64]struct{}
+
+func (clerk FileClerk) trustedDirOwnerIdSetResolver(
+	trustedDirOwnerUsernames []tkValueObject.UnixUsername,
+	trustedDirOwnerUserIds []tkValueObject.UnixUserId,
+) (trustedDirOwnerIds trustedDirOwnerIdSet, err error) {
+	trustedDirOwnerIds = trustedDirOwnerIdSet{}
+
+	for _, trustedDirOwnerUsername := range trustedDirOwnerUsernames {
+		resolvedUserId, resolveErr := clerk.ownerUserIdResolver(
+			&trustedDirOwnerUsername, nil,
+		)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		trustedDirOwnerIds[resolvedUserId.Uint64()] = struct{}{}
+	}
+
+	for _, trustedDirOwnerUserId := range trustedDirOwnerUserIds {
+		trustedDirOwnerIds[trustedDirOwnerUserId.Uint64()] = struct{}{}
+	}
+
+	if len(trustedDirOwnerIds) == 0 {
+		processUserId, resolveErr := clerk.ownerUserIdResolver(nil, nil)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		trustedDirOwnerIds[processUserId.Uint64()] = struct{}{}
+	}
+
+	return trustedDirOwnerIds, nil
+}
+
 func (FileClerk) openRedirectProofDirChain(
 	dirPath tkValueObject.UnixAbsoluteFilePath,
-	ownerUserId tkValueObject.UnixUserId,
+	trustedDirOwnerIds trustedDirOwnerIdSet,
 	dirChainPolicy FileClerkDirChainPolicy,
 ) (dirHandle int, err error) {
 	walkFlags := unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC
@@ -1206,10 +1239,11 @@ func (FileClerk) openRedirectProofDirChain(
 			)
 		}
 
-		ownedByRequestedUser := uint64(componentStat.Uid) == ownerUserId.Uint64()
-		ownedByRoot := componentStat.Uid == 0
-		ownedByTrustedAccount := ownedByRequestedUser || ownedByRoot
-		if !ownedByTrustedAccount {
+		_, componentOwnedByTrustedOwner := trustedDirOwnerIds[uint64(componentStat.Uid)]
+		componentOwnedByRoot := componentStat.Uid == 0
+		componentOwnedByTrustedAccount := componentOwnedByTrustedOwner ||
+			componentOwnedByRoot
+		if !componentOwnedByTrustedAccount {
 			return 0, fmt.Errorf(
 				"%w: %s", ErrDirectoryOwnerInvalid, pathComponent,
 			)
@@ -1294,8 +1328,8 @@ func (clerk FileClerk) fileWriteTargetResolver(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	symlinkPolicy FileClerkSymlinkPolicy,
 	dirChainPolicy FileClerkDirChainPolicy,
-	trustedDirOwnerUsername *tkValueObject.UnixUsername,
-	trustedDirOwnerUserId *tkValueObject.UnixUserId,
+	trustedDirOwnerUsernames []tkValueObject.UnixUsername,
+	trustedDirOwnerUserIds []tkValueObject.UnixUserId,
 ) (target fileWriteTarget, err error) {
 	hasTrailingSeparator := strings.HasSuffix(filePath.String(), "/")
 	if hasTrailingSeparator {
@@ -1325,8 +1359,8 @@ func (clerk FileClerk) fileWriteTargetResolver(
 		return target, ErrFileNameInvalid
 	}
 
-	trustedDirOwnerId, trustErr := clerk.ownerUserIdResolver(
-		trustedDirOwnerUsername, trustedDirOwnerUserId,
+	trustedDirOwnerIds, trustErr := clerk.trustedDirOwnerIdSetResolver(
+		trustedDirOwnerUsernames, trustedDirOwnerUserIds,
 	)
 	if trustErr != nil {
 		return target, trustErr
@@ -1334,7 +1368,7 @@ func (clerk FileClerk) fileWriteTargetResolver(
 
 	dirPath := targetFilePath.ReadFileDir()
 	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
-		dirPath, trustedDirOwnerId, dirChainPolicy,
+		dirPath, trustedDirOwnerIds, dirChainPolicy,
 	)
 	if dirChainErr != nil {
 		return target, dirChainErr
@@ -1440,9 +1474,9 @@ type FileRegexReplaceSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
 
 func (clerk FileClerk) regexReplaceWholeFile(
@@ -1579,7 +1613,7 @@ func (clerk FileClerk) FileContentRegexReplace(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return 0, targetErr
@@ -1627,9 +1661,9 @@ type FileAppendSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
 
 // AppendFileContent verifies the opened inode against the inspected target and
@@ -1656,7 +1690,7 @@ func (clerk FileClerk) AppendFileContent(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return targetErr
@@ -1689,9 +1723,9 @@ type FileUpsertSettings struct {
 	OverwritePolicy *FileClerkOverwritePolicy
 	SymlinkPolicy   *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 
 	Permissions *os.FileMode
 
@@ -1893,7 +1927,7 @@ func (clerk FileClerk) UpsertFile(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, symlinkPolicy, *settings.DirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return targetErr

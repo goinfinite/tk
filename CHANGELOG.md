@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.3.6 - 2026/09/11
+feat: FileClerk trusts a set of directory owners. FileRegexReplaceSettings, FileAppendSettings, and FileUpsertSettings take TrustedDirOwnerUsernames and TrustedDirOwnerUserIds slices. Every parent component must be owned by root or a named account; an empty set trusts the running process account. Breaking change: the singular TrustedDirOwnerUsername and TrustedDirOwnerUserId fields are gone.
+test: cover multi-owner chains, mixed username and user id entries, unlisted owners failing with ErrDirectoryOwnerInvalid, root-owned components, and the empty-set fallback.
+docs: document the FileClerk multi-owner trust model in the infra README.
+
 0.3.5 - 2026/09/11
 docs: move the TK usage skill to the repository root; delete the openapi-test skill and skills/README.md.
 docs: tighten the TK usage skill procedure and guardrails.

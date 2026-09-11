@@ -1257,8 +1257,10 @@ func TestAppendFileContent(t *testing.T) {
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath:                absoluteFilePathForTest(t, testFile),
-			TrustedDirOwnerUsername: &unknownUsername,
+			FilePath: absoluteFilePathForTest(t, testFile),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				unknownUsername,
+			},
 		}, " Appended")
 		if err == nil {
 			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
@@ -3739,8 +3741,10 @@ func TestUpsertFile(t *testing.T) {
 
 		filePath := filepath.Join(tempDir, "unknownOwner.txt")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath:                absoluteFilePathForTest(t, filePath),
-			TrustedDirOwnerUsername: &unknownUsername,
+			FilePath: absoluteFilePathForTest(t, filePath),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				unknownUsername,
+			},
 		}, newFileContent)
 		if err == nil {
 			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
@@ -3772,8 +3776,10 @@ func TestUpsertFile(t *testing.T) {
 
 		filePath := filepath.Join(tempDir, "numericOwner.txt")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath:              absoluteFilePathForTest(t, filePath),
-			TrustedDirOwnerUserId: &unresolvableUserId,
+			FilePath: absoluteFilePathForTest(t, filePath),
+			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
+				unresolvableUserId,
+			},
 		}, newFileContent)
 		if err != nil && !errors.Is(err, ErrDirectoryOwnerInvalid) {
 			t.Errorf(
@@ -3982,8 +3988,10 @@ func TestUpsertFile(t *testing.T) {
 		}
 		target := filepath.Join(dir, "refused.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:                absoluteFilePathForTest(t, target),
-			TrustedDirOwnerUsername: &ownerName,
+			FilePath: absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				ownerName,
+			},
 		}, newFileContent)
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
 			t.Errorf(
@@ -4085,9 +4093,11 @@ func TestUpsertFile(t *testing.T) {
 		ownerSource := FileClerkOwnerSourceContainingDirectory
 		target := filepath.Join(dir, "owned.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:              absoluteFilePathForTest(t, target),
-			TrustedDirOwnerUserId: &nobodyUserId,
-			OwnerSource:           &ownerSource,
+			FilePath: absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
+				nobodyUserId,
+			},
+			OwnerSource: &ownerSource,
 		}, newFileContent)
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -4587,6 +4597,9 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 	if userIdErr != nil {
 		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
 	}
+	currentTrustedDirOwnerIds := trustedDirOwnerIdSet{
+		currentUserId.Uint64(): struct{}{},
+	}
 
 	sharedWriteAllowedPolicy := FileClerkDirChainPolicySharedWriteAllowed
 	sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
@@ -4596,7 +4609,7 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 			tempDir + "/../traversal.txt",
 		)
 		_, dirChainErr := clerk.openRedirectProofDirChain(
-			traversalPath, currentUserId, sharedWriteAllowedPolicy,
+			traversalPath, currentTrustedDirOwnerIds, sharedWriteAllowedPolicy,
 		)
 		if !errors.Is(dirChainErr, ErrDirPathTraversalInvalid) {
 			t.Errorf("ExpectedErrDirPathTraversalInvalid, got: %v", dirChainErr)
@@ -4615,7 +4628,8 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 		}
 
 		_, strictChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteRefusedPolicy,
+			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			sharedWriteRefusedPolicy,
 		)
 		if !errors.Is(strictChainErr, ErrDirectoryWritableByOthers) {
 			t.Errorf(
@@ -4624,7 +4638,8 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 		}
 
 		lenientHandle, lenientChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteAllowedPolicy,
+			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			sharedWriteAllowedPolicy,
 		)
 		if lenientChainErr != nil {
 			t.Fatalf("UnexpectedErrorForLenientChain: %v", lenientChainErr)
@@ -4644,7 +4659,8 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 		}
 
 		dirHandle, strictChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteRefusedPolicy,
+			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			sharedWriteRefusedPolicy,
 		)
 		if strictChainErr != nil {
 			t.Fatalf("UnexpectedSurprise: %v", strictChainErr)
@@ -4661,7 +4677,7 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 		}
 
 		dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, originalDir), currentUserId,
+			absoluteFilePathForTest(t, originalDir), currentTrustedDirOwnerIds,
 			sharedWriteAllowedPolicy,
 		)
 		if dirChainErr != nil {
@@ -4698,6 +4714,344 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 		}
 		if clerk.FileExists(filepath.Join(escapeDir, "staged.txt")) {
 			t.Errorf("WriteFollowedReplacementSymlink")
+		}
+	})
+}
+
+func TestTrustedDirOwnerIdSetResolver(t *testing.T) {
+	clerk := FileClerk{}
+
+	currentAccount, accountErr := user.Current()
+	if accountErr != nil {
+		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+	}
+	currentUsername, usernameErr := tkValueObject.NewUnixUsername(
+		currentAccount.Username,
+	)
+	if usernameErr != nil {
+		t.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
+	}
+	currentUserId, userIdErr := tkValueObject.NewUnixUserId(currentAccount.Uid)
+	if userIdErr != nil {
+		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
+	}
+	runningProcessUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
+	if userIdErr != nil {
+		t.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
+	}
+	unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
+		"no-such-user-xyz-42",
+	)
+	if usernameErr != nil {
+		t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+	}
+	arbitraryUserId := tkValueObject.UnixUserId(4242)
+
+	testCases := []struct {
+		name            string
+		usernames       []tkValueObject.UnixUsername
+		userIds         []tkValueObject.UnixUserId
+		expectedUserIds []tkValueObject.UnixUserId
+		expectedError   string
+	}{
+		{
+			name:            "EmptySetFallsBackToRunningProcessAccount",
+			expectedUserIds: []tkValueObject.UnixUserId{runningProcessUserId},
+		},
+		{
+			name:            "ResolvesUsernameToUserId",
+			usernames:       []tkValueObject.UnixUsername{currentUsername},
+			expectedUserIds: []tkValueObject.UnixUserId{currentUserId},
+		},
+		{
+			name:            "KeepsUserIdWithoutLookup",
+			userIds:         []tkValueObject.UnixUserId{arbitraryUserId},
+			expectedUserIds: []tkValueObject.UnixUserId{arbitraryUserId},
+		},
+		{
+			name:      "MixedUsernameAndUserIdBothCount",
+			usernames: []tkValueObject.UnixUsername{currentUsername},
+			userIds:   []tkValueObject.UnixUserId{arbitraryUserId},
+			expectedUserIds: []tkValueObject.UnixUserId{
+				currentUserId, arbitraryUserId,
+			},
+		},
+		{
+			name:          "UnknownUsernameFails",
+			usernames:     []tkValueObject.UnixUsername{unknownUsername},
+			expectedError: "OwnerLookupFailed",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			trustedDirOwnerIds, err := clerk.trustedDirOwnerIdSetResolver(
+				testCase.usernames, testCase.userIds,
+			)
+			if testCase.expectedError != "" {
+				errorMissing := err == nil ||
+					!strings.Contains(err.Error(), testCase.expectedError)
+				if errorMissing {
+					t.Fatalf(
+						"Expected%sError, got: %v", testCase.expectedError, err,
+					)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UnexpectedError: %v", err)
+			}
+			if len(trustedDirOwnerIds) != len(testCase.expectedUserIds) {
+				t.Errorf(
+					"SetSizeMismatch: expected %d, got %d",
+					len(testCase.expectedUserIds), len(trustedDirOwnerIds),
+				)
+			}
+			for _, expectedUserId := range testCase.expectedUserIds {
+				_, isTrusted := trustedDirOwnerIds[expectedUserId.Uint64()]
+				if !isTrusted {
+					t.Errorf("MissingTrustedOwnerId: %d", expectedUserId)
+				}
+			}
+		})
+	}
+}
+
+func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("RootPrivilegesRequired")
+	}
+
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	candidateAccountNames := []string{"nobody", "daemon", "bin", "mail", "games"}
+	ownerAccountNames := []string{}
+	for _, candidateAccountName := range candidateAccountNames {
+		_, lookupErr := user.Lookup(candidateAccountName)
+		if lookupErr != nil {
+			continue
+		}
+		ownerAccountNames = append(ownerAccountNames, candidateAccountName)
+		if len(ownerAccountNames) == 3 {
+			break
+		}
+	}
+	if len(ownerAccountNames) < 3 {
+		t.Skip("ThreeOwnerAccountsRequired")
+	}
+
+	ownerUserIds := make([]tkValueObject.UnixUserId, 0, len(ownerAccountNames))
+	ownerUids := make([]int, 0, len(ownerAccountNames))
+	for _, ownerAccountName := range ownerAccountNames {
+		ownerAccount, lookupErr := user.Lookup(ownerAccountName)
+		if lookupErr != nil {
+			t.Skipf("AccountMissing: %s: %v", ownerAccountName, lookupErr)
+		}
+		ownerUid, uidParseErr := strconv.Atoi(ownerAccount.Uid)
+		if uidParseErr != nil {
+			t.Fatalf("UidParseFailed: %s: %v", ownerAccountName, uidParseErr)
+		}
+		ownerUserId, userIdErr := tkValueObject.NewUnixUserId(ownerUid)
+		if userIdErr != nil {
+			t.Fatalf("OwnerUserIdInvalid: %s: %v", ownerAccountName, userIdErr)
+		}
+		ownerUids = append(ownerUids, ownerUid)
+		ownerUserIds = append(ownerUserIds, ownerUserId)
+	}
+
+	firstOwnerDir := filepath.Join(tempDir, "firstOwner")
+	secondOwnerDir := filepath.Join(firstOwnerDir, "secondOwner")
+	thirdOwnerDir := filepath.Join(secondOwnerDir, "thirdOwner")
+	mkdirErr := os.MkdirAll(thirdOwnerDir, 0755)
+	if mkdirErr != nil {
+		t.Fatalf("MkdirFailed: %v", mkdirErr)
+	}
+	ownedDirs := []string{firstOwnerDir, secondOwnerDir, thirdOwnerDir}
+	for dirIndex, ownedDir := range ownedDirs {
+		chownErr := os.Chown(ownedDir, ownerUids[dirIndex], -1)
+		if chownErr != nil {
+			t.Fatalf("ChownFailed: %s: %v", ownedDir, chownErr)
+		}
+	}
+
+	sharedWriteAllowedPolicy := FileClerkDirChainPolicySharedWriteAllowed
+
+	testCases := []struct {
+		name              string
+		walkPath          tkValueObject.UnixAbsoluteFilePath
+		trustedUserIds    []tkValueObject.UnixUserId
+		expectedError     error
+		expectedComponent string
+	}{
+		{
+			name:           "AcceptsChainWithEveryOwnerNamed",
+			walkPath:       absoluteFilePathForTest(t, thirdOwnerDir),
+			trustedUserIds: ownerUserIds,
+		},
+		{
+			name:              "RefusesFirstOwnerWhenUnnamed",
+			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			trustedUserIds:    ownerUserIds[1:],
+			expectedError:     ErrDirectoryOwnerInvalid,
+			expectedComponent: "firstOwner",
+		},
+		{
+			name:              "RefusesThirdOwnerWhenUnnamed",
+			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			trustedUserIds:    ownerUserIds[:2],
+			expectedError:     ErrDirectoryOwnerInvalid,
+			expectedComponent: "thirdOwner",
+		},
+		{
+			name:              "RefusesChainWhenTrustedSetEmpty",
+			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			expectedError:     ErrDirectoryOwnerInvalid,
+			expectedComponent: "firstOwner",
+		},
+		{
+			name:           "AcceptsSingleOwnerChainWhenNamed",
+			walkPath:       absoluteFilePathForTest(t, firstOwnerDir),
+			trustedUserIds: ownerUserIds[:1],
+		},
+		{
+			name:              "RefusesSingleOwnerChainWhenUnnamed",
+			walkPath:          absoluteFilePathForTest(t, firstOwnerDir),
+			trustedUserIds:    ownerUserIds[1:2],
+			expectedError:     ErrDirectoryOwnerInvalid,
+			expectedComponent: "firstOwner",
+		},
+		{
+			name:           "AcceptsRootOwnedChainWithUnrelatedTrustedOwner",
+			walkPath:       absoluteFilePathForTest(t, tempDir),
+			trustedUserIds: ownerUserIds[:1],
+		},
+		{
+			name:     "AcceptsRootOwnedChainWithEmptySet",
+			walkPath: absoluteFilePathForTest(t, tempDir),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			trustedDirOwnerIds := trustedDirOwnerIdSet{}
+			for _, trustedUserId := range testCase.trustedUserIds {
+				trustedDirOwnerIds[trustedUserId.Uint64()] = struct{}{}
+			}
+
+			dirHandle, err := clerk.openRedirectProofDirChain(
+				testCase.walkPath, trustedDirOwnerIds, sharedWriteAllowedPolicy,
+			)
+			if testCase.expectedError != nil {
+				if !errors.Is(err, testCase.expectedError) {
+					t.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
+				}
+				if !strings.Contains(err.Error(), testCase.expectedComponent) {
+					t.Errorf(
+						"ErrorDoesNotNameComponent: %s: %v",
+						testCase.expectedComponent, err,
+					)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UnexpectedError: %v", err)
+			}
+			_ = unix.Close(dirHandle)
+		})
+	}
+}
+
+func TestUpsertFileTrustedDirOwners(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("RootPrivilegesRequired")
+	}
+
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	nobodyAccount, nobodyErr := user.Lookup("nobody")
+	if nobodyErr != nil {
+		t.Skipf("NobodyUserMissing: %v", nobodyErr)
+	}
+	daemonAccount, daemonErr := user.Lookup("daemon")
+	if daemonErr != nil {
+		t.Skipf("DaemonUserMissing: %v", daemonErr)
+	}
+	nobodyUid, nobodyUidErr := strconv.Atoi(nobodyAccount.Uid)
+	if nobodyUidErr != nil {
+		t.Fatalf("NobodyUidParseFailed: %v", nobodyUidErr)
+	}
+	daemonUid, daemonUidErr := strconv.Atoi(daemonAccount.Uid)
+	if daemonUidErr != nil {
+		t.Fatalf("DaemonUidParseFailed: %v", daemonUidErr)
+	}
+
+	nobodyUsername, usernameErr := tkValueObject.NewUnixUsername(
+		nobodyAccount.Username,
+	)
+	if usernameErr != nil {
+		t.Fatalf("NobodyUsernameInvalid: %v", usernameErr)
+	}
+	daemonUserId, userIdErr := tkValueObject.NewUnixUserId(daemonUid)
+	if userIdErr != nil {
+		t.Fatalf("DaemonUserIdInvalid: %v", userIdErr)
+	}
+
+	nobodyDir := filepath.Join(tempDir, "nobodyOwner")
+	daemonDir := filepath.Join(nobodyDir, "daemonOwner")
+	mkdirErr := os.MkdirAll(daemonDir, 0755)
+	if mkdirErr != nil {
+		t.Fatalf("MkdirFailed: %v", mkdirErr)
+	}
+	nobodyChownErr := os.Chown(nobodyDir, nobodyUid, -1)
+	if nobodyChownErr != nil {
+		t.Fatalf("NobodyChownFailed: %v", nobodyChownErr)
+	}
+	daemonChownErr := os.Chown(daemonDir, daemonUid, -1)
+	if daemonChownErr != nil {
+		t.Fatalf("DaemonChownFailed: %v", daemonChownErr)
+	}
+
+	t.Run("WritesThroughChainWithUsernameAndUserIdTrusted", func(t *testing.T) {
+		target := filepath.Join(daemonDir, "php-webserver.conf")
+		fileContent := []byte("display_errors = On")
+		err := clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				nobodyUsername,
+			},
+			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{daemonUserId},
+		}, fileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		writtenContent, readErr := os.ReadFile(target)
+		if readErr != nil {
+			t.Fatalf("ReadFileFailed: %v", readErr)
+		}
+		if string(writtenContent) != string(fileContent) {
+			t.Errorf("ContentMismatch: %s", writtenContent)
+		}
+	})
+
+	t.Run("RefusesChainWhenOneOwnerUnnamed", func(t *testing.T) {
+		target := filepath.Join(daemonDir, "refused.conf")
+		err := clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				nobodyUsername,
+			},
+		}, []byte("display_errors = Off"))
+		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
+			t.Fatalf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "daemonOwner") {
+			t.Errorf("ErrorDoesNotNameOffendingComponent: %v", err)
+		}
+		if clerk.FileExists(target) {
+			t.Errorf("RefusedTargetWasCreated")
 		}
 	})
 }
