@@ -20,6 +20,7 @@ fix: FileClerk.FileContentRegexReplace preserves the target's owner, group, and 
 feat: add DirChainPolicy to FileAppendSettings, FileUpsertSettings, and FileRegexReplaceSettings. It defaults to FileClerkDirChainPolicySharedWriteAllowed; FileClerkDirChainPolicySharedWriteRefused rejects a chain component writable by group or others unless the sticky bit is set (ErrDirectoryWritableByOthers).
 refactor: remove FileClerk.VerifyDirPathRedirectSafety. The fd walk stays internal to UpsertFile, AppendFileContent, and FileContentRegexReplace, which hold the directory handle through the write. Breaking change.
 fix: FileClerk write paths reject a file path that ends with a separator (ErrFileNameInvalid) before splitting the final component.
+fix: UnixAbsoluteFilePath and UnixRelativeFilePath ReadFileName return the last path component for paths that end with a separator; ReadFileDir trims trailing separators before resolving the parent, so both readers agree.
 test: reroute the directory-chain error coverage to UpsertFile and openRedirectProofDirChain; cover append's missing-target, metadata, symlink, and trust-anchor behavior.
 
 0.3.4 - 2026/09/10

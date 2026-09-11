@@ -73,8 +73,7 @@ func (vo UnixRelativeFilePath) ReadWithoutExtension() UnixRelativeFilePath {
 }
 
 func (vo UnixRelativeFilePath) ReadFileName() (UnixFileName, error) {
-	_, rawFileName := filepath.Split(string(vo))
-	return NewUnixFileName(rawFileName, true)
+	return NewUnixFileName(filepath.Base(string(vo)), true)
 }
 
 func (vo UnixRelativeFilePath) ReadFileExtension() (UnixFileExtension, error) {
@@ -135,7 +134,18 @@ func (vo UnixRelativeFilePath) ReadFileNameWithoutExtension() (UnixFileName, err
 }
 
 func (vo UnixRelativeFilePath) ReadFileDir() UnixRelativeFilePath {
-	unixFileDirPath, _ := NewUnixRelativeFilePath(filepath.Dir(string(vo)))
+	pathWithoutTrailingSeparators := strings.TrimRight(string(vo), "/")
+	if pathWithoutTrailingSeparators == "" {
+		pathWithoutTrailingSeparators = "."
+	}
+
+	rawFileDir := filepath.Dir(pathWithoutTrailingSeparators)
+	fileDirIsHomeShorthand := rawFileDir == "~"
+	if fileDirIsHomeShorthand {
+		rawFileDir = "~/"
+	}
+
+	unixFileDirPath, _ := NewUnixRelativeFilePath(rawFileDir)
 	return unixFileDirPath
 }
 

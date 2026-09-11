@@ -79,8 +79,7 @@ func (vo UnixAbsoluteFilePath) ReadWithoutExtension(allowUnsafeChars bool) UnixA
 func (vo UnixAbsoluteFilePath) ReadFileName(
 	allowUnsafeChars bool,
 ) (UnixFileName, error) {
-	_, rawFileName := filepath.Split(string(vo))
-	return NewUnixFileName(rawFileName, allowUnsafeChars)
+	return NewUnixFileName(filepath.Base(string(vo)), allowUnsafeChars)
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileExtension() (UnixFileExtension, error) {
@@ -143,7 +142,14 @@ func (vo UnixAbsoluteFilePath) ReadFileNameWithoutExtension(
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileDir() UnixAbsoluteFilePath {
-	unixFileDirPath, _ := NewUnixAbsoluteFilePath(filepath.Dir(string(vo)), true)
+	pathWithoutTrailingSeparators := strings.TrimRight(string(vo), "/")
+	if pathWithoutTrailingSeparators == "" {
+		pathWithoutTrailingSeparators = "/"
+	}
+
+	unixFileDirPath, _ := NewUnixAbsoluteFilePath(
+		filepath.Dir(pathWithoutTrailingSeparators), true,
+	)
 	return unixFileDirPath
 }
 

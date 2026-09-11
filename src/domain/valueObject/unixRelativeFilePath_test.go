@@ -123,7 +123,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./dir/file.txt"), UnixFileName("file.txt"), false},
 			{UnixRelativeFilePath("./subdir/file.txt"), UnixFileName("file.txt"), false},
 			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл.txt"), false},
-			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
+			{UnixRelativeFilePath("./dir/"), UnixFileName("dir"), false},
 			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
 			{UnixRelativeFilePath("./dir/.."), UnixFileName(""), true},
 		}
@@ -187,7 +187,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 	})
 
 	t.Run("ReadFileExtensionMethodPathError", func(t *testing.T) {
-		_, err := UnixRelativeFilePath("./dir/").ReadFileExtension()
+		_, err := UnixRelativeFilePath("./dir/.").ReadFileExtension()
 		if err == nil {
 			t.Fatal("MissingExpectedError")
 		}
@@ -254,7 +254,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 				UnixFileName("file.someverylongextension"),
 				false,
 			},
-			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
+			{UnixRelativeFilePath("./dir/"), UnixFileName("dir"), false},
 			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
 		}
 
@@ -283,6 +283,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("../file.txt"), UnixRelativeFilePath("../")},
 			{UnixRelativeFilePath("./a/b/c/file.txt"), UnixRelativeFilePath("./a/b/c")},
 			{UnixRelativeFilePath("~/dir/file"), UnixRelativeFilePath("~/dir")},
+			{UnixRelativeFilePath("./dir/"), UnixRelativeFilePath("./")},
+			{UnixRelativeFilePath("~/dir/"), UnixRelativeFilePath("~/")},
 		}
 
 		for _, testCase := range testCaseStructs {

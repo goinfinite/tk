@@ -205,8 +205,9 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		}{
 			{UnixAbsoluteFilePath("/home/file.php"), UnixFileName("file.php"), false},
 			{UnixAbsoluteFilePath("/file.txt"), UnixFileName("file.txt"), false},
+			{UnixAbsoluteFilePath("/root/dir"), UnixFileName("dir"), false},
+			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName("dir"), false},
 			{UnixAbsoluteFilePath("/"), UnixFileName(""), true},
-			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/~"), UnixFileName(""), true},
@@ -265,7 +266,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 	})
 
 	t.Run("ReadFileExtensionMethodPathError", func(t *testing.T) {
-		_, err := UnixAbsoluteFilePath("/root/dir/").ReadFileExtension()
+		_, err := UnixAbsoluteFilePath("/home/user/.").ReadFileExtension()
 		if err == nil {
 			t.Fatal("MissingExpectedError")
 		}
@@ -331,7 +332,7 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 				UnixFileName("file.someverylongextension"),
 				false,
 			},
-			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
+			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName("dir"), false},
 			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},
 		}
@@ -358,6 +359,9 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.php"), UnixAbsoluteFilePath("/home")},
 			{UnixAbsoluteFilePath("/root/dir/file.txt"), UnixAbsoluteFilePath("/root/dir")},
 			{UnixAbsoluteFilePath("/file.txt"), UnixAbsoluteFilePath("/")},
+			{UnixAbsoluteFilePath("/root/dir/"), UnixAbsoluteFilePath("/root")},
+			{UnixAbsoluteFilePath("/root/"), UnixAbsoluteFilePath("/")},
+			{UnixAbsoluteFilePath("/"), UnixAbsoluteFilePath("/")},
 		}
 
 		for _, testCase := range testCaseStructs {
