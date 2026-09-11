@@ -37,7 +37,7 @@ func (vo UnixFileExtension) ReadMimeType() MimeType {
 	fileExtWithLeadingDot := "." + string(vo)
 	mimeTypeWithCharset := mime.TypeByExtension(fileExtWithLeadingDot)
 	if len(mimeTypeWithCharset) > 0 {
-		mimeTypeOnly := strings.Split(mimeTypeWithCharset, ";")[0]
+		mimeTypeOnly, _, _ := strings.Cut(mimeTypeWithCharset, ";")
 		mimeTypeStr = mimeTypeOnly
 	}
 

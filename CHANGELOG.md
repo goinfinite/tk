@@ -11,6 +11,7 @@ refactor: FileClerk.UpsertFile settings use optional pointers: SymlinkPolicy, Ov
 feat: FileClerk.UpsertFile inherits the target's mode (special bits included) and owner/group on replace, and refuses a directory target with ErrTargetIsDirectory.
 fix: FileClerk.UpsertFile maps a chown EPERM to ErrFileOwnerChangeFailed, so an unprivileged process that cannot set the resolved owner fails with a named error and leaves the target untouched.
 fix: ReadFileExtension returns ('', nil) when the file has no extension; NewUnixFileExtension returns ErrFileExtensionInvalid when validation fails. ReadWithoutExtension and ReadFileNameWithoutExtension return the input unchanged on an empty extension. Breaking change: callers must check the extension value, not err == nil.
+chore: use strings.Cut in UnixFileExtension.ReadMimeType.
 test: cover UpsertFile owner-source precedence, group fallback, mode resolution, special-bit conversion, and the unprivileged chown failure; root-gated cases stay.
 test: cover ReadFileExtension and its siblings for README, .htaccess, file., .config.json, site.tar.gz, and an overlong extension.
 
