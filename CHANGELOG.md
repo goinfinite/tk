@@ -1,6 +1,32 @@
 # Changelog
 
 ```log
+0.3.5 - 2026/09/11
+docs: move the TK usage skill to the repository root; delete the openapi-test skill and skills/README.md.
+docs: tighten the TK usage skill procedure and guardrails.
+docs: refresh the README blurb, installation, usage routing, and SonarCloud badge.
+docs: scope the domain dependency constraint to production code and note the test fixture exception.
+docs: attach the UpsertFile notes to the FileClerk entry in the infra README.
+refactor: FileClerk.UpsertFile settings use optional pointers: SymlinkPolicy, OverwritePolicy, OwnerSource, and Permissions. Defaults: strict-refuse, strict-refuse, existing-file, and target mode on replace / FileClerkDefaultNewFileMode (0600) on create. OwnerUsername/OwnerUserId set only the file owner; TrustedDirOwner* gate the directory chain, and a stated owner conflicts with the containing-directory or running-process source (ErrOwnerSourceConflict). Breaking change: ShouldFollowSymlinks, ShouldOverwrite, and ErrFilePermissionsInvalid are gone.
+feat: FileClerk.UpsertFile inherits the target's mode (special bits included) and owner/group on replace, and refuses a directory target with ErrTargetIsDirectory.
+fix: FileClerk.UpsertFile maps a chown EPERM to ErrFileOwnerChangeFailed, so an unprivileged process that cannot set the resolved owner fails with a named error and leaves the target untouched.
+fix: ReadFileExtension returns ('', nil) when the file has no extension; NewUnixFileExtension returns ErrFileExtensionInvalid when validation fails. ReadWithoutExtension and ReadFileNameWithoutExtension return the input unchanged on an empty extension. Breaking change: callers must check the extension value, not err == nil.
+chore: use strings.Cut in UnixFileExtension.ReadMimeType.
+test: cover UpsertFile owner-source precedence, group fallback, mode resolution, special-bit conversion, and the unprivileged chown failure; root-gated cases stay.
+test: cover ReadFileExtension and its siblings for README, .htaccess, file., .config.json, site.tar.gz, and an overlong extension.
+refactor: FileClerk.AppendFileContent takes FileAppendSettings (FilePath, SymlinkPolicy, DirChainPolicy, TrustedDirOwner*) and no longer creates a missing file: a missing target fails with ErrFileMissing, and the append never changes the target's owner, group, or mode. Breaking change: the positional signature is gone.
+refactor: FileClerk.FileContentRegexReplace takes FileRegexReplaceSettings (FilePath, SymlinkPolicy, DirChainPolicy, TrustedDirOwner*) and walks the parent directory chain through a held handle with the same trust model as UpsertFile. It opens the target through that handle and verifies the opened inode, so a swap between the two fails with ErrTargetFileChanged. Breaking change: the positional signature is gone and symlinks are refused by default.
+fix: FileClerk.FileContentRegexReplace preserves the target's owner, group, and mode, including setuid/setgid/sticky bits. It previously kept only the permission bits and left the replacement owned by the process account.
+feat: add DirChainPolicy to FileAppendSettings, FileUpsertSettings, and FileRegexReplaceSettings. It defaults to FileClerkDirChainPolicySharedWriteAllowed; FileClerkDirChainPolicySharedWriteRefused rejects a chain component writable by group or others unless the sticky bit is set (ErrDirectoryWritableByOthers).
+refactor: remove FileClerk.VerifyDirPathRedirectSafety. The fd walk stays internal to UpsertFile, AppendFileContent, and FileContentRegexReplace, which hold the directory handle through the write. Breaking change.
+fix: FileClerk write paths reject a file path that ends with a separator (ErrFileNameInvalid) before splitting the final component.
+fix: UnixAbsoluteFilePath and UnixRelativeFilePath ReadFileName return the last path component for paths that end with a separator; ReadFileDir trims trailing separators before resolving the parent, so both readers agree.
+fix: FileClerk.FileContentRegexReplace and FileClerk.AppendFileContent open targets non-blocking and verify the opened inode, so a swapped-in regular file fails with ErrTargetFileChanged and a FIFO cannot hang them; a non-regular append target fails with ErrTargetNotRegularFile.
+fix: PaginationParser rejects a zero itemsPerPage with InvalidItemsPerPage, so an untrusted zero fails at the parse boundary as a user error instead of reaching the database as an infrastructure error.
+fix: UnixAbsoluteFilePath.ReadFileName returns ErrRootPathHasNoFileName for the root path instead of InvalidUnixFileName, so callers can branch on the sentinel. Breaking change: a root path no longer reports InvalidUnixFileName.
+test: reroute the directory-chain error coverage to UpsertFile and openRedirectProofDirChain; cover append's missing-target, metadata, symlink, and trust-anchor behavior.
+test: cover the PaginationParser zero itemsPerPage rejection and the UnixAbsoluteFilePath root-path sentinel.
+
 0.3.4 - 2026/09/10
 feat: add TransientDatabaseService, a shared in-memory SQLite key-value store. Has, Read (ErrKeyNotFound), and Set (upsert) work on a KeyValue model; every instance in the process shares the same data.
 feat: add FileClerk.VerifyDirPathRedirectSafety(dirPath, ownerUsernamePtr, ownerUserIdPtr). It walks each directory step without following symlinks. The first problem fails the walk: '..' (ErrDirPathTraversalInvalid), a symlink (ErrSymlinkedPathInvalid), a non-directory (ErrTargetNotDirectory), a foreign owner (ErrDirectoryOwnerInvalid), an unknown account (OwnerLookupFailed), or an uninspectable step (PathCheckFailed). It skips dot and empty components. A numeric UID is compared directly without an account lookup; with no owner given, it expects the process account.

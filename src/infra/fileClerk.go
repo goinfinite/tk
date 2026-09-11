@@ -26,6 +26,14 @@ const (
 	tempFileNameEntropyChars                 = 8
 )
 
+// A swapped-in FIFO would block the open before the swap verifier runs.
+const (
+	targetFileReadOpenFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC |
+		unix.O_NONBLOCK
+	targetFileAppendOpenFlags = unix.O_WRONLY | unix.O_APPEND | unix.O_NOFOLLOW |
+		unix.O_CLOEXEC | unix.O_NONBLOCK
+)
+
 var (
 	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
 	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
@@ -46,13 +54,58 @@ var (
 	ErrFileTooLarge                 = errors.New("FileTooLarge")
 	ErrTargetIsSymlink              = errors.New("TargetIsSymlink")
 	ErrTargetNotDirectory           = errors.New("TargetNotDirectory")
+	ErrTargetNotRegularFile         = errors.New("TargetNotRegularFile")
 	ErrDirPathTraversalInvalid      = errors.New("DirPathParentTraversalNotAllowed")
 	ErrSymlinkedPathInvalid         = errors.New("PathComponentIsSymlink")
 	ErrDirectoryOwnerInvalid        = errors.New("DirectoryNotOwnedByExpectedOwner")
-	ErrFilePermissionsInvalid       = errors.New("FilePermissionsUnset")
+	ErrDirectoryWritableByOthers    = errors.New("DirectoryWritableByOthers")
 	ErrFileNameInvalid              = errors.New("FilePathFinalComponentIsNotAFileName")
 	ErrTempFileNameTooLong          = errors.New("TempFileNameExceedsNameMax")
+	ErrDirChainPolicyInvalid        = errors.New("DirChainPolicyInvalid")
+	ErrSymlinkPolicyInvalid         = errors.New("SymlinkPolicyInvalid")
+	ErrOverwritePolicyInvalid       = errors.New("OverwritePolicyInvalid")
+	ErrOwnerSourceInvalid           = errors.New("OwnerSourceInvalid")
+	ErrOwnerSourceConflict          = errors.New("OwnerSourceConflictsWithStatedOwner")
+	ErrFileOwnerChangeFailed        = errors.New("FileOwnerChangeFailed")
+	ErrTargetFileChanged            = errors.New("TargetFileChanged")
 )
+
+type FileClerkSymlinkPolicy string
+
+const (
+	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
+	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
+)
+
+// FileClerkDirChainPolicy selects how the directory-chain walk treats a
+// component writable by group or others.
+type FileClerkDirChainPolicy string
+
+const (
+	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
+	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
+
+	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
+	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
+	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
+)
+
+type FileClerkOverwritePolicy string
+
+const (
+	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
+	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
+)
+
+type FileClerkOwnerSource string
+
+const (
+	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
+	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
+	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
+)
+
+const FileClerkDefaultNewFileMode os.FileMode = 0o600
 
 type FileClerk struct{}
 
@@ -87,9 +140,8 @@ func (clerk FileClerk) IsDir(filePath string) bool {
 	return fileInfo.IsDir() && !clerk.IsSymlink(filePath)
 }
 
-// TouchFile refreshes timestamps or creates the file, like touch(1) — but a
-// dangling symlink at the path fails with ErrTargetIsSymlink instead of
-// creating the file behind the link.
+// TouchFile behaves like touch(1), except a dangling symlink fails with
+// ErrTargetIsSymlink instead of creating the file behind the link.
 func (FileClerk) TouchFile(filePath string) error {
 	timestampNow := time.Now()
 
@@ -297,6 +349,41 @@ func (FileClerk) DeleteFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
+func (FileClerk) readFileContentFromReader(
+	fileReader io.Reader,
+	maxContentSizeBytesPtr *int64,
+) (fileContent string, err error) {
+	maxContentSizeBytes := ReadFileContentDefaultMaxSizeBytes
+	if maxContentSizeBytesPtr != nil {
+		maxContentSizeBytes = *maxContentSizeBytesPtr
+	}
+	if maxContentSizeBytes < 0 {
+		maxContentSizeBytes = 0
+	}
+
+	limitedReader := io.LimitedReader{R: fileReader, N: maxContentSizeBytes}
+	fileContentBytes, err := io.ReadAll(&limitedReader)
+	if err != nil {
+		return fileContent, err
+	}
+
+	sizeCapReached := limitedReader.N == 0
+	if !sizeCapReached {
+		return string(fileContentBytes), nil
+	}
+
+	trailingByte := make([]byte, 1)
+	trailingCount, trailingErr := fileReader.Read(trailingByte)
+	if trailingCount > 0 {
+		return fileContent, ErrFileTooLarge
+	}
+	if trailingErr != nil && !errors.Is(trailingErr, io.EOF) {
+		return fileContent, trailingErr
+	}
+
+	return string(fileContentBytes), nil
+}
+
 func (clerk FileClerk) ReadFileContent(
 	filePath string,
 	maxContentSizeBytesPtr *int64,
@@ -310,40 +397,11 @@ func (clerk FileClerk) ReadFileContent(
 	}
 	defer func() { _ = fileHandler.Close() }()
 
-	maxContentSizeBytes := ReadFileContentDefaultMaxSizeBytes
-	if maxContentSizeBytesPtr != nil {
-		maxContentSizeBytes = *maxContentSizeBytesPtr
-	}
-	if maxContentSizeBytes < 0 {
-		maxContentSizeBytes = 0
-	}
-
-	limitedReader := io.LimitedReader{R: fileHandler, N: maxContentSizeBytes}
-	fileContentBytes, err := io.ReadAll(&limitedReader)
-	if err != nil {
-		return fileContent, err
-	}
-
-	sizeCapReached := limitedReader.N == 0
-	if !sizeCapReached {
-		return string(fileContentBytes), nil
-	}
-
-	trailingByte := make([]byte, 1)
-	trailingCount, trailingErr := fileHandler.Read(trailingByte)
-	if trailingCount > 0 {
-		return fileContent, ErrFileTooLarge
-	}
-	if trailingErr != nil && !errors.Is(trailingErr, io.EOF) {
-		return fileContent, trailingErr
-	}
-
-	return string(fileContentBytes), nil
+	return clerk.readFileContentFromReader(fileHandler, maxContentSizeBytesPtr)
 }
 
-// FileContentRegexFindings holds one regex match plus its 1-based line
-// range and capture groups. LineNumRange is [start, end] inclusive;
-// a single-line match has start == end.
+// FileContentRegexFindings holds one regex match and its capture groups.
+// LineNumRange is [start, end] inclusive; a single-line match has start == end.
 type FileContentRegexFindings struct {
 	Match        string
 	Groups       []string
@@ -451,12 +509,12 @@ func (clerk FileClerk) regexTargetFileInspector(
 	return fileInfo, nil
 }
 
-// FileContentRegexSearch finds every regex match in a file, returning each
-// match's 1-based inclusive line range and capture groups. Files under
-// RegexLargeFileThresholdBytes are matched in one pass — per-line anchors
-// need the (?m) flag — and multi-line matches span every line they touch.
-// Larger files stream line-by-line: multi-line patterns then match within a
-// single line only, and LineNumRange is always [n, n].
+// FileContentRegexSearch finds every regex match in a file with its 1-based
+// inclusive line range and capture groups. Files under
+// RegexLargeFileThresholdBytes are matched in one pass, so per-line anchors
+// need the (?m) flag and multi-line matches span every line they touch.
+// Larger files stream line-by-line, so multi-line patterns match within a
+// single line only.
 func (clerk FileClerk) FileContentRegexSearch(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	regexPattern *regexp.Regexp,
@@ -552,6 +610,10 @@ func (clerk FileClerk) writeFileAtomically(
 			int(settings.OwnerUserId.Uint64()),
 			int(settings.OwnerGroupId.Uint64()),
 		)
+		ownerChangeNotPermitted := errors.Is(chownErr, unix.EPERM)
+		if ownerChangeNotPermitted {
+			chownErr = fmt.Errorf("%w: %w", ErrFileOwnerChangeFailed, chownErr)
+		}
 	}
 	// Chmod last: chown clears the setuid and setgid bits a mode may carry.
 	chmodErr := tempFile.Chmod(settings.Permissions)
@@ -583,204 +645,71 @@ func (clerk FileClerk) writeFileAtomically(
 	return nil
 }
 
-func (clerk FileClerk) atomicReplacementSettingsResolver(
-	filePathStr string,
-) (atomicFileWriteSettings, error) {
-	actualFilePath := filePathStr
-	if clerk.IsSymlink(filePathStr) {
-		resolvedFilePath, evalErr := filepath.EvalSymlinks(filePathStr)
-		if evalErr != nil {
-			return atomicFileWriteSettings{}, evalErr
-		}
-		actualFilePath = resolvedFilePath
+func (FileClerk) unixFileModeConverter(rawMode uint32) os.FileMode {
+	fileMode := os.FileMode(rawMode).Perm()
+	if rawMode&unix.S_ISUID != 0 {
+		fileMode |= os.ModeSetuid
+	}
+	if rawMode&unix.S_ISGID != 0 {
+		fileMode |= os.ModeSetgid
+	}
+	if rawMode&unix.S_ISVTX != 0 {
+		fileMode |= os.ModeSticky
 	}
 
-	fileInfo, statErr := os.Stat(actualFilePath)
+	return fileMode
+}
+
+type targetFileState struct {
+	Exists       bool
+	IsSymlink    bool
+	IsDirectory  bool
+	OwnerUserId  tkValueObject.UnixUserId
+	OwnerGroupId tkValueObject.UnixGroupId
+	Permissions  os.FileMode
+	SizeBytes    int64
+	DeviceId     uint64
+	InodeId      uint64
+}
+
+func (clerk FileClerk) targetFileStateReader(
+	dirHandle int,
+	targetFileName tkValueObject.UnixFileName,
+) (fileState targetFileState, err error) {
+	entryStat := unix.Stat_t{}
+	statErr := unix.Fstatat(
+		dirHandle, targetFileName.String(), &entryStat, unix.AT_SYMLINK_NOFOLLOW,
+	)
 	if statErr != nil {
-		return atomicFileWriteSettings{}, statErr
-	}
-	existingFilePermissions := fileInfo.Mode().Perm()
-
-	dirPath, rawTargetFileName := filepath.Split(actualFilePath)
-	targetFileName, fileNameErr := tkValueObject.NewUnixFileName(
-		rawTargetFileName, true,
-	)
-	if fileNameErr != nil {
-		return atomicFileWriteSettings{}, fileNameErr
-	}
-
-	dirHandle, openErr := unix.Open(dirPath, unix.O_PATH|unix.O_CLOEXEC, 0)
-	if openErr != nil {
-		return atomicFileWriteSettings{}, openErr
-	}
-
-	return atomicFileWriteSettings{
-		DirHandle:       dirHandle,
-		TargetFileName:  targetFileName,
-		Permissions:     existingFilePermissions,
-		ShouldOverwrite: true,
-	}, nil
-}
-
-func (clerk FileClerk) regexReplaceWholeFile(
-	filePathStr string,
-	regexPattern *regexp.Regexp,
-	replacement string,
-) (replacementCount int, err error) {
-	fileContent, readErr := clerk.ReadFileContent(filePathStr, nil)
-	if readErr != nil {
-		return 0, readErr
-	}
-
-	foundMatches := regexPattern.FindAllString(fileContent, -1)
-	replacementCount = len(foundMatches)
-	replacedContent := regexPattern.ReplaceAllString(fileContent, replacement)
-
-	if len(replacedContent) == 0 {
-		return 0, ErrReplacementWouldTruncateFile
-	}
-
-	settings, settingsErr := clerk.atomicReplacementSettingsResolver(filePathStr)
-	if settingsErr != nil {
-		return 0, settingsErr
-	}
-	defer func() { _ = unix.Close(settings.DirHandle) }()
-
-	writeErr := clerk.writeFileAtomically(
-		settings,
-		func(writer io.Writer) error {
-			_, writeErr := io.WriteString(writer, replacedContent)
-			return writeErr
-		},
-	)
-	if writeErr != nil {
-		return 0, writeErr
-	}
-
-	return replacementCount, nil
-}
-
-func (clerk FileClerk) writeRegexReplacedLines(
-	writer io.Writer,
-	bufferReader *bufio.Reader,
-	regexPattern *regexp.Regexp,
-	replacement string,
-) (replacementCount int, writtenBytesTotal int, err error) {
-	for {
-		rawLine, readErr := bufferReader.ReadString('\n')
-		if readErr == io.EOF && len(rawLine) == 0 {
-			break
+		if errors.Is(statErr, unix.ENOENT) {
+			return fileState, nil
 		}
-
-		lineTerminator := ""
-		switch {
-		case strings.HasSuffix(rawLine, "\r\n"):
-			lineTerminator = "\r\n"
-		case strings.HasSuffix(rawLine, "\n"):
-			lineTerminator = "\n"
-		}
-		lineContent := rawLine[:len(rawLine)-len(lineTerminator)]
-
-		replacedLine := regexPattern.ReplaceAllString(lineContent, replacement)
-		replacementCount += len(regexPattern.FindAllString(lineContent, -1))
-		writtenCount, writeErr := writer.Write(
-			[]byte(replacedLine + lineTerminator),
-		)
-		writtenBytesTotal += writtenCount
-		if writeErr != nil {
-			return replacementCount, writtenBytesTotal, writeErr
-		}
-
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			return replacementCount, writtenBytesTotal, readErr
-		}
+		return fileState, statErr
 	}
 
-	if writtenBytesTotal == 0 {
-		return replacementCount, writtenBytesTotal, ErrReplacementWouldTruncateFile
+	ownerUserId, userIdErr := tkValueObject.NewUnixUserId(entryStat.Uid)
+	if userIdErr != nil {
+		return fileState, userIdErr
+	}
+	ownerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(entryStat.Gid)
+	if groupIdErr != nil {
+		return fileState, groupIdErr
 	}
 
-	return replacementCount, writtenBytesTotal, nil
-}
-
-func (clerk FileClerk) regexReplaceStreaming(
-	filePathStr string,
-	regexPattern *regexp.Regexp,
-	replacement string,
-) (replacementCount int, err error) {
-	fileHandler, osOpenErr := os.Open(filePathStr)
-	if osOpenErr != nil {
-		if os.IsNotExist(osOpenErr) {
-			return 0, ErrFileMissing
-		}
-		return 0, osOpenErr
-	}
-	defer func() { _ = fileHandler.Close() }()
-
-	settings, settingsErr := clerk.atomicReplacementSettingsResolver(filePathStr)
-	if settingsErr != nil {
-		return 0, settingsErr
-	}
-	defer func() { _ = unix.Close(settings.DirHandle) }()
-
-	bufferReader := bufio.NewReader(fileHandler)
-	writeErr := clerk.writeFileAtomically(
-		settings,
-		func(writer io.Writer) error {
-			var replaceErr error
-			replacementCount, _, replaceErr = clerk.writeRegexReplacedLines(
-				writer, bufferReader, regexPattern, replacement,
-			)
-			return replaceErr
-		},
-	)
-	if writeErr != nil {
-		return 0, writeErr
+	entryFormat := entryStat.Mode & unix.S_IFMT
+	fileState = targetFileState{
+		Exists:       true,
+		IsSymlink:    entryFormat == unix.S_IFLNK,
+		IsDirectory:  entryFormat == unix.S_IFDIR,
+		OwnerUserId:  ownerUserId,
+		OwnerGroupId: ownerGroupId,
+		Permissions:  clerk.unixFileModeConverter(entryStat.Mode),
+		SizeBytes:    entryStat.Size,
+		DeviceId:     entryStat.Dev,
+		InodeId:      entryStat.Ino,
 	}
 
-	return replacementCount, nil
-}
-
-// FileContentRegexReplace atomically substitutes regex matches in a file.
-// Empty files and directories are rejected; symlinks are followed. A result
-// with zero bytes fails as a call-site bug — use TruncateFileContent to
-// empty a file on purpose; a file whose every line matches keeps its line
-// terminators. Files at or above RegexLargeFileThresholdBytes are processed
-// line-by-line, so multi-line patterns only match in smaller files.
-func (clerk FileClerk) FileContentRegexReplace(
-	filePath tkValueObject.UnixAbsoluteFilePath,
-	regexPattern *regexp.Regexp,
-	replacement string,
-) (replacementCount int, err error) {
-	if regexPattern == nil {
-		return 0, ErrRegexPatternMissing
-	}
-
-	filePathStr := filePath.String()
-	fileInfo, inspectErr := clerk.regexTargetFileInspector(filePath)
-	if inspectErr != nil {
-		return 0, inspectErr
-	}
-	originalFileSize := fileInfo.Size()
-
-	if originalFileSize == 0 {
-		return 0, ErrFileEmpty
-	}
-
-	if originalFileSize >= RegexLargeFileThresholdBytes {
-		slog.Warn(
-			"FileContentRegexReplaceStreamingFallback",
-			slog.String("filePath", filePathStr),
-			slog.Int64("fileSizeBytes", originalFileSize),
-			slog.Int64("thresholdBytes", RegexLargeFileThresholdBytes),
-			slog.String("reason", "FileSizeExceedsThreshold"),
-		)
-		return clerk.regexReplaceStreaming(filePathStr, regexPattern, replacement)
-	}
-	return clerk.regexReplaceWholeFile(filePathStr, regexPattern, replacement)
+	return fileState, nil
 }
 
 func (FileClerk) TruncateFileContent(
@@ -904,10 +833,10 @@ func (clerk FileClerk) CompressFile(
 	return targetPath, nil
 }
 
-// DecompressFile expands sourcePath (optionally into targetPathPtr) and
-// removes the archive unless shouldKeepSourceFilePtr requests otherwise.
-// Zip extraction overwrites existing files at the destination without
-// warning: only decompress archives you trust.
+// DecompressFile expands sourcePath and removes the archive unless
+// shouldKeepSourceFilePtr requests otherwise. Zip extraction overwrites
+// existing files at the destination without warning: only decompress archives
+// you trust.
 func (clerk FileClerk) DecompressFile(
 	sourcePath string,
 	targetPathPtr *string,
@@ -1222,6 +1151,7 @@ func (FileClerk) ownerGroupIdResolver(
 func (FileClerk) openRedirectProofDirChain(
 	dirPath tkValueObject.UnixAbsoluteFilePath,
 	ownerUserId tkValueObject.UnixUserId,
+	dirChainPolicy FileClerkDirChainPolicy,
 ) (dirHandle int, err error) {
 	walkFlags := unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC
 	walkHandle, openErr := unix.Open("/", walkFlags, 0)
@@ -1284,162 +1214,738 @@ func (FileClerk) openRedirectProofDirChain(
 				"%w: %s", ErrDirectoryOwnerInvalid, pathComponent,
 			)
 		}
+
+		componentHasSharedWrite :=
+			componentStat.Mode&(unix.S_IWGRP|unix.S_IWOTH) != 0
+		componentIsSticky := componentStat.Mode&unix.S_ISVTX != 0
+		policyRefusesSharedWrite :=
+			dirChainPolicy == FileClerkDirChainPolicySharedWriteRefused
+		componentIsSharedWriteRefused := policyRefusesSharedWrite &&
+			componentHasSharedWrite && !componentIsSticky
+		if componentIsSharedWriteRefused {
+			return 0, fmt.Errorf(
+				"%w: %s", ErrDirectoryWritableByOthers, pathComponent,
+			)
+		}
 	}
 
 	return walkHandle, nil
 }
 
-func (clerk FileClerk) VerifyDirPathRedirectSafety(
-	dirPath tkValueObject.UnixAbsoluteFilePath,
-	ownerUsernamePtr *tkValueObject.UnixUsername,
-	ownerUserIdPtr *tkValueObject.UnixUserId,
-) error {
-	ownerUserId, resolveErr := clerk.ownerUserIdResolver(
-		ownerUsernamePtr, ownerUserIdPtr,
-	)
-	if resolveErr != nil {
-		return resolveErr
+func (FileClerk) symlinkPolicyNormalizer(
+	symlinkPolicyPtr *FileClerkSymlinkPolicy,
+) (*FileClerkSymlinkPolicy, error) {
+	if symlinkPolicyPtr == nil {
+		defaultSymlinkPolicy := FileClerkSymlinkPolicyStrictRefuse
+		return &defaultSymlinkPolicy, nil
 	}
-
-	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(dirPath, ownerUserId)
-	if dirChainErr != nil {
-		return dirChainErr
+	switch *symlinkPolicyPtr {
+	case FileClerkSymlinkPolicyStrictRefuse, FileClerkSymlinkPolicyResolve:
+		return symlinkPolicyPtr, nil
+	default:
+		return nil, ErrSymlinkPolicyInvalid
 	}
-	return unix.Close(dirHandle)
 }
 
-func (clerk FileClerk) AppendFileContent(
-	filePath tkValueObject.UnixAbsoluteFilePath,
-	content string,
-) error {
-	targetFileName, fileNameErr := filePath.ReadFileName(true)
-	if fileNameErr != nil {
-		return ErrFileNameInvalid
+func (FileClerk) dirChainPolicyNormalizer(
+	dirChainPolicyPtr *FileClerkDirChainPolicy,
+) (*FileClerkDirChainPolicy, error) {
+	if dirChainPolicyPtr == nil {
+		defaultDirChainPolicy := FileClerkDirChainPolicySharedWriteAllowed
+		return &defaultDirChainPolicy, nil
 	}
-
-	ownerUserId, resolveErr := clerk.ownerUserIdResolver(nil, nil)
-	if resolveErr != nil {
-		return resolveErr
+	switch *dirChainPolicyPtr {
+	case FileClerkDirChainPolicySharedWriteAllowed, FileClerkDirChainPolicySharedWriteRefused:
+		return dirChainPolicyPtr, nil
+	default:
+		return nil, ErrDirChainPolicyInvalid
 	}
-
-	dirPath := filePath.ReadFileDir()
-	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(dirPath, ownerUserId)
-	if dirChainErr != nil {
-		return dirChainErr
-	}
-	defer func() { _ = unix.Close(dirHandle) }()
-
-	fileHandle, openErr := unix.Openat(
-		dirHandle,
-		targetFileName.String(),
-		unix.O_WRONLY|unix.O_CREAT|unix.O_APPEND|unix.O_NOFOLLOW|unix.O_CLOEXEC,
-		0644,
-	)
-	if openErr != nil {
-		if errors.Is(openErr, unix.ELOOP) {
-			return ErrTargetIsSymlink
-		}
-		return openErr
-	}
-	targetFile := os.NewFile(uintptr(fileHandle), targetFileName.String())
-
-	_, writeErr := targetFile.WriteString(content)
-	closeErr := targetFile.Close()
-	return errors.Join(writeErr, closeErr)
 }
 
 func (FileClerk) resolveSymlinkedFilePath(filePath string) (string, error) {
 	fileInfo, lstatErr := os.Lstat(filePath)
 	entryIsSymlink := lstatErr == nil && fileInfo.Mode()&os.ModeSymlink != 0
 	if entryIsSymlink {
-		return filepath.EvalSymlinks(filePath)
+		resolvedFilePath, evalErr := filepath.EvalSymlinks(filePath)
+		if os.IsNotExist(evalErr) {
+			return "", ErrFileMissing
+		}
+		return resolvedFilePath, evalErr
 	}
 
 	dirPath, fileName := filepath.Split(filePath)
 	resolvedDirPath, evalErr := filepath.EvalSymlinks(dirPath)
+	if os.IsNotExist(evalErr) {
+		return "", ErrFileMissing
+	}
 	if evalErr != nil {
 		return "", evalErr
 	}
 	return filepath.Join(resolvedDirPath, fileName), nil
 }
 
-type FileUpsertSettings struct {
-	FilePath             tkValueObject.UnixAbsoluteFilePath
-	Permissions          os.FileMode
-	ShouldFollowSymlinks bool
-	ShouldOverwrite      bool
-	OwnerUsername        *tkValueObject.UnixUsername
-	OwnerUserId          *tkValueObject.UnixUserId
+type fileWriteTarget struct {
+	DirHandle   int
+	FileName    tkValueObject.UnixFileName
+	TargetState targetFileState
 }
 
-func (clerk FileClerk) UpsertFile(
-	settings FileUpsertSettings,
-	fileContent []byte,
-) error {
-	if settings.Permissions == 0 {
-		return ErrFilePermissionsInvalid
+func (clerk FileClerk) fileWriteTargetResolver(
+	filePath tkValueObject.UnixAbsoluteFilePath,
+	symlinkPolicy FileClerkSymlinkPolicy,
+	dirChainPolicy FileClerkDirChainPolicy,
+	trustedDirOwnerUsername *tkValueObject.UnixUsername,
+	trustedDirOwnerUserId *tkValueObject.UnixUserId,
+) (target fileWriteTarget, err error) {
+	hasTrailingSeparator := strings.HasSuffix(filePath.String(), "/")
+	if hasTrailingSeparator {
+		return target, ErrFileNameInvalid
 	}
 
-	targetFilePath := settings.FilePath
-	if settings.ShouldFollowSymlinks {
+	targetFilePath := filePath
+	if symlinkPolicy == FileClerkSymlinkPolicyResolve {
 		resolvedFilePathStr, resolveErr := clerk.resolveSymlinkedFilePath(
 			targetFilePath.String(),
 		)
 		if resolveErr != nil {
-			return resolveErr
+			return target, resolveErr
 		}
 
 		resolvedFilePath, pathErr := tkValueObject.NewUnixAbsoluteFilePath(
 			resolvedFilePathStr, true,
 		)
 		if pathErr != nil {
-			return pathErr
+			return target, pathErr
 		}
 		targetFilePath = resolvedFilePath
 	}
 
 	targetFileName, fileNameErr := targetFilePath.ReadFileName(true)
 	if fileNameErr != nil {
-		return ErrFileNameInvalid
+		return target, ErrFileNameInvalid
 	}
 
-	ownerUserId, resolveErr := clerk.ownerUserIdResolver(
-		settings.OwnerUsername, settings.OwnerUserId,
+	trustedDirOwnerId, trustErr := clerk.ownerUserIdResolver(
+		trustedDirOwnerUsername, trustedDirOwnerUserId,
 	)
-	if resolveErr != nil {
-		return resolveErr
+	if trustErr != nil {
+		return target, trustErr
 	}
 
 	dirPath := targetFilePath.ReadFileDir()
-	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(dirPath, ownerUserId)
+	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
+		dirPath, trustedDirOwnerId, dirChainPolicy,
+	)
 	if dirChainErr != nil {
-		return dirChainErr
+		return target, dirChainErr
 	}
-	defer func() { _ = unix.Close(dirHandle) }()
 
-	writeSettings := atomicFileWriteSettings{
-		DirHandle:       dirHandle,
-		TargetFileName:  targetFileName,
-		Permissions:     settings.Permissions,
-		ShouldOverwrite: settings.ShouldOverwrite,
+	targetState, stateErr := clerk.targetFileStateReader(dirHandle, targetFileName)
+	if stateErr != nil {
+		_ = unix.Close(dirHandle)
+		return target, stateErr
 	}
-	shouldChown := settings.OwnerUsername != nil || settings.OwnerUserId != nil
-	if shouldChown {
-		ownerGroupId, groupResolveErr := clerk.ownerGroupIdResolver(ownerUserId)
-		if groupResolveErr != nil {
-			return groupResolveErr
+
+	return fileWriteTarget{
+		DirHandle:   dirHandle,
+		FileName:    targetFileName,
+		TargetState: targetState,
+	}, nil
+}
+
+func (FileClerk) atomicReplacementSettingsResolver(
+	target fileWriteTarget,
+) atomicFileWriteSettings {
+	return atomicFileWriteSettings{
+		DirHandle:       target.DirHandle,
+		TargetFileName:  target.FileName,
+		Permissions:     target.TargetState.Permissions,
+		ShouldOverwrite: true,
+		OwnerUserId:     &target.TargetState.OwnerUserId,
+		OwnerGroupId:    &target.TargetState.OwnerGroupId,
+	}
+}
+
+func (FileClerk) targetFileStateValidator(
+	targetState targetFileState,
+) error {
+	if !targetState.Exists {
+		return ErrFileMissing
+	}
+	if targetState.IsSymlink {
+		return ErrTargetIsSymlink
+	}
+	if targetState.IsDirectory {
+		return ErrTargetIsDirectory
+	}
+
+	return nil
+}
+
+func (FileClerk) targetFileSwapVerifier(
+	fileHandle int,
+	targetState targetFileState,
+) error {
+	openedFileStat := unix.Stat_t{}
+	statErr := unix.Fstat(fileHandle, &openedFileStat)
+	if statErr != nil {
+		return statErr
+	}
+
+	identityChanged := openedFileStat.Dev != targetState.DeviceId ||
+		openedFileStat.Ino != targetState.InodeId
+	if identityChanged {
+		return ErrTargetFileChanged
+	}
+
+	return nil
+}
+
+func (clerk FileClerk) inspectedTargetFileOpener(
+	dirHandle int,
+	targetFileName tkValueObject.UnixFileName,
+	targetState targetFileState,
+	openFlags int,
+) (fileHandle int, err error) {
+	fileHandle, openErr := unix.Openat(
+		dirHandle, targetFileName.String(), openFlags, 0,
+	)
+	if openErr != nil {
+		switch {
+		case errors.Is(openErr, unix.ELOOP):
+			return 0, ErrTargetIsSymlink
+		case errors.Is(openErr, unix.ENOENT):
+			return 0, ErrFileMissing
+		case errors.Is(openErr, unix.EISDIR):
+			return 0, ErrTargetIsDirectory
+		case errors.Is(openErr, unix.ENXIO):
+			return 0, ErrTargetNotRegularFile
+		default:
+			return 0, openErr
 		}
+	}
 
-		writeSettings.OwnerUserId = &ownerUserId
-		writeSettings.OwnerGroupId = &ownerGroupId
+	swapErr := clerk.targetFileSwapVerifier(fileHandle, targetState)
+	if swapErr != nil {
+		_ = unix.Close(fileHandle)
+		return 0, swapErr
+	}
+
+	return fileHandle, nil
+}
+
+type FileRegexReplaceSettings struct {
+	FilePath tkValueObject.UnixAbsoluteFilePath
+
+	DirChainPolicy *FileClerkDirChainPolicy
+	SymlinkPolicy  *FileClerkSymlinkPolicy
+
+	// When unset, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsername *tkValueObject.UnixUsername
+	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+}
+
+func (clerk FileClerk) regexReplaceWholeFile(
+	fileHandler *os.File,
+	target fileWriteTarget,
+	regexPattern *regexp.Regexp,
+	replacement string,
+) (replacementCount int, err error) {
+	fileContent, readErr := clerk.readFileContentFromReader(fileHandler, nil)
+	if readErr != nil {
+		return 0, readErr
+	}
+
+	foundMatches := regexPattern.FindAllString(fileContent, -1)
+	replacementCount = len(foundMatches)
+	replacedContent := regexPattern.ReplaceAllString(fileContent, replacement)
+
+	if len(replacedContent) == 0 {
+		return 0, ErrReplacementWouldTruncateFile
 	}
 
 	writeErr := clerk.writeFileAtomically(
+		clerk.atomicReplacementSettingsResolver(target),
+		func(writer io.Writer) error {
+			_, writeErr := io.WriteString(writer, replacedContent)
+			return writeErr
+		},
+	)
+	if writeErr != nil {
+		return 0, writeErr
+	}
+
+	return replacementCount, nil
+}
+
+func (clerk FileClerk) writeRegexReplacedLines(
+	writer io.Writer,
+	bufferReader *bufio.Reader,
+	regexPattern *regexp.Regexp,
+	replacement string,
+) (replacementCount int, writtenBytesTotal int, err error) {
+	for {
+		rawLine, readErr := bufferReader.ReadString('\n')
+		if readErr == io.EOF && len(rawLine) == 0 {
+			break
+		}
+
+		lineTerminator := ""
+		switch {
+		case strings.HasSuffix(rawLine, "\r\n"):
+			lineTerminator = "\r\n"
+		case strings.HasSuffix(rawLine, "\n"):
+			lineTerminator = "\n"
+		}
+		lineContent := rawLine[:len(rawLine)-len(lineTerminator)]
+
+		replacedLine := regexPattern.ReplaceAllString(lineContent, replacement)
+		replacementCount += len(regexPattern.FindAllString(lineContent, -1))
+		writtenCount, writeErr := writer.Write(
+			[]byte(replacedLine + lineTerminator),
+		)
+		writtenBytesTotal += writtenCount
+		if writeErr != nil {
+			return replacementCount, writtenBytesTotal, writeErr
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return replacementCount, writtenBytesTotal, readErr
+		}
+	}
+
+	if writtenBytesTotal == 0 {
+		return replacementCount, writtenBytesTotal, ErrReplacementWouldTruncateFile
+	}
+
+	return replacementCount, writtenBytesTotal, nil
+}
+
+func (clerk FileClerk) regexReplaceStreaming(
+	fileHandler *os.File,
+	target fileWriteTarget,
+	regexPattern *regexp.Regexp,
+	replacement string,
+) (replacementCount int, err error) {
+	bufferReader := bufio.NewReader(fileHandler)
+	writeErr := clerk.writeFileAtomically(
+		clerk.atomicReplacementSettingsResolver(target),
+		func(writer io.Writer) error {
+			var replaceErr error
+			replacementCount, _, replaceErr = clerk.writeRegexReplacedLines(
+				writer, bufferReader, regexPattern, replacement,
+			)
+			return replaceErr
+		},
+	)
+	if writeErr != nil {
+		return 0, writeErr
+	}
+
+	return replacementCount, nil
+}
+
+// FileContentRegexReplace atomically substitutes regex matches in a file. It
+// preserves the target's owner, group, and mode, including special bits. The
+// parent chain is held and the opened inode is verified against the inspected
+// target, so a swap between the two fails with ErrTargetFileChanged. Symlinks
+// are refused unless the policy resolves them. A zero-byte result fails; use
+// TruncateFileContent to empty a file. Files at or above the large-file
+// threshold stream line-by-line, so multi-line patterns need smaller files.
+func (clerk FileClerk) FileContentRegexReplace(
+	settings FileRegexReplaceSettings,
+	regexPattern *regexp.Regexp,
+	replacement string,
+) (replacementCount int, err error) {
+	if regexPattern == nil {
+		return 0, ErrRegexPatternMissing
+	}
+
+	symlinkPolicy, symlinkPolicyErr := clerk.symlinkPolicyNormalizer(
+		settings.SymlinkPolicy,
+	)
+	if symlinkPolicyErr != nil {
+		return 0, symlinkPolicyErr
+	}
+	dirChainPolicy, dirChainPolicyErr := clerk.dirChainPolicyNormalizer(
+		settings.DirChainPolicy,
+	)
+	if dirChainPolicyErr != nil {
+		return 0, dirChainPolicyErr
+	}
+
+	target, targetErr := clerk.fileWriteTargetResolver(
+		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
+		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+	)
+	if targetErr != nil {
+		return 0, targetErr
+	}
+	defer func() { _ = unix.Close(target.DirHandle) }()
+
+	targetState := target.TargetState
+	targetStateErr := clerk.targetFileStateValidator(targetState)
+	if targetStateErr != nil {
+		return 0, targetStateErr
+	}
+	if targetState.SizeBytes == 0 {
+		return 0, ErrFileEmpty
+	}
+
+	fileHandle, openErr := clerk.inspectedTargetFileOpener(
+		target.DirHandle, target.FileName, targetState, targetFileReadOpenFlags,
+	)
+	if openErr != nil {
+		return 0, openErr
+	}
+	fileHandler := os.NewFile(uintptr(fileHandle), target.FileName.String())
+	defer func() { _ = fileHandler.Close() }()
+
+	if targetState.SizeBytes >= RegexLargeFileThresholdBytes {
+		slog.Warn(
+			"FileContentRegexReplaceStreamingFallback",
+			slog.String("filePath", settings.FilePath.String()),
+			slog.Int64("fileSizeBytes", targetState.SizeBytes),
+			slog.Int64("thresholdBytes", RegexLargeFileThresholdBytes),
+			slog.String("reason", "FileSizeExceedsThreshold"),
+		)
+		return clerk.regexReplaceStreaming(
+			fileHandler, target, regexPattern, replacement,
+		)
+	}
+	return clerk.regexReplaceWholeFile(
+		fileHandler, target, regexPattern, replacement,
+	)
+}
+
+type FileAppendSettings struct {
+	FilePath tkValueObject.UnixAbsoluteFilePath
+
+	DirChainPolicy *FileClerkDirChainPolicy
+	SymlinkPolicy  *FileClerkSymlinkPolicy
+
+	// When unset, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsername *tkValueObject.UnixUsername
+	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+}
+
+// AppendFileContent verifies the opened inode against the inspected target and
+// appends through an O_APPEND write, so concurrent writers never lose data and
+// the target's owner, group, and mode stay untouched. A missing target fails
+// with ErrFileMissing; create it with UpsertFile. Symlinks are refused unless
+// the policy resolves them.
+func (clerk FileClerk) AppendFileContent(
+	settings FileAppendSettings,
+	content string,
+) error {
+	symlinkPolicy, symlinkPolicyErr := clerk.symlinkPolicyNormalizer(
+		settings.SymlinkPolicy,
+	)
+	if symlinkPolicyErr != nil {
+		return symlinkPolicyErr
+	}
+	dirChainPolicy, dirChainPolicyErr := clerk.dirChainPolicyNormalizer(
+		settings.DirChainPolicy,
+	)
+	if dirChainPolicyErr != nil {
+		return dirChainPolicyErr
+	}
+
+	target, targetErr := clerk.fileWriteTargetResolver(
+		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
+		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+	)
+	if targetErr != nil {
+		return targetErr
+	}
+	defer func() { _ = unix.Close(target.DirHandle) }()
+
+	targetState := target.TargetState
+	targetStateErr := clerk.targetFileStateValidator(targetState)
+	if targetStateErr != nil {
+		return targetStateErr
+	}
+
+	fileHandle, openErr := clerk.inspectedTargetFileOpener(
+		target.DirHandle, target.FileName, targetState, targetFileAppendOpenFlags,
+	)
+	if openErr != nil {
+		return openErr
+	}
+	targetFile := os.NewFile(uintptr(fileHandle), target.FileName.String())
+
+	_, writeErr := targetFile.WriteString(content)
+	closeErr := targetFile.Close()
+	return errors.Join(writeErr, closeErr)
+}
+
+type FileUpsertSettings struct {
+	FilePath tkValueObject.UnixAbsoluteFilePath
+
+	DirChainPolicy  *FileClerkDirChainPolicy
+	OverwritePolicy *FileClerkOverwritePolicy
+	SymlinkPolicy   *FileClerkSymlinkPolicy
+
+	// When unset, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsername *tkValueObject.UnixUsername
+	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+
+	Permissions *os.FileMode
+
+	OwnerSource   *FileClerkOwnerSource
+	OwnerUsername *tkValueObject.UnixUsername
+	OwnerUserId   *tkValueObject.UnixUserId
+	OwnerGroupId  *tkValueObject.UnixGroupId
+}
+
+type fileUpsertOwnership struct {
+	UserId  tkValueObject.UnixUserId
+	GroupId tkValueObject.UnixGroupId
+}
+
+func (clerk FileClerk) runningProcessOwnershipResolver() (
+	ownership fileUpsertOwnership, err error,
+) {
+	processUserId, userIdErr := clerk.ownerUserIdResolver(nil, nil)
+	if userIdErr != nil {
+		return ownership, userIdErr
+	}
+
+	processGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
+	if groupIdErr != nil {
+		return ownership, groupIdErr
+	}
+
+	ownership = fileUpsertOwnership{
+		UserId:  processUserId,
+		GroupId: processGroupId,
+	}
+
+	return ownership, nil
+}
+
+func (clerk FileClerk) fileUpsertSourceOwnershipResolver(
+	ownerSource FileClerkOwnerSource,
+	targetState targetFileState,
+	containingDirStat unix.Stat_t,
+) (ownership fileUpsertOwnership, err error) {
+	switch ownerSource {
+	case FileClerkOwnerSourceExistingFile:
+		if targetState.Exists {
+			ownership = fileUpsertOwnership{
+				UserId:  targetState.OwnerUserId,
+				GroupId: targetState.OwnerGroupId,
+			}
+			return ownership, nil
+		}
+		return clerk.runningProcessOwnershipResolver()
+	case FileClerkOwnerSourceContainingDirectory:
+		containingDirUserId, userIdErr := tkValueObject.NewUnixUserId(
+			containingDirStat.Uid,
+		)
+		if userIdErr != nil {
+			return ownership, userIdErr
+		}
+		containingDirGroupId, groupIdErr := tkValueObject.NewUnixGroupId(
+			containingDirStat.Gid,
+		)
+		if groupIdErr != nil {
+			return ownership, groupIdErr
+		}
+		ownership = fileUpsertOwnership{
+			UserId:  containingDirUserId,
+			GroupId: containingDirGroupId,
+		}
+		return ownership, nil
+	case FileClerkOwnerSourceRunningProcess:
+		return clerk.runningProcessOwnershipResolver()
+	default:
+		return ownership, ErrOwnerSourceInvalid
+	}
+}
+
+func (clerk FileClerk) fileUpsertOwnerResolver(
+	ownerSource FileClerkOwnerSource,
+	ownerUsername *tkValueObject.UnixUsername,
+	ownerUserId *tkValueObject.UnixUserId,
+	ownerGroupId *tkValueObject.UnixGroupId,
+	targetState targetFileState,
+	containingDirStat unix.Stat_t,
+) (ownership fileUpsertOwnership, err error) {
+	ownerAccountStated := ownerUsername != nil || ownerUserId != nil
+	if ownerAccountStated {
+		ownerSourceContradictsAccount :=
+			ownerSource == FileClerkOwnerSourceContainingDirectory ||
+				ownerSource == FileClerkOwnerSourceRunningProcess
+		if ownerSourceContradictsAccount {
+			return ownership, ErrOwnerSourceConflict
+		}
+
+		statedUserId, userIdErr := clerk.ownerUserIdResolver(
+			ownerUsername, ownerUserId,
+		)
+		if userIdErr != nil {
+			return ownership, userIdErr
+		}
+		if ownerGroupId != nil {
+			ownership = fileUpsertOwnership{
+				UserId:  statedUserId,
+				GroupId: *ownerGroupId,
+			}
+			return ownership, nil
+		}
+
+		statedGroupId, groupIdErr := clerk.ownerGroupIdResolver(statedUserId)
+		if groupIdErr != nil {
+			return ownership, groupIdErr
+		}
+		ownership = fileUpsertOwnership{
+			UserId:  statedUserId,
+			GroupId: statedGroupId,
+		}
+		return ownership, nil
+	}
+
+	ownership, err = clerk.fileUpsertSourceOwnershipResolver(
+		ownerSource, targetState, containingDirStat,
+	)
+	if err != nil {
+		return ownership, err
+	}
+	if ownerGroupId != nil {
+		ownership.GroupId = *ownerGroupId
+	}
+
+	return ownership, nil
+}
+
+func (FileClerk) fileUpsertPermissionsResolver(
+	statedPermissionsPtr *os.FileMode,
+	targetState targetFileState,
+) os.FileMode {
+	if statedPermissionsPtr != nil {
+		return *statedPermissionsPtr
+	}
+	if targetState.Exists {
+		return targetState.Permissions
+	}
+
+	return FileClerkDefaultNewFileMode
+}
+
+func (clerk FileClerk) fileUpsertSettingsNormalizer(
+	settings FileUpsertSettings,
+) (FileUpsertSettings, error) {
+	dirChainPolicy, dirChainPolicyErr := clerk.dirChainPolicyNormalizer(
+		settings.DirChainPolicy,
+	)
+	if dirChainPolicyErr != nil {
+		return settings, dirChainPolicyErr
+	}
+	settings.DirChainPolicy = dirChainPolicy
+
+	symlinkPolicy, symlinkPolicyErr := clerk.symlinkPolicyNormalizer(
+		settings.SymlinkPolicy,
+	)
+	if symlinkPolicyErr != nil {
+		return settings, symlinkPolicyErr
+	}
+	settings.SymlinkPolicy = symlinkPolicy
+
+	if settings.OverwritePolicy == nil {
+		defaultOverwritePolicy := FileClerkOverwritePolicyStrictRefuse
+		settings.OverwritePolicy = &defaultOverwritePolicy
+	}
+	switch *settings.OverwritePolicy {
+	case FileClerkOverwritePolicyStrictRefuse, FileClerkOverwritePolicyReplace:
+	default:
+		return settings, ErrOverwritePolicyInvalid
+	}
+
+	if settings.OwnerSource == nil {
+		defaultOwnerSource := FileClerkOwnerSourceExistingFile
+		settings.OwnerSource = &defaultOwnerSource
+	}
+	switch *settings.OwnerSource {
+	case FileClerkOwnerSourceExistingFile, FileClerkOwnerSourceContainingDirectory,
+		FileClerkOwnerSourceRunningProcess:
+	default:
+		return settings, ErrOwnerSourceInvalid
+	}
+
+	return settings, nil
+}
+
+func (clerk FileClerk) UpsertFile(
+	settings FileUpsertSettings,
+	fileContent []byte,
+) error {
+	settings, normalizeErr := clerk.fileUpsertSettingsNormalizer(settings)
+	if normalizeErr != nil {
+		return normalizeErr
+	}
+	symlinkPolicy := *settings.SymlinkPolicy
+	overwritePolicy := *settings.OverwritePolicy
+	ownerSource := *settings.OwnerSource
+
+	target, targetErr := clerk.fileWriteTargetResolver(
+		settings.FilePath, symlinkPolicy, *settings.DirChainPolicy,
+		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+	)
+	if targetErr != nil {
+		return targetErr
+	}
+	defer func() { _ = unix.Close(target.DirHandle) }()
+
+	targetState := target.TargetState
+	shouldRefuseSymlink := targetState.IsSymlink &&
+		symlinkPolicy == FileClerkSymlinkPolicyStrictRefuse
+	if shouldRefuseSymlink {
+		return ErrTargetIsSymlink
+	}
+	if targetState.IsDirectory {
+		return ErrTargetIsDirectory
+	}
+
+	shouldOverwrite := overwritePolicy == FileClerkOverwritePolicyReplace
+	if targetState.Exists && !shouldOverwrite {
+		return ErrTargetFileExists
+	}
+
+	permissions := clerk.fileUpsertPermissionsResolver(
+		settings.Permissions, targetState,
+	)
+
+	containingDirStat := unix.Stat_t{}
+	containingDirStatErr := unix.Fstat(target.DirHandle, &containingDirStat)
+	if containingDirStatErr != nil {
+		return containingDirStatErr
+	}
+
+	ownership, ownerErr := clerk.fileUpsertOwnerResolver(
+		ownerSource, settings.OwnerUsername, settings.OwnerUserId,
+		settings.OwnerGroupId, targetState, containingDirStat,
+	)
+	if ownerErr != nil {
+		return ownerErr
+	}
+
+	writeSettings := atomicFileWriteSettings{
+		DirHandle:       target.DirHandle,
+		TargetFileName:  target.FileName,
+		Permissions:     permissions,
+		ShouldOverwrite: shouldOverwrite,
+		OwnerUserId:     &ownership.UserId,
+		OwnerGroupId:    &ownership.GroupId,
+	}
+	return clerk.writeFileAtomically(
 		writeSettings,
 		func(writer io.Writer) error {
 			_, writeErr := writer.Write(fileContent)
 			return writeErr
 		},
 	)
-	return writeErr
 }

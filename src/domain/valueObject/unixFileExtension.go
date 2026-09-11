@@ -11,6 +11,8 @@ import (
 
 var unixFileExtensionRegex = regexp.MustCompile(`^([\w\-]{1,15}\.)?[\w\-]{1,15}$`)
 
+var ErrFileExtensionInvalid = errors.New("FileExtensionInvalid")
+
 type UnixFileExtension string
 
 func NewUnixFileExtension(value any) (
@@ -23,7 +25,7 @@ func NewUnixFileExtension(value any) (
 	stringValue = strings.TrimPrefix(stringValue, ".")
 
 	if !unixFileExtensionRegex.MatchString(stringValue) {
-		return unixFileExtension, errors.New("InvalidUnixFileExtension")
+		return unixFileExtension, ErrFileExtensionInvalid
 	}
 
 	return UnixFileExtension(stringValue), nil
@@ -35,7 +37,7 @@ func (vo UnixFileExtension) ReadMimeType() MimeType {
 	fileExtWithLeadingDot := "." + string(vo)
 	mimeTypeWithCharset := mime.TypeByExtension(fileExtWithLeadingDot)
 	if len(mimeTypeWithCharset) > 0 {
-		mimeTypeOnly := strings.Split(mimeTypeWithCharset, ";")[0]
+		mimeTypeOnly, _, _ := strings.Cut(mimeTypeWithCharset, ";")
 		mimeTypeStr = mimeTypeOnly
 	}
 

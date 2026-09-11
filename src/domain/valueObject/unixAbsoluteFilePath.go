@@ -17,6 +17,8 @@ var (
 	unixAbsoluteFilePathUnsafeRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][^\x00-\x1f\x7f]*$`)
 )
 
+var ErrRootPathHasNoFileName = errors.New("RootPathHasNoFileName")
+
 type UnixAbsoluteFilePath string
 
 func NewUnixAbsoluteFilePath(value any, allowUnsafeChars bool) (
@@ -66,6 +68,9 @@ func (vo UnixAbsoluteFilePath) ReadWithoutExtension(allowUnsafeChars bool) UnixA
 	if err != nil {
 		return vo
 	}
+	if fileExt == "" {
+		return vo
+	}
 
 	extStr := "." + fileExt.String()
 	rawFilePathWithoutExt := strings.TrimSuffix(string(vo), extStr)
@@ -76,7 +81,10 @@ func (vo UnixAbsoluteFilePath) ReadWithoutExtension(allowUnsafeChars bool) UnixA
 func (vo UnixAbsoluteFilePath) ReadFileName(
 	allowUnsafeChars bool,
 ) (UnixFileName, error) {
-	_, rawFileName := filepath.Split(string(vo))
+	rawFileName := filepath.Base(string(vo))
+	if rawFileName == "/" {
+		return "", ErrRootPathHasNoFileName
+	}
 	return NewUnixFileName(rawFileName, allowUnsafeChars)
 }
 
@@ -86,16 +94,22 @@ func (vo UnixAbsoluteFilePath) ReadFileExtension() (UnixFileExtension, error) {
 		return "", fileNameErr
 	}
 
-	fileNameWithoutLeadingDots := strings.TrimLeft(fileName.String(), ".")
-	isExtensionlessDotfile := strings.HasPrefix(fileName.String(), ".") &&
+	fileNameStr := fileName.String()
+	fileNameWithoutLeadingDots := strings.TrimLeft(fileNameStr, ".")
+	isExtensionlessDotfile := strings.HasPrefix(fileNameStr, ".") &&
 		fileNameWithoutLeadingDots != "" &&
 		!strings.Contains(fileNameWithoutLeadingDots, ".")
 	if isExtensionlessDotfile {
-		return NewUnixFileExtension("")
+		return "", nil
 	}
 
-	unixFileExtensionStr := filepath.Ext(string(vo))
-	return NewUnixFileExtension(unixFileExtensionStr)
+	rawFileExtension := filepath.Ext(fileNameStr)
+	isTrailingDotName := rawFileExtension == "."
+	if rawFileExtension == "" || isTrailingDotName {
+		return "", nil
+	}
+
+	return NewUnixFileExtension(rawFileExtension)
 }
 
 func (vo UnixAbsoluteFilePath) ReadCompoundFileExtension() (UnixFileExtension, error) {
@@ -123,7 +137,7 @@ func (vo UnixAbsoluteFilePath) ReadFileNameWithoutExtension(
 	}
 
 	fileExt, extErr := vo.ReadCompoundFileExtension()
-	if extErr != nil {
+	if extErr != nil || fileExt == "" {
 		return fileName, nil
 	}
 
@@ -134,7 +148,14 @@ func (vo UnixAbsoluteFilePath) ReadFileNameWithoutExtension(
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileDir() UnixAbsoluteFilePath {
-	unixFileDirPath, _ := NewUnixAbsoluteFilePath(filepath.Dir(string(vo)), true)
+	pathWithoutTrailingSeparators := strings.TrimRight(string(vo), "/")
+	if pathWithoutTrailingSeparators == "" {
+		pathWithoutTrailingSeparators = "/"
+	}
+
+	unixFileDirPath, _ := NewUnixAbsoluteFilePath(
+		filepath.Dir(pathWithoutTrailingSeparators), true,
+	)
 	return unixFileDirPath
 }
 

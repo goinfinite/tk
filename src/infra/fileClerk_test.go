@@ -995,26 +995,6 @@ func TestAppendFileContent(t *testing.T) {
 	clerk := FileClerk{}
 	tempDir := t.TempDir()
 
-	t.Run("CreatesMissingFile", func(t *testing.T) {
-		testFile := filepath.Join(tempDir, "created.txt")
-		content := "Created by append"
-
-		err := clerk.AppendFileContent(
-			absoluteFilePathForTest(t, testFile), content,
-		)
-		if err != nil {
-			t.Fatalf("AppendFileContentFailed: %v", err)
-		}
-
-		actualContent, readErr := clerk.ReadFileContent(testFile, nil)
-		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
-		}
-		if actualContent != content {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, content)
-		}
-	})
-
 	t.Run("AppendsToExistingFile", func(t *testing.T) {
 		testFile := filepath.Join(tempDir, "append.txt")
 		initialContent := "Initial"
@@ -1025,9 +1005,9 @@ func TestAppendFileContent(t *testing.T) {
 			t.Fatalf("WriteFileFailed: %v", err)
 		}
 
-		err = clerk.AppendFileContent(
-			absoluteFilePathForTest(t, testFile), appendContent,
-		)
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, testFile),
+		}, appendContent)
 		if err != nil {
 			t.Fatalf("AppendFileContentFailed: %v", err)
 		}
@@ -1039,6 +1019,252 @@ func TestAppendFileContent(t *testing.T) {
 		expectedContent := initialContent + appendContent
 		if actualContent != expectedContent {
 			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
+		}
+	})
+
+	t.Run("MissingFileReturnsFileNotFound", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "missing.txt")
+
+		err := clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, testFile),
+		}, "content")
+		if !errors.Is(err, ErrFileMissing) {
+			t.Errorf("ExpectedErrFileMissing, got: %v", err)
+		}
+		if clerk.FileExists(testFile) {
+			t.Errorf("MissingTargetWasCreated")
+		}
+	})
+
+	t.Run("KeepsTargetMode", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "mode.txt")
+		err := os.WriteFile(testFile, []byte("Initial"), 0640)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, testFile),
+		}, " Appended")
+		if err != nil {
+			t.Fatalf("AppendFileContentFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(testFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Mode().Perm() != 0640 {
+			t.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
+		}
+	})
+
+	t.Run("KeepsTargetOwner", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
+		if gidErr != nil {
+			t.Fatalf("GidParseFailed: %v", gidErr)
+		}
+
+		testFile := filepath.Join(tempDir, "owned.txt")
+		err := os.WriteFile(testFile, []byte("Initial"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		err = os.Chown(testFile, nobodyUid, nobodyGid)
+		if err != nil {
+			t.Fatalf("ChownFailed: %v", err)
+		}
+
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, testFile),
+		}, " Appended")
+		if err != nil {
+			t.Fatalf("AppendFileContentFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(testFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
+			t.Errorf(
+				"OwnerChanged: expected %d:%d, got %d:%d",
+				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("RefusesSymlinkTargetByDefault", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "symlinkReal.txt")
+		err := os.WriteFile(realFile, []byte("real"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		linkFile := filepath.Join(tempDir, "symlinkLink.txt")
+		err = os.Symlink(realFile, linkFile)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, linkFile),
+		}, " appended")
+		if !errors.Is(err, ErrTargetIsSymlink) {
+			t.Errorf("ExpectedErrTargetIsSymlink, got: %v", err)
+		}
+	})
+
+	t.Run("ResolvesSymlinkTargetWhenRequested", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "resolveReal.txt")
+		err := os.WriteFile(realFile, []byte("real"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		linkFile := filepath.Join(tempDir, "resolveLink.txt")
+		err = os.Symlink(realFile, linkFile)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		symlinkPolicy := FileClerkSymlinkPolicyResolve
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath:      absoluteFilePathForTest(t, linkFile),
+			SymlinkPolicy: &symlinkPolicy,
+		}, " appended")
+		if err != nil {
+			t.Fatalf("AppendFileContentFailed: %v", err)
+		}
+
+		actualContent, readErr := clerk.ReadFileContent(realFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if actualContent != "real appended" {
+			t.Errorf("ContentMismatch: '%s'", actualContent)
+		}
+	})
+
+	t.Run("DanglingSymlinkWithResolveReturnsFileNotFound", func(t *testing.T) {
+		linkFile := filepath.Join(tempDir, "danglingLink.txt")
+		err := os.Symlink(filepath.Join(tempDir, "missingTarget.txt"), linkFile)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		symlinkPolicy := FileClerkSymlinkPolicyResolve
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath:      absoluteFilePathForTest(t, linkFile),
+			SymlinkPolicy: &symlinkPolicy,
+		}, "content")
+		if !errors.Is(err, ErrFileMissing) {
+			t.Errorf("ExpectedErrFileMissing, got: %v", err)
+		}
+	})
+
+	t.Run("RefusesDirectoryTarget", func(t *testing.T) {
+		testDir := filepath.Join(tempDir, "appendDir")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath: absoluteFilePathForTest(t, testDir),
+		}, "content")
+		if !errors.Is(err, ErrTargetIsDirectory) {
+			t.Errorf("ExpectedErrTargetIsDirectory, got: %v", err)
+		}
+	})
+
+	t.Run("RefusesFifoWithoutReader", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "append.fifo")
+		fifoErr := unix.Mkfifo(testFile, 0o600)
+		if fifoErr != nil {
+			t.Fatalf("MkfifoFailed: %v", fifoErr)
+		}
+		targetPath := absoluteFilePathForTest(t, testFile)
+
+		appendResultChan := make(chan error, 1)
+		go func() {
+			appendResultChan <- clerk.AppendFileContent(
+				FileAppendSettings{FilePath: targetPath}, "content",
+			)
+		}()
+
+		select {
+		case appendErr := <-appendResultChan:
+			if !errors.Is(appendErr, ErrTargetNotRegularFile) {
+				t.Fatalf("ExpectedErrTargetNotRegularFile, got: %v", appendErr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("AppendBlockedOnFifo")
+		}
+	})
+
+	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+		testDir := filepath.Join(tempDir, "writableAppendDir")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+		err = os.Chmod(testDir, 0o777)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+		testFile := filepath.Join(testDir, "append.txt")
+		err = os.WriteFile(testFile, []byte("Initial"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath:       absoluteFilePathForTest(t, testFile),
+			DirChainPolicy: &sharedWriteRefusedPolicy,
+		}, " Appended")
+		if !errors.Is(err, ErrDirectoryWritableByOthers) {
+			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+		}
+	})
+
+	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+		testFile := filepath.Join(tempDir, "unknownOwner.txt")
+		err := os.WriteFile(testFile, []byte("Initial"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
+			"no-such-user-xyz-42",
+		)
+		if usernameErr != nil {
+			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+		}
+
+		err = clerk.AppendFileContent(FileAppendSettings{
+			FilePath:                absoluteFilePathForTest(t, testFile),
+			TrustedDirOwnerUsername: &unknownUsername,
+		}, " Appended")
+		if err == nil {
+			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+		}
+		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
+			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 }
@@ -2484,7 +2710,8 @@ func TestFileContentRegexReplace(t *testing.T) {
 			}
 
 			replacementCount, replaceErr := clerk.FileContentRegexReplace(
-				filePath, regexPattern, testCase.replacement,
+				FileRegexReplaceSettings{FilePath: filePath},
+				regexPattern, testCase.replacement,
 			)
 
 			if testCase.expectedErrIsNil {
@@ -2567,6 +2794,165 @@ func TestFileContentRegexReplace(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("RefusesSymlinkTargetByDefault", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "replaceSymlinkReal.txt")
+		err := os.WriteFile(realFile, []byte("alpha=1"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		linkFile := filepath.Join(tempDir, "replaceSymlinkLink.txt")
+		err = os.Symlink(realFile, linkFile)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
+		_, replaceErr := clerk.FileContentRegexReplace(
+			FileRegexReplaceSettings{
+				FilePath: absoluteFilePathForTest(t, linkFile),
+			},
+			regexPattern, `alpha=$1!`,
+		)
+		if !errors.Is(replaceErr, ErrTargetIsSymlink) {
+			t.Errorf("ExpectedErrTargetIsSymlink, got: %v", replaceErr)
+		}
+	})
+
+	t.Run("ResolvesSymlinkTargetWhenRequested", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "resolveReplaceReal.txt")
+		err := os.WriteFile(realFile, []byte("alpha=1"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		linkFile := filepath.Join(tempDir, "resolveReplaceLink.txt")
+		err = os.Symlink(realFile, linkFile)
+		if err != nil {
+			t.Fatalf("SymlinkFailed: %v", err)
+		}
+
+		symlinkPolicy := FileClerkSymlinkPolicyResolve
+		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
+		replacementCount, replaceErr := clerk.FileContentRegexReplace(
+			FileRegexReplaceSettings{
+				FilePath:      absoluteFilePathForTest(t, linkFile),
+				SymlinkPolicy: &symlinkPolicy,
+			},
+			regexPattern, `alpha=$1!`,
+		)
+		if replaceErr != nil {
+			t.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
+		}
+		if replacementCount != 1 {
+			t.Errorf("WrongReplacementCount: expected=1 actual=%d", replacementCount)
+		}
+
+		actualContent, readErr := clerk.ReadFileContent(realFile, nil)
+		if readErr != nil {
+			t.Fatalf("ReadFileContentFailed: %v", readErr)
+		}
+		if actualContent != "alpha=1!" {
+			t.Errorf("WrongContent: '%s'", actualContent)
+		}
+		if !clerk.IsSymlink(linkFile) {
+			t.Errorf("SymlinkWasReplaced")
+		}
+	})
+
+	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "writableReplaceDir")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+		err = os.Chmod(dir, 0o777)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+		targetFile := filepath.Join(dir, "replace.txt")
+		err = os.WriteFile(targetFile, []byte("alpha=1"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
+		_, replaceErr := clerk.FileContentRegexReplace(
+			FileRegexReplaceSettings{
+				FilePath:       absoluteFilePathForTest(t, targetFile),
+				DirChainPolicy: &sharedWriteRefusedPolicy,
+			},
+			regexPattern, `alpha=$1!`,
+		)
+		if !errors.Is(replaceErr, ErrDirectoryWritableByOthers) {
+			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", replaceErr)
+		}
+	})
+
+	t.Run("PreservesTargetOwnerAndSpecialModeBits", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
+		if gidErr != nil {
+			t.Fatalf("GidParseFailed: %v", gidErr)
+		}
+
+		targetFile := filepath.Join(tempDir, "ownerPreserved.txt")
+		err := os.WriteFile(targetFile, []byte("alpha=1"), 0640)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		err = os.Chown(targetFile, nobodyUid, nobodyGid)
+		if err != nil {
+			t.Fatalf("ChownFailed: %v", err)
+		}
+		err = os.Chmod(targetFile, os.FileMode(0640)|os.ModeSetgid)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+
+		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
+		_, replaceErr := clerk.FileContentRegexReplace(
+			FileRegexReplaceSettings{
+				FilePath: absoluteFilePathForTest(t, targetFile),
+			},
+			regexPattern, `alpha=$1!`,
+		)
+		if replaceErr != nil {
+			t.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
+		}
+
+		fileInfo, statErr := os.Stat(targetFile)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
+			t.Errorf(
+				"OwnerChanged: expected %d:%d, got %d:%d",
+				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
+			)
+		}
+		if fileInfo.Mode().Perm() != 0640 {
+			t.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
+		}
+		if fileInfo.Mode()&os.ModeSetgid == 0 {
+			t.Errorf("SetgidBitLost: %v", fileInfo.Mode())
+		}
+	})
 }
 
 func absoluteFilePathForTest(
@@ -2578,6 +2964,102 @@ func absoluteFilePathForTest(
 		t.Fatalf("FilePathInvalid: %v", pathErr)
 	}
 	return filePath
+}
+
+func TestInspectedTargetFileOpener(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	targetFileName, fileNameErr := tkValueObject.NewUnixFileName(
+		"verified.txt", true,
+	)
+	if fileNameErr != nil {
+		t.Fatalf("FileNameInvalid: %v", fileNameErr)
+	}
+	targetFilePath := filepath.Join(tempDir, targetFileName.String())
+	writeErr := os.WriteFile(targetFilePath, []byte("alpha=1"), 0644)
+	if writeErr != nil {
+		t.Fatalf("WriteFileFailed: %v", writeErr)
+	}
+
+	dirHandle, openErr := unix.Open(
+		tempDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0,
+	)
+	if openErr != nil {
+		t.Fatalf("OpenDirFailed: %v", openErr)
+	}
+	defer func() { _ = unix.Close(dirHandle) }()
+
+	targetState, stateErr := clerk.targetFileStateReader(
+		dirHandle, targetFileName,
+	)
+	if stateErr != nil {
+		t.Fatalf("TargetFileStateReadFailed: %v", stateErr)
+	}
+
+	t.Run("AcceptsTheInspectedInode", func(t *testing.T) {
+		fileHandle, openErr := clerk.inspectedTargetFileOpener(
+			dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
+		)
+		if openErr != nil {
+			t.Fatalf("UnexpectedOpenError: %v", openErr)
+		}
+		_ = unix.Close(fileHandle)
+	})
+
+	t.Run("RefusesSwappedRegularFile", func(t *testing.T) {
+		swappedFilePath := filepath.Join(tempDir, "swapped.txt")
+		writeErr := os.WriteFile(swappedFilePath, []byte("bravo=2"), 0644)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		renameErr := os.Rename(swappedFilePath, targetFilePath)
+		if renameErr != nil {
+			t.Fatalf("RenameFailed: %v", renameErr)
+		}
+
+		openFlagCases := []int{targetFileReadOpenFlags, targetFileAppendOpenFlags}
+		for _, openFlags := range openFlagCases {
+			_, openErr := clerk.inspectedTargetFileOpener(
+				dirHandle, targetFileName, targetState, openFlags,
+			)
+			if !errors.Is(openErr, ErrTargetFileChanged) {
+				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			}
+		}
+	})
+
+	t.Run("RefusesFifoSwap", func(t *testing.T) {
+		fifoPath := filepath.Join(tempDir, "swapped.fifo")
+		fifoErr := unix.Mkfifo(fifoPath, 0o600)
+		if fifoErr != nil {
+			t.Fatalf("MkfifoFailed: %v", fifoErr)
+		}
+		renameErr := os.Rename(fifoPath, targetFilePath)
+		if renameErr != nil {
+			t.Fatalf("RenameFailed: %v", renameErr)
+		}
+
+		openResultChan := make(chan error, 1)
+		go func() {
+			fileHandle, openErr := clerk.inspectedTargetFileOpener(
+				dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
+			)
+			if fileHandle != 0 {
+				_ = unix.Close(fileHandle)
+			}
+			openResultChan <- openErr
+		}()
+
+		select {
+		case openErr := <-openResultChan:
+			if !errors.Is(openErr, ErrTargetFileChanged) {
+				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("OpenBlockedOnFifo")
+		}
+	})
 }
 
 func TestTempFileNameFactory(t *testing.T) {
@@ -2654,6 +3136,9 @@ func TestUpsertFile(t *testing.T) {
 
 	newFileContent := []byte("unit content")
 
+	overwritePolicy := FileClerkOverwritePolicyReplace
+	symlinkPolicy := FileClerkSymlinkPolicyResolve
+
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
 		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
@@ -2665,8 +3150,8 @@ func TestUpsertFile(t *testing.T) {
 		t.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
 	}
 
-	t.Run("WritesNewFileWithRequestedMode", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "fresh")
+	t.Run("WritesNewFileWithDefaultMode", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "defaultMode")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
@@ -2674,9 +3159,202 @@ func TestUpsertFile(t *testing.T) {
 
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, target),
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		written, readErr := os.ReadFile(target)
+		if readErr != nil {
+			t.Fatalf("ReadFailed: %v", readErr)
+		}
+		if string(written) != string(newFileContent) {
+			t.Errorf("ContentMismatch: %s", written)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Mode().Perm() != FileClerkDefaultNewFileMode {
+			t.Errorf(
+				"ModeMismatch: expected %v, got %v",
+				FileClerkDefaultNewFileMode, fileInfo.Mode().Perm(),
+			)
+		}
+	})
+
+	t.Run("WritesNewFileWithStatedMode", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "statedMode")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		statedPermissions := os.FileMode(0640)
+		target := filepath.Join(dir, "unit.service")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:    absoluteFilePathForTest(t, target),
+			Permissions: &statedPermissions,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Mode().Perm() != 0640 {
+			t.Errorf("ModeMismatch: expected 0640, got %v", fileInfo.Mode().Perm())
+		}
+	})
+
+	t.Run("WritesNewFileWithZeroStatedMode", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "zeroMode")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		zeroPermissions := os.FileMode(0)
+		target := filepath.Join(dir, "unit.service")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:    absoluteFilePathForTest(t, target),
+			Permissions: &zeroPermissions,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if fileInfo.Mode().Perm() != 0 {
+			t.Errorf("ModeMismatch: expected 0000, got %v", fileInfo.Mode().Perm())
+		}
+	})
+
+	t.Run("WritesNewFileWithProcessOwnership", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "processOwner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		target := filepath.Join(dir, "unit.service")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, target),
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		written, readErr := os.ReadFile(target)
+		if readErr != nil {
+			t.Fatalf("ReadFailed: %v", readErr)
+		}
+		if string(written) != string(newFileContent) {
+			t.Errorf("ContentMismatch: %s", written)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != os.Geteuid() || int(fileStat.Gid) != os.Getegid() {
+			t.Errorf(
+				"OwnershipMismatch: expected %d:%d, got %d:%d",
+				os.Geteuid(), os.Getegid(), fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("UsesRunningProcessOwnerWhenRequested", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "runningProcessOwner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		ownerSource := FileClerkOwnerSourceRunningProcess
+		target := filepath.Join(dir, "unit.service")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:    absoluteFilePathForTest(t, target),
+			OwnerSource: &ownerSource,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != os.Geteuid() || int(fileStat.Gid) != os.Getegid() {
+			t.Errorf(
+				"OwnershipMismatch: expected %d:%d, got %d:%d",
+				os.Geteuid(), os.Getegid(), fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("RefusesTempNameAboveNameMax", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "longName")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		longBaseName := strings.Repeat("a", 246) + ".txt"
+		statedPermissions := os.FileMode(0644)
+		target := filepath.Join(dir, longBaseName)
+		err = clerk.UpsertFile(FileUpsertSettings{
 			FilePath:      absoluteFilePathForTest(t, target),
-			Permissions:   0640,
+			Permissions:   &statedPermissions,
 			OwnerUsername: &currentUsername,
+		}, newFileContent)
+		if !errors.Is(err, ErrTempFileNameTooLong) {
+			t.Fatalf("ExpectedErrTempFileNameTooLong, got: %v", err)
+		}
+
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			t.Fatalf("ReadDirFailed: %v", readErr)
+		}
+		if len(entries) != 0 {
+			t.Errorf("TempFileLeaked: %v", entries)
+		}
+	})
+
+	t.Run("ReplacesExistingFileWithStatedMode", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "replace")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		target := filepath.Join(dir, "unit.service")
+		err = os.WriteFile(target, []byte("old"), 0644)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+
+		statedPermissions := os.FileMode(0640)
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:        absoluteFilePathForTest(t, target),
+			OverwritePolicy: &overwritePolicy,
+			Permissions:     &statedPermissions,
 		}, newFileContent)
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -2699,104 +3377,31 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("RefusesUnsetPermissions", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "noMode")
+	t.Run("InheritsTargetModeAndOwnershipOnReplace", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "inherit")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
-		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
-			OwnerUsername: &currentUsername,
-		}, newFileContent)
-		if !errors.Is(err, ErrFilePermissionsInvalid) {
-			t.Fatalf("ExpectedErrFilePermissionsInvalid, got: %v", err)
-		}
-		if clerk.FileExists(target) {
-			t.Errorf("TargetWrittenDespiteRefusal")
-		}
-
-		entries, readErr := os.ReadDir(dir)
-		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
-		}
-		if len(entries) != 0 {
-			t.Errorf("TempFileLeaked: %v", entries)
-		}
-	})
-
-	t.Run("WritesNewFileUsingProcessAccount", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "processOwner")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-
-		target := filepath.Join(dir, "unit.service")
-		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:    absoluteFilePathForTest(t, target),
-			Permissions: 0644,
-		}, newFileContent)
-		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
-		}
-
-		written, readErr := os.ReadFile(target)
-		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
-		}
-		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
-		}
-	})
-
-	t.Run("RefusesTempNameAboveNameMax", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "longName")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-
-		longBaseName := strings.Repeat("a", 246) + ".txt"
-		target := filepath.Join(dir, longBaseName)
-		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
-			Permissions:   0644,
-			OwnerUsername: &currentUsername,
-		}, newFileContent)
-		if !errors.Is(err, ErrTempFileNameTooLong) {
-			t.Fatalf("ExpectedErrTempFileNameTooLong, got: %v", err)
-		}
-
-		entries, readErr := os.ReadDir(dir)
-		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
-		}
-		if len(entries) != 0 {
-			t.Errorf("TempFileLeaked: %v", entries)
-		}
-	})
-
-	t.Run("ReplacesExistingRegularFile", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "replace")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-
-		target := filepath.Join(dir, "unit.service")
-		err = os.WriteFile(target, []byte("old"), 0644)
+		err = os.WriteFile(target, []byte("old"), 0640)
 		if err != nil {
 			t.Fatalf("WriteFileFailed: %v", err)
 		}
 
+		originalInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		originalStat, assertOk := originalInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+
 		err = clerk.UpsertFile(FileUpsertSettings{
 			FilePath:        absoluteFilePathForTest(t, target),
-			Permissions:     0644,
-			ShouldOverwrite: true,
-			OwnerUsername:   &currentUsername,
+			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -2809,9 +3414,72 @@ func TestUpsertFile(t *testing.T) {
 		if string(written) != string(newFileContent) {
 			t.Errorf("ContentMismatch: %s", written)
 		}
+
+		replacedInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		if replacedInfo.Mode().Perm() != 0640 {
+			t.Errorf(
+				"ModeNotInherited: expected 0640, got %v",
+				replacedInfo.Mode().Perm(),
+			)
+		}
+
+		replacedStat, assertOk := replacedInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if replacedStat.Uid != originalStat.Uid || replacedStat.Gid != originalStat.Gid {
+			t.Errorf(
+				"OwnershipNotInherited: expected %d:%d, got %d:%d",
+				originalStat.Uid, originalStat.Gid,
+				replacedStat.Uid, replacedStat.Gid,
+			)
+		}
 	})
 
-	t.Run("RefusesExistingFileWhenReplaceNotAllowed", func(t *testing.T) {
+	t.Run("InheritsSpecialModeBitsOnReplace", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "inheritSpecialMode")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		target := filepath.Join(dir, "unit.service")
+		err = os.WriteFile(target, []byte("old"), 0755)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		specialMode := os.ModeSetuid | os.ModeSetgid | os.ModeSticky | 0755
+		err = os.Chmod(target, specialMode)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:        absoluteFilePathForTest(t, target),
+			OverwritePolicy: &overwritePolicy,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		specialModeMask := os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+		inheritedSpecialMode := fileInfo.Mode() & specialModeMask
+		if inheritedSpecialMode != specialMode&specialModeMask {
+			t.Errorf(
+				"SpecialModeNotInherited: expected %v, got %v",
+				specialMode, fileInfo.Mode(),
+			)
+		}
+	})
+
+	t.Run("RefusesExistingFileByDefault", func(t *testing.T) {
 		dir := filepath.Join(tempDir, "refuseTaken")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
@@ -2825,9 +3493,7 @@ func TestUpsertFile(t *testing.T) {
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
-			Permissions:   0644,
-			OwnerUsername: &currentUsername,
+			FilePath: absoluteFilePathForTest(t, target),
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetFileExists) {
 			t.Fatalf("ExpectedErrTargetFileExists, got: %v", err)
@@ -2850,39 +3516,8 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("RefusesExistingSymlinkWhenReplaceNotAllowed", func(t *testing.T) {
+	t.Run("RefusesFinalComponentSymlinkByDefault", func(t *testing.T) {
 		dir := filepath.Join(tempDir, "refuseLink")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-
-		canaryPath := filepath.Join(dir, "canary.txt")
-		err = os.WriteFile(canaryPath, []byte("do-not-touch"), 0600)
-		if err != nil {
-			t.Fatalf("CanaryWriteFailed: %v", err)
-		}
-		target := filepath.Join(dir, "unit.service")
-		err = os.Symlink(canaryPath, target)
-		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
-		}
-
-		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
-			Permissions:   0644,
-			OwnerUsername: &currentUsername,
-		}, newFileContent)
-		if !errors.Is(err, ErrTargetFileExists) {
-			t.Fatalf("ExpectedErrTargetFileExists, got: %v", err)
-		}
-		if !clerk.IsSymlink(target) {
-			t.Errorf("SymlinkWasReplacedDespiteRefusal")
-		}
-	})
-
-	t.Run("ReplacesFinalComponentSymlinkWithoutFollowingIt", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "finalLink")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
@@ -2894,7 +3529,6 @@ func TestUpsertFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CanaryWriteFailed: %v", err)
 		}
-
 		target := filepath.Join(dir, "unit.service")
 		err = os.Symlink(canaryPath, target)
 		if err != nil {
@@ -2902,24 +3536,13 @@ func TestUpsertFile(t *testing.T) {
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
-			Permissions:     0644,
-			ShouldOverwrite: true,
-			OwnerUsername:   &currentUsername,
+			FilePath: absoluteFilePathForTest(t, target),
 		}, newFileContent)
-		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+		if !errors.Is(err, ErrTargetIsSymlink) {
+			t.Fatalf("ExpectedErrTargetIsSymlink, got: %v", err)
 		}
-
-		written, readErr := os.ReadFile(target)
-		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
-		}
-		if string(written) != string(newFileContent) {
-			t.Errorf("TargetContentMismatch: %s", written)
-		}
-		if clerk.IsSymlink(target) {
-			t.Errorf("TargetStillSymlink")
+		if !clerk.IsSymlink(target) {
+			t.Errorf("SymlinkWasReplacedDespiteRefusal")
 		}
 
 		canary, canaryErr := os.ReadFile(canaryPath)
@@ -2931,8 +3554,8 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("FollowsFinalComponentSymlinkWhenRequested", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "followLink")
+	t.Run("ResolvesFinalComponentSymlinkWhenRequested", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "resolveLink")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
@@ -2951,11 +3574,9 @@ func TestUpsertFile(t *testing.T) {
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:             absoluteFilePathForTest(t, target),
-			Permissions:          0644,
-			ShouldFollowSymlinks: true,
-			ShouldOverwrite:      true,
-			OwnerUsername:        &currentUsername,
+			FilePath:        absoluteFilePathForTest(t, target),
+			SymlinkPolicy:   &symlinkPolicy,
+			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -2989,9 +3610,7 @@ func TestUpsertFile(t *testing.T) {
 
 		escapedFilePath := filepath.Join(trapLink, "nested", "escape.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, escapedFilePath),
-			Permissions:   0644,
-			OwnerUsername: &currentUsername,
+			FilePath: absoluteFilePathForTest(t, escapedFilePath),
 		}, newFileContent)
 		if !errors.Is(err, ErrSymlinkedPathInvalid) {
 			t.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
@@ -3003,7 +3622,7 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("FollowsSymlinkedParentChainWhenRequested", func(t *testing.T) {
+	t.Run("ResolvesSymlinkedParentChainWhenRequested", func(t *testing.T) {
 		realParent := filepath.Join(tempDir, "realParent")
 		err := os.MkdirAll(realParent, 0755)
 		if err != nil {
@@ -3018,10 +3637,8 @@ func TestUpsertFile(t *testing.T) {
 
 		target := filepath.Join(linkedParent, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:             absoluteFilePathForTest(t, target),
-			Permissions:          0644,
-			ShouldFollowSymlinks: true,
-			OwnerUsername:        &currentUsername,
+			FilePath:      absoluteFilePathForTest(t, target),
+			SymlinkPolicy: &symlinkPolicy,
 		}, newFileContent)
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -3055,9 +3672,7 @@ func TestUpsertFile(t *testing.T) {
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
 				err := clerk.UpsertFile(FileUpsertSettings{
-					FilePath:      absoluteFilePathForTest(t, testCase.filePath),
-					Permissions:   0644,
-					OwnerUsername: &currentUsername,
+					FilePath: absoluteFilePathForTest(t, testCase.filePath),
 				}, newFileContent)
 				if !errors.Is(err, ErrFileNameInvalid) {
 					t.Errorf(
@@ -3078,12 +3693,114 @@ func TestUpsertFile(t *testing.T) {
 
 		blockedFilePath := filepath.Join(blockerFile, "nested", "blocked.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, blockedFilePath),
-			Permissions:   0644,
-			OwnerUsername: &currentUsername,
+			FilePath: absoluteFilePathForTest(t, blockedFilePath),
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetNotDirectory) {
 			t.Errorf("ExpectedErrTargetNotDirectory, got: %v", err)
+		}
+	})
+
+	t.Run("ToleratesDotAndEmptyComponents", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "dotted", "inner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		dottedFilePath := tempDir + "/./dotted//inner/dotted.txt"
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, dottedFilePath),
+		}, newFileContent)
+		if err != nil {
+			t.Errorf("UnexpectedSurprise: %v", err)
+		}
+	})
+
+	t.Run("ReportsUninspectableDirStep", func(t *testing.T) {
+		missingFilePath := filepath.Join(tempDir, "missing", "deeper", "file.txt")
+		err := clerk.UpsertFile(FileUpsertSettings{
+			FilePath: absoluteFilePathForTest(t, missingFilePath),
+		}, newFileContent)
+		if err == nil {
+			t.Fatalf("MissingErrorForUninspectableStep")
+		}
+		if !strings.Contains(err.Error(), "PathCheckFailed") {
+			t.Errorf("ErrorMissingPathCheckFailed: %v", err)
+		}
+	})
+
+	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
+			"no-such-user-xyz-42",
+		)
+		if usernameErr != nil {
+			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+		}
+
+		filePath := filepath.Join(tempDir, "unknownOwner.txt")
+		err := clerk.UpsertFile(FileUpsertSettings{
+			FilePath:                absoluteFilePathForTest(t, filePath),
+			TrustedDirOwnerUsername: &unknownUsername,
+		}, newFileContent)
+		if err == nil {
+			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+		}
+		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
+			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+		}
+	})
+
+	t.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(t *testing.T) {
+		unresolvableUserIdFinder := func() uint32 {
+			for candidate := uint32(999999); candidate > 0; candidate-- {
+				_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
+				if lookupErr != nil {
+					return candidate
+				}
+			}
+
+			t.Fatal("NoUnresolvableUserIdFound")
+			return 0
+		}
+
+		unresolvableUserId, userIdErr := tkValueObject.NewUnixUserId(
+			unresolvableUserIdFinder(),
+		)
+		if userIdErr != nil {
+			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
+		}
+
+		filePath := filepath.Join(tempDir, "numericOwner.txt")
+		err := clerk.UpsertFile(FileUpsertSettings{
+			FilePath:              absoluteFilePathForTest(t, filePath),
+			TrustedDirOwnerUserId: &unresolvableUserId,
+		}, newFileContent)
+		if err != nil && !errors.Is(err, ErrDirectoryOwnerInvalid) {
+			t.Errorf(
+				"ExpectedOwnershipComparisonNotAccountLookup, got: %v", err,
+			)
+		}
+	})
+
+	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "writableUpsertDir")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+		err = os.Chmod(dir, 0o777)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		filePath := filepath.Join(dir, "strict.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:       absoluteFilePathForTest(t, filePath),
+			DirChainPolicy: &sharedWriteRefusedPolicy,
+		}, newFileContent)
+		if !errors.Is(err, ErrDirectoryWritableByOthers) {
+			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
 		}
 	})
 
@@ -3101,9 +3818,7 @@ func TestUpsertFile(t *testing.T) {
 		contentB := strings.Repeat("b", contentSizeBytes)
 		err = clerk.UpsertFile(FileUpsertSettings{
 			FilePath:        targetPath,
-			Permissions:     0644,
-			ShouldOverwrite: true,
-			OwnerUsername:   &currentUsername,
+			OverwritePolicy: &overwritePolicy,
 		}, []byte(contentA))
 		if err != nil {
 			t.Fatalf("UpsertFileFailed: %v", err)
@@ -3119,9 +3834,7 @@ func TestUpsertFile(t *testing.T) {
 				}
 				writeErr := clerk.UpsertFile(FileUpsertSettings{
 					FilePath:        targetPath,
-					Permissions:     0644,
-					ShouldOverwrite: true,
-					OwnerUsername:   &currentUsername,
+					OverwritePolicy: &overwritePolicy,
 				}, []byte(content))
 				if writeErr != nil {
 					t.Errorf("ConcurrentWriteFailed: %v", writeErr)
@@ -3151,15 +3864,13 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("FailureLeavesNoTempFileBehind", func(t *testing.T) {
+	t.Run("RefusesDirectoryTargetLeavingNoTempFile", func(t *testing.T) {
 		dir := filepath.Join(tempDir, "leakCheck")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
 		}
 
-		// A directory at fileName blocks the swap but not the temp write,
-		// so the failure happens after the temp file already exists.
 		blockingDir := filepath.Join(dir, "taken.txt")
 		err = os.Mkdir(blockingDir, 0755)
 		if err != nil {
@@ -3168,12 +3879,10 @@ func TestUpsertFile(t *testing.T) {
 
 		err = clerk.UpsertFile(FileUpsertSettings{
 			FilePath:        absoluteFilePathForTest(t, blockingDir),
-			Permissions:     0644,
-			ShouldOverwrite: true,
-			OwnerUsername:   &currentUsername,
+			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
-		if err == nil {
-			t.Fatalf("MissingErrorForDirectoryTarget")
+		if !errors.Is(err, ErrTargetIsDirectory) {
+			t.Fatalf("ExpectedErrTargetIsDirectory, got: %v", err)
 		}
 
 		entries, readErr := os.ReadDir(dir)
@@ -3213,9 +3922,10 @@ func TestUpsertFile(t *testing.T) {
 		if ownerNameErr != nil {
 			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
 		}
+		statedPermissions := os.FileMode(0644)
 		err = clerk.UpsertFile(FileUpsertSettings{
 			FilePath:      absoluteFilePathForTest(t, filepath.Join(dir, "owned.txt")),
-			Permissions:   0644,
+			Permissions:   &statedPermissions,
 			OwnerUsername: &ownerName,
 		}, newFileContent)
 		if err != nil {
@@ -3270,10 +3980,10 @@ func TestUpsertFile(t *testing.T) {
 		if ownerNameErr != nil {
 			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
 		}
+		target := filepath.Join(dir, "refused.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, filepath.Join(dir, "refused.txt")),
-			Permissions:   0644,
-			OwnerUsername: &ownerName,
+			FilePath:                absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUsername: &ownerName,
 		}, newFileContent)
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
 			t.Errorf(
@@ -3281,11 +3991,353 @@ func TestUpsertFile(t *testing.T) {
 			)
 		}
 	})
+
+	t.Run("InheritsTargetOwnerOnReplace", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
+		if gidErr != nil {
+			t.Fatalf("GidParseFailed: %v", gidErr)
+		}
+
+		dir := filepath.Join(tempDir, "inheritOwner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		target := filepath.Join(dir, "owned.txt")
+		err = os.WriteFile(target, []byte("old"), 0640)
+		if err != nil {
+			t.Fatalf("WriteFileFailed: %v", err)
+		}
+		err = os.Chown(target, nobodyUid, nobodyGid)
+		if err != nil {
+			t.Fatalf("ChownFailed: %v", err)
+		}
+
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:        absoluteFilePathForTest(t, target),
+			OverwritePolicy: &overwritePolicy,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
+			t.Errorf(
+				"OwnerNotInherited: expected %d:%d, got %d:%d",
+				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("UsesContainingDirectoryOwnerWhenRequested", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
+		if gidErr != nil {
+			t.Fatalf("GidParseFailed: %v", gidErr)
+		}
+		nobodyUserId, userIdErr := tkValueObject.NewUnixUserId(nobodyUid)
+		if userIdErr != nil {
+			t.Fatalf("NobodyUserIdInvalid: %v", userIdErr)
+		}
+
+		dir := filepath.Join(tempDir, "dirOwner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+		err = os.Chown(dir, nobodyUid, nobodyGid)
+		if err != nil {
+			t.Fatalf("ChownFailed: %v", err)
+		}
+
+		ownerSource := FileClerkOwnerSourceContainingDirectory
+		target := filepath.Join(dir, "owned.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:              absoluteFilePathForTest(t, target),
+			TrustedDirOwnerUserId: &nobodyUserId,
+			OwnerSource:           &ownerSource,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
+			t.Errorf(
+				"OwnerMismatch: expected %d:%d, got %d:%d",
+				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("StatesOwnerGroup", func(t *testing.T) {
+		if os.Geteuid() != 0 {
+			t.Skip("RootPrivilegesRequired")
+		}
+
+		nobody, lookupErr := user.Lookup("nobody")
+		if lookupErr != nil {
+			t.Skipf("NobodyUserMissing: %v", lookupErr)
+		}
+		daemon, daemonErr := user.Lookup("daemon")
+		if daemonErr != nil {
+			t.Skipf("DaemonUserMissing: %v", daemonErr)
+		}
+		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
+		if uidErr != nil {
+			t.Fatalf("UidParseFailed: %v", uidErr)
+		}
+		daemonGid, gidErr := strconv.Atoi(daemon.Gid)
+		if gidErr != nil {
+			t.Fatalf("GidParseFailed: %v", gidErr)
+		}
+
+		dir := filepath.Join(tempDir, "statedGroup")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		ownerName, ownerNameErr := tkValueObject.NewUnixUsername("nobody")
+		if ownerNameErr != nil {
+			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
+		}
+		ownerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(daemonGid)
+		if groupIdErr != nil {
+			t.Fatalf("GroupIdInvalid: %v", groupIdErr)
+		}
+
+		target := filepath.Join(dir, "owned.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:      absoluteFilePathForTest(t, target),
+			OwnerUsername: &ownerName,
+			OwnerGroupId:  &ownerGroupId,
+		}, newFileContent)
+		if err != nil {
+			t.Fatalf("UpsertFileFailed: %v", err)
+		}
+
+		fileInfo, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("StatFailed: %v", statErr)
+		}
+		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
+		if !assertOk {
+			t.Fatalf("StatAssertionFailed")
+		}
+		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != daemonGid {
+			t.Errorf(
+				"OwnershipMismatch: expected %d:%d, got %d:%d",
+				nobodyUid, daemonGid, fileStat.Uid, fileStat.Gid,
+			)
+		}
+	})
+
+	t.Run("RefusesStatedOwnerWithContainingDirectorySource", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "ownerConflict")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		ownerSource := FileClerkOwnerSourceContainingDirectory
+		target := filepath.Join(dir, "conflict.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:      absoluteFilePathForTest(t, target),
+			OwnerSource:   &ownerSource,
+			OwnerUsername: &currentUsername,
+		}, newFileContent)
+		if !errors.Is(err, ErrOwnerSourceConflict) {
+			t.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
+		}
+		if clerk.FileExists(target) {
+			t.Errorf("TargetWrittenDespiteConflict")
+		}
+	})
+
+	t.Run("RefusesStatedOwnerWithRunningProcessSource", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "ownerProcessConflict")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		ownerSource := FileClerkOwnerSourceRunningProcess
+		target := filepath.Join(dir, "conflict.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:      absoluteFilePathForTest(t, target),
+			OwnerSource:   &ownerSource,
+			OwnerUsername: &currentUsername,
+		}, newFileContent)
+		if !errors.Is(err, ErrOwnerSourceConflict) {
+			t.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
+		}
+		if clerk.FileExists(target) {
+			t.Errorf("TargetWrittenDespiteConflict")
+		}
+	})
+
+	t.Run("RefusesUnknownPolicyValues", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "unknownPolicy")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		target := filepath.Join(dir, "unknown.txt")
+		targetPath := absoluteFilePathForTest(t, target)
+		unsupportedOwnerSource := FileClerkOwnerSource("unsupported")
+		unsupportedSymlinkPolicy := FileClerkSymlinkPolicy("unsupported")
+		unsupportedOverwritePolicy := FileClerkOverwritePolicy("unsupported")
+		unsupportedDirChainPolicy := FileClerkDirChainPolicy("unsupported")
+
+		testCases := []struct {
+			name          string
+			settings      FileUpsertSettings
+			expectedError error
+		}{
+			{
+				"DirChainPolicy",
+				FileUpsertSettings{
+					FilePath:       targetPath,
+					DirChainPolicy: &unsupportedDirChainPolicy,
+				},
+				ErrDirChainPolicyInvalid,
+			},
+			{
+				"SymlinkPolicy",
+				FileUpsertSettings{
+					FilePath:      targetPath,
+					SymlinkPolicy: &unsupportedSymlinkPolicy,
+				},
+				ErrSymlinkPolicyInvalid,
+			},
+			{
+				"OverwritePolicy",
+				FileUpsertSettings{
+					FilePath:        targetPath,
+					OverwritePolicy: &unsupportedOverwritePolicy,
+				},
+				ErrOverwritePolicyInvalid,
+			},
+			{
+				"OwnerSource",
+				FileUpsertSettings{
+					FilePath:    targetPath,
+					OwnerSource: &unsupportedOwnerSource,
+				},
+				ErrOwnerSourceInvalid,
+			},
+		}
+
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				err := clerk.UpsertFile(testCase.settings, newFileContent)
+				if !errors.Is(err, testCase.expectedError) {
+					t.Errorf("Expected%v, got: %v", testCase.expectedError, err)
+				}
+			})
+		}
+
+		if clerk.FileExists(target) {
+			t.Errorf("TargetWrittenDespiteInvalidSettings")
+		}
+	})
+
+	t.Run("RefusesUnprivilegedOwnerChange", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
+		}
+
+		dir := filepath.Join(tempDir, "unprivilegedOwner")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+
+		foreignOwnerUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid() + 1)
+		if userIdErr != nil {
+			t.Fatalf("ForeignOwnerUserIdInvalid: %v", userIdErr)
+		}
+		foreignOwnerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
+		if groupIdErr != nil {
+			t.Fatalf("ForeignOwnerGroupIdInvalid: %v", groupIdErr)
+		}
+
+		target := filepath.Join(dir, "owned.txt")
+		err = clerk.UpsertFile(FileUpsertSettings{
+			FilePath:     absoluteFilePathForTest(t, target),
+			OwnerUserId:  &foreignOwnerUserId,
+			OwnerGroupId: &foreignOwnerGroupId,
+		}, newFileContent)
+		if !errors.Is(err, ErrFileOwnerChangeFailed) {
+			t.Fatalf("ExpectedErrFileOwnerChangeFailed, got: %v", err)
+		}
+		if clerk.FileExists(target) {
+			t.Errorf("TargetWrittenDespiteOwnerChangeFailure")
+		}
+
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			t.Fatalf("ReadDirFailed: %v", readErr)
+		}
+		if len(entries) != 0 {
+			t.Errorf("TempFileLeaked: %v", entries)
+		}
+	})
 }
 
-func TestVerifyDirPathRedirectSafety(t *testing.T) {
+func TestFileUpsertOwnerResolver(t *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+
+	runningProcessUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
+	if userIdErr != nil {
+		t.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
+	}
+	runningProcessGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
+	if groupIdErr != nil {
+		t.Fatalf("RunningProcessGroupIdInvalid: %v", groupIdErr)
+	}
+
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
 		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
@@ -3300,68 +4352,304 @@ func TestVerifyDirPathRedirectSafety(t *testing.T) {
 	if userIdErr != nil {
 		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
 	}
+	currentPrimaryGroupId, groupIdErr := tkValueObject.NewUnixGroupId(
+		currentAccount.Gid,
+	)
+	if groupIdErr != nil {
+		t.Fatalf("CurrentPrimaryGroupIdInvalid: %v", groupIdErr)
+	}
 
-	t.Run("AllClearChain", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "scout", "inner")
+	existingFileOwnerUserId := tkValueObject.UnixUserId(1234)
+	existingFileOwnerGroupId := tkValueObject.UnixGroupId(1235)
+	containingDirOwnerUserId := tkValueObject.UnixUserId(2345)
+	containingDirOwnerGroupId := tkValueObject.UnixGroupId(2346)
+	statedOwnerUserId := tkValueObject.UnixUserId(3456)
+	statedGroupId := tkValueObject.UnixGroupId(3457)
+
+	targetStateExisting := targetFileState{
+		Exists:       true,
+		OwnerUserId:  existingFileOwnerUserId,
+		OwnerGroupId: existingFileOwnerGroupId,
+	}
+	targetStateMissing := targetFileState{}
+	containingDirStat := unix.Stat_t{
+		Uid: uint32(containingDirOwnerUserId),
+		Gid: uint32(containingDirOwnerGroupId),
+	}
+
+	testCases := []struct {
+		name            string
+		ownerSource     FileClerkOwnerSource
+		ownerUsername   *tkValueObject.UnixUsername
+		ownerUserId     *tkValueObject.UnixUserId
+		ownerGroupId    *tkValueObject.UnixGroupId
+		targetState     targetFileState
+		expectedUserId  tkValueObject.UnixUserId
+		expectedGroupId tkValueObject.UnixGroupId
+		expectedError   error
+	}{
+		{
+			name:            "StatedAccountUsesPrimaryGroup",
+			ownerSource:     FileClerkOwnerSourceExistingFile,
+			ownerUsername:   &currentUsername,
+			targetState:     targetStateMissing,
+			expectedUserId:  currentUserId,
+			expectedGroupId: currentPrimaryGroupId,
+		},
+		{
+			name:            "StatedUserIdAndGroupWin",
+			ownerSource:     FileClerkOwnerSourceExistingFile,
+			ownerUserId:     &statedOwnerUserId,
+			ownerGroupId:    &statedGroupId,
+			targetState:     targetStateExisting,
+			expectedUserId:  statedOwnerUserId,
+			expectedGroupId: statedGroupId,
+		},
+		{
+			name:            "ExistingFileSourceInheritsTargetOwnership",
+			ownerSource:     FileClerkOwnerSourceExistingFile,
+			targetState:     targetStateExisting,
+			expectedUserId:  existingFileOwnerUserId,
+			expectedGroupId: existingFileOwnerGroupId,
+		},
+		{
+			name:            "ExistingFileSourceFallsBackToRunningProcess",
+			ownerSource:     FileClerkOwnerSourceExistingFile,
+			targetState:     targetStateMissing,
+			expectedUserId:  runningProcessUserId,
+			expectedGroupId: runningProcessGroupId,
+		},
+		{
+			name:            "ContainingDirectorySourceUsesDirectoryOwnership",
+			ownerSource:     FileClerkOwnerSourceContainingDirectory,
+			targetState:     targetStateMissing,
+			expectedUserId:  containingDirOwnerUserId,
+			expectedGroupId: containingDirOwnerGroupId,
+		},
+		{
+			name:            "RunningProcessSourceUsesProcessOwnership",
+			ownerSource:     FileClerkOwnerSourceRunningProcess,
+			targetState:     targetStateMissing,
+			expectedUserId:  runningProcessUserId,
+			expectedGroupId: runningProcessGroupId,
+		},
+		{
+			name:            "StatedGroupOverridesInheritedGroup",
+			ownerSource:     FileClerkOwnerSourceExistingFile,
+			ownerGroupId:    &statedGroupId,
+			targetState:     targetStateExisting,
+			expectedUserId:  existingFileOwnerUserId,
+			expectedGroupId: statedGroupId,
+		},
+		{
+			name:          "StatedAccountConflictsWithContainingDirectory",
+			ownerSource:   FileClerkOwnerSourceContainingDirectory,
+			ownerUsername: &currentUsername,
+			targetState:   targetStateMissing,
+			expectedError: ErrOwnerSourceConflict,
+		},
+		{
+			name:          "StatedAccountConflictsWithRunningProcess",
+			ownerSource:   FileClerkOwnerSourceRunningProcess,
+			ownerUsername: &currentUsername,
+			targetState:   targetStateMissing,
+			expectedError: ErrOwnerSourceConflict,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ownership, err := clerk.fileUpsertOwnerResolver(
+				testCase.ownerSource, testCase.ownerUsername, testCase.ownerUserId,
+				testCase.ownerGroupId, testCase.targetState, containingDirStat,
+			)
+
+			if testCase.expectedError != nil {
+				if !errors.Is(err, testCase.expectedError) {
+					t.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UnexpectedError: %v", err)
+			}
+			if ownership.UserId != testCase.expectedUserId {
+				t.Errorf(
+					"UserIdMismatch: expected %d, got %d",
+					testCase.expectedUserId, ownership.UserId,
+				)
+			}
+			if ownership.GroupId != testCase.expectedGroupId {
+				t.Errorf(
+					"GroupIdMismatch: expected %d, got %d",
+					testCase.expectedGroupId, ownership.GroupId,
+				)
+			}
+		})
+	}
+}
+
+func TestFileUpsertPermissionsResolver(t *testing.T) {
+	clerk := FileClerk{}
+
+	statedPermissions := os.FileMode(0640)
+	zeroPermissions := os.FileMode(0)
+	existingPermissions := os.FileMode(0604)
+
+	targetStateExisting := targetFileState{
+		Exists:      true,
+		Permissions: existingPermissions,
+	}
+
+	testCases := []struct {
+		name                 string
+		statedPermissionsPtr *os.FileMode
+		targetState          targetFileState
+		expectedPermissions  os.FileMode
+	}{
+		{
+			"StatedPermissionsWin",
+			&statedPermissions, targetStateExisting, statedPermissions,
+		},
+		{
+			"StatedZeroPermissionsWin",
+			&zeroPermissions, targetStateExisting, zeroPermissions,
+		},
+		{
+			"InheritsExistingPermissions",
+			nil, targetStateExisting, existingPermissions,
+		},
+		{
+			"DefaultsForMissingTarget",
+			nil, targetFileState{}, FileClerkDefaultNewFileMode,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			permissions := clerk.fileUpsertPermissionsResolver(
+				testCase.statedPermissionsPtr, testCase.targetState,
+			)
+			if permissions != testCase.expectedPermissions {
+				t.Errorf(
+					"PermissionsMismatch: expected %v, got %v",
+					testCase.expectedPermissions, permissions,
+				)
+			}
+		})
+	}
+}
+
+func TestUnixFileModeConverter(t *testing.T) {
+	clerk := FileClerk{}
+
+	specialModeMask := os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+
+	testCases := []struct {
+		name             string
+		rawMode          uint32
+		expectedFileMode os.FileMode
+	}{
+		{"PermissionBits", unix.S_IFREG | 0o640, os.FileMode(0o640)},
+		{"SetuidBit", unix.S_IFREG | 0o4755, os.FileMode(0o755) | os.ModeSetuid},
+		{"SetgidBit", unix.S_IFREG | 0o2755, os.FileMode(0o755) | os.ModeSetgid},
+		{"StickyBit", unix.S_IFREG | 0o1755, os.FileMode(0o755) | os.ModeSticky},
+		{
+			"AllSpecialBits",
+			unix.S_IFREG | 0o7755,
+			os.FileMode(0o755) | specialModeMask,
+		},
+		{"DropsFileTypeBits", unix.S_IFDIR | 0o750, os.FileMode(0o750)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fileMode := clerk.unixFileModeConverter(testCase.rawMode)
+			if fileMode != testCase.expectedFileMode {
+				t.Errorf(
+					"FileModeMismatch: expected %v, got %v",
+					testCase.expectedFileMode, fileMode,
+				)
+			}
+		})
+	}
+}
+
+func TestOpenRedirectProofDirChain(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	currentAccount, accountErr := user.Current()
+	if accountErr != nil {
+		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+	}
+	currentUserId, userIdErr := tkValueObject.NewUnixUserId(currentAccount.Uid)
+	if userIdErr != nil {
+		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
+	}
+
+	sharedWriteAllowedPolicy := FileClerkDirChainPolicySharedWriteAllowed
+	sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+
+	t.Run("RefusesParentTraversalComponents", func(t *testing.T) {
+		traversalPath := tkValueObject.UnixAbsoluteFilePath(
+			tempDir + "/../traversal.txt",
+		)
+		_, dirChainErr := clerk.openRedirectProofDirChain(
+			traversalPath, currentUserId, sharedWriteAllowedPolicy,
+		)
+		if !errors.Is(dirChainErr, ErrDirPathTraversalInvalid) {
+			t.Errorf("ExpectedErrDirPathTraversalInvalid, got: %v", dirChainErr)
+		}
+	})
+
+	t.Run("RefusesWritableComponentWhenRequired", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "writable")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			t.Fatalf("MkdirFailed: %v", err)
 		}
-
-		err = clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, dir), &currentUsername, nil,
-		)
+		err = os.Chmod(dir, 0o777)
 		if err != nil {
-			t.Errorf("UnexpectedSurprise: %v", err)
+			t.Fatalf("ChmodFailed: %v", err)
 		}
-	})
 
-	t.Run("AcceptsOmittedOwnerUsingProcessAccount", func(t *testing.T) {
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, tempDir), nil, nil,
+		_, strictChainErr := clerk.openRedirectProofDirChain(
+			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteRefusedPolicy,
 		)
-		if err != nil {
-			t.Errorf("UnexpectedSurprise: %v", err)
-		}
-	})
-
-	t.Run("AcceptsUserIdInsteadOfUsername", func(t *testing.T) {
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, tempDir), nil, &currentUserId,
-		)
-		if err != nil {
-			t.Errorf("UnexpectedSurprise: %v", err)
-		}
-	})
-
-	t.Run("AcceptsUserIdWithoutAccountEntry", func(t *testing.T) {
-		unresolvableUserIdFinder := func() uint32 {
-			for candidate := uint32(999999); candidate > 0; candidate-- {
-				_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
-				if lookupErr != nil {
-					return candidate
-				}
-			}
-
-			t.Fatal("NoUnresolvableUserIdFound")
-			return 0
-		}
-
-		unresolvableUserIdVo, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUserIdFinder(),
-		)
-		if userIdErr != nil {
-			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
-		}
-
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, tempDir), nil, &unresolvableUserIdVo,
-		)
-		if err != nil && !errors.Is(err, ErrDirectoryOwnerInvalid) {
+		if !errors.Is(strictChainErr, ErrDirectoryWritableByOthers) {
 			t.Errorf(
-				"ExpectedOwnershipComparisonNotAccountLookup, got: %v", err,
+				"ExpectedErrDirectoryWritableByOthers, got: %v", strictChainErr,
 			)
 		}
+
+		lenientHandle, lenientChainErr := clerk.openRedirectProofDirChain(
+			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteAllowedPolicy,
+		)
+		if lenientChainErr != nil {
+			t.Fatalf("UnexpectedErrorForLenientChain: %v", lenientChainErr)
+		}
+		_ = unix.Close(lenientHandle)
+	})
+
+	t.Run("AcceptsStickyWritableComponentWhenRequired", func(t *testing.T) {
+		dir := filepath.Join(tempDir, "stickyWritable")
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			t.Fatalf("MkdirFailed: %v", err)
+		}
+		err = os.Chmod(dir, os.ModeSticky|0o777)
+		if err != nil {
+			t.Fatalf("ChmodFailed: %v", err)
+		}
+
+		dirHandle, strictChainErr := clerk.openRedirectProofDirChain(
+			absoluteFilePathForTest(t, dir), currentUserId, sharedWriteRefusedPolicy,
+		)
+		if strictChainErr != nil {
+			t.Fatalf("UnexpectedSurprise: %v", strictChainErr)
+		}
+		_ = unix.Close(dirHandle)
 	})
 
 	t.Run("HandleStaysOnOriginalInodeAfterPathSwap", func(t *testing.T) {
@@ -3374,6 +4662,7 @@ func TestVerifyDirPathRedirectSafety(t *testing.T) {
 
 		dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
 			absoluteFilePathForTest(t, originalDir), currentUserId,
+			sharedWriteAllowedPolicy,
 		)
 		if dirChainErr != nil {
 			t.Fatalf("RedirectProofFailed: %v", dirChainErr)
@@ -3409,142 +4698,6 @@ func TestVerifyDirPathRedirectSafety(t *testing.T) {
 		}
 		if clerk.FileExists(filepath.Join(escapeDir, "staged.txt")) {
 			t.Errorf("WriteFollowedReplacementSymlink")
-		}
-	})
-
-	t.Run("RefusesParentTraversalComponents", func(t *testing.T) {
-		traversalPath := tempDir + "/.."
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, traversalPath), &currentUsername, nil,
-		)
-		if !errors.Is(err, ErrDirPathTraversalInvalid) {
-			t.Errorf("ExpectedErrDirPathTraversalInvalid, got: %v", err)
-		}
-	})
-
-	t.Run("ToleratesDotAndEmptyComponents", func(t *testing.T) {
-		dir := filepath.Join(tempDir, "dotted", "inner")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-
-		dottedPath := tempDir + "/./dotted//inner"
-		err = clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, dottedPath), &currentUsername, nil,
-		)
-		if err != nil {
-			t.Errorf("UnexpectedSurprise: %v", err)
-		}
-	})
-
-	t.Run("ReportsSymlinkedComponent", func(t *testing.T) {
-		linkTarget := filepath.Join(tempDir, "scoutTarget")
-		err := os.MkdirAll(filepath.Join(linkTarget, "nested"), 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-		trapLink := filepath.Join(tempDir, "scoutTrap")
-		err = os.Symlink(linkTarget, trapLink)
-		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
-		}
-
-		scoutPath := filepath.Join(trapLink, "nested")
-		err = clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, scoutPath), &currentUsername, nil,
-		)
-		if !errors.Is(err, ErrSymlinkedPathInvalid) {
-			t.Errorf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
-		}
-	})
-
-	t.Run("ReportsFileWhereDirExpected", func(t *testing.T) {
-		blockerFile := filepath.Join(tempDir, "scoutBlocker")
-		err := os.WriteFile(blockerFile, []byte("x"), 0644)
-		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
-		}
-
-		blockedDirPath := filepath.Join(blockerFile, "nested")
-		err = clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, blockedDirPath), &currentUsername, nil,
-		)
-		if !errors.Is(err, ErrTargetNotDirectory) {
-			t.Errorf("ExpectedErrTargetNotDirectory, got: %v", err)
-		}
-	})
-
-	t.Run("ReportsUninspectableStep", func(t *testing.T) {
-		missing := filepath.Join(tempDir, "scoutMissing", "deeper")
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, missing), &currentUsername, nil,
-		)
-		if err == nil {
-			t.Fatalf("MissingErrorForUninspectableStep")
-		}
-		if !strings.Contains(err.Error(), "PathCheckFailed") {
-			t.Errorf("ErrorMissingPathCheckFailed: %v", err)
-		}
-	})
-
-	t.Run("RefusesStrangerOwnedComponent", func(t *testing.T) {
-		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
-		}
-
-		daemon, lookupErr := user.Lookup("daemon")
-		if lookupErr != nil {
-			t.Skipf("DaemonUserMissing: %v", lookupErr)
-		}
-		_, nobodyErr := user.Lookup("nobody")
-		if nobodyErr != nil {
-			t.Skipf("NobodyUserMissing: %v", nobodyErr)
-		}
-		daemonUid, uidErr := strconv.Atoi(daemon.Uid)
-		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
-		}
-
-		dir := filepath.Join(tempDir, "scoutStranger")
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
-		}
-		err = os.Chown(dir, daemonUid, -1)
-		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
-		}
-
-		ownerName, ownerNameErr := tkValueObject.NewUnixUsername("nobody")
-		if ownerNameErr != nil {
-			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
-		}
-		err = clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, dir), &ownerName, nil,
-		)
-		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Errorf(
-				"ExpectedErrDirectoryOwnerInvalid, got: %v", err,
-			)
-		}
-	})
-
-	t.Run("ReportsUnknownOwner", func(t *testing.T) {
-		unknownName, unknownNameErr := tkValueObject.NewUnixUsername(
-			"no-such-user-xyz-42",
-		)
-		if unknownNameErr != nil {
-			t.Fatalf("UnknownNameInvalid: %v", unknownNameErr)
-		}
-		err := clerk.VerifyDirPathRedirectSafety(
-			absoluteFilePathForTest(t, tempDir), &unknownName, nil,
-		)
-		if err == nil {
-			t.Fatalf("MissingErrorForUnknownOwner")
-		}
-		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
-			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 }
