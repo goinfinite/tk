@@ -17,6 +17,8 @@ var (
 	unixAbsoluteFilePathUnsafeRegex = regexp.MustCompile(`^[\/\p{L}\p{N}\p{Pc}\p{Pd}\.][^\x00-\x1f\x7f]*$`)
 )
 
+var ErrRootPathHasNoFileName = errors.New("RootPathHasNoFileName")
+
 type UnixAbsoluteFilePath string
 
 func NewUnixAbsoluteFilePath(value any, allowUnsafeChars bool) (
@@ -79,7 +81,11 @@ func (vo UnixAbsoluteFilePath) ReadWithoutExtension(allowUnsafeChars bool) UnixA
 func (vo UnixAbsoluteFilePath) ReadFileName(
 	allowUnsafeChars bool,
 ) (UnixFileName, error) {
-	return NewUnixFileName(filepath.Base(string(vo)), allowUnsafeChars)
+	rawFileName := filepath.Base(string(vo))
+	if rawFileName == "/" {
+		return "", ErrRootPathHasNoFileName
+	}
+	return NewUnixFileName(rawFileName, allowUnsafeChars)
 }
 
 func (vo UnixAbsoluteFilePath) ReadFileExtension() (UnixFileExtension, error) {

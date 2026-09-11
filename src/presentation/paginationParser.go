@@ -24,7 +24,7 @@ func PaginationParser(
 
 	if untrustedInput["itemsPerPage"] != nil {
 		itemsPerPage, err := tkVoUtil.InterfaceToUint16(untrustedInput["itemsPerPage"])
-		if err != nil {
+		if err != nil || itemsPerPage == 0 {
 			return parsedPagination, errors.New("InvalidItemsPerPage")
 		}
 		parsedPagination.ItemsPerPage = itemsPerPage

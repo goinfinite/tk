@@ -227,6 +227,13 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		}
 	})
 
+	t.Run("ReadFileNameMethodRootPathError", func(t *testing.T) {
+		_, err := UnixAbsoluteFilePath("/").ReadFileName(false)
+		if !errors.Is(err, ErrRootPathHasNoFileName) {
+			t.Errorf("ExpectedErrRootPathHasNoFileName, got: %v", err)
+		}
+	})
+
 	t.Run("ReadFileExtensionMethod", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixAbsoluteFilePath

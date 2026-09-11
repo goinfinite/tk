@@ -257,6 +257,24 @@ func TestPaginationParser(t *testing.T) {
 				},
 				expectError: true,
 			},
+			{
+				inputMap: map[string]any{
+					"itemsPerPage": 0,
+				},
+				expectError: true,
+			},
+			{
+				inputMap: map[string]any{
+					"itemsPerPage": uint16(0),
+				},
+				expectError: true,
+			},
+			{
+				inputMap: map[string]any{
+					"itemsPerPage": "0",
+				},
+				expectError: true,
+			},
 		}
 
 		defaultPagination := tkDto.Pagination{
