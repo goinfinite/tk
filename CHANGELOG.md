@@ -1,6 +1,12 @@
 # Changelog
 
 ```log
+0.3.5 - 2026/09/11
+docs: move the TK usage skill to the repository root; delete the openapi-test skill and skills/README.md.
+docs: tighten the TK usage skill procedure and guardrails.
+docs: refresh the README blurb, installation, usage routing, and SonarCloud badge.
+docs: scope the domain dependency constraint to production code and note the test fixture exception.
+
 0.3.4 - 2026/09/10
 feat: add TransientDatabaseService, a shared in-memory SQLite key-value store. Has, Read (ErrKeyNotFound), and Set (upsert) work on a KeyValue model; every instance in the process shares the same data.
 feat: add FileClerk.VerifyDirPathRedirectSafety(dirPath, ownerUsernamePtr, ownerUserIdPtr). It walks each directory step without following symlinks. The first problem fails the walk: '..' (ErrDirPathTraversalInvalid), a symlink (ErrSymlinkedPathInvalid), a non-directory (ErrTargetNotDirectory), a foreign owner (ErrDirectoryOwnerInvalid), an unknown account (OwnerLookupFailed), or an uninspectable step (PathCheckFailed). It skips dot and empty components. A numeric UID is compared directly without an account lookup; with no owner given, it expects the process account.
