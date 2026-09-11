@@ -2966,7 +2966,7 @@ func absoluteFilePathForTest(
 	return filePath
 }
 
-func TestTargetFileReadHandleOpener(t *testing.T) {
+func TestInspectedTargetFileOpener(t *testing.T) {
 	clerk := FileClerk{}
 	tempDir := t.TempDir()
 
@@ -2998,8 +2998,8 @@ func TestTargetFileReadHandleOpener(t *testing.T) {
 	}
 
 	t.Run("AcceptsTheInspectedInode", func(t *testing.T) {
-		fileHandle, openErr := clerk.targetFileReadHandleOpener(
-			dirHandle, targetFileName, targetState,
+		fileHandle, openErr := clerk.inspectedTargetFileOpener(
+			dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
 		)
 		if openErr != nil {
 			t.Fatalf("UnexpectedOpenError: %v", openErr)
@@ -3018,11 +3018,14 @@ func TestTargetFileReadHandleOpener(t *testing.T) {
 			t.Fatalf("RenameFailed: %v", renameErr)
 		}
 
-		_, openErr := clerk.targetFileReadHandleOpener(
-			dirHandle, targetFileName, targetState,
-		)
-		if !errors.Is(openErr, ErrTargetFileChanged) {
-			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+		openFlagCases := []int{targetFileReadOpenFlags, targetFileAppendOpenFlags}
+		for _, openFlags := range openFlagCases {
+			_, openErr := clerk.inspectedTargetFileOpener(
+				dirHandle, targetFileName, targetState, openFlags,
+			)
+			if !errors.Is(openErr, ErrTargetFileChanged) {
+				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			}
 		}
 	})
 
@@ -3039,8 +3042,8 @@ func TestTargetFileReadHandleOpener(t *testing.T) {
 
 		openResultChan := make(chan error, 1)
 		go func() {
-			fileHandle, openErr := clerk.targetFileReadHandleOpener(
-				dirHandle, targetFileName, targetState,
+			fileHandle, openErr := clerk.inspectedTargetFileOpener(
+				dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
 			)
 			if fileHandle != 0 {
 				_ = unix.Close(fileHandle)

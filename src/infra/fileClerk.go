@@ -26,8 +26,7 @@ const (
 	tempFileNameEntropyChars                 = 8
 )
 
-// A swap can land a FIFO at the target name. A blocking open would wait for a
-// peer and never reach the swap verifier, so target opens never block.
+// A swapped-in FIFO would block the open before the swap verifier runs.
 const (
 	targetFileReadOpenFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC |
 		unix.O_NONBLOCK
@@ -1402,13 +1401,14 @@ func (FileClerk) targetFileSwapVerifier(
 	return nil
 }
 
-func (clerk FileClerk) targetFileReadHandleOpener(
+func (clerk FileClerk) inspectedTargetFileOpener(
 	dirHandle int,
 	targetFileName tkValueObject.UnixFileName,
 	targetState targetFileState,
+	openFlags int,
 ) (fileHandle int, err error) {
 	fileHandle, openErr := unix.Openat(
-		dirHandle, targetFileName.String(), targetFileReadOpenFlags, 0,
+		dirHandle, targetFileName.String(), openFlags, 0,
 	)
 	if openErr != nil {
 		switch {
@@ -1416,15 +1416,19 @@ func (clerk FileClerk) targetFileReadHandleOpener(
 			return 0, ErrTargetIsSymlink
 		case errors.Is(openErr, unix.ENOENT):
 			return 0, ErrFileMissing
+		case errors.Is(openErr, unix.EISDIR):
+			return 0, ErrTargetIsDirectory
+		case errors.Is(openErr, unix.ENXIO):
+			return 0, ErrTargetNotRegularFile
 		default:
 			return 0, openErr
 		}
 	}
 
-	identityErr := clerk.targetFileSwapVerifier(fileHandle, targetState)
-	if identityErr != nil {
+	swapErr := clerk.targetFileSwapVerifier(fileHandle, targetState)
+	if swapErr != nil {
 		_ = unix.Close(fileHandle)
-		return 0, identityErr
+		return 0, swapErr
 	}
 
 	return fileHandle, nil
@@ -1546,12 +1550,11 @@ func (clerk FileClerk) regexReplaceStreaming(
 
 // FileContentRegexReplace atomically substitutes regex matches in a file. It
 // preserves the target's owner, group, and mode, including special bits. The
-// parent chain and the opened inode are verified against the inspected target,
-// so a swap cannot redirect the read. Symlinks are refused unless the policy
-// resolves them. A zero-byte result fails as a call-site bug; use
-// TruncateFileContent to empty a file on purpose. Files at or above
-// RegexLargeFileThresholdBytes stream line-by-line, so multi-line patterns
-// only match in smaller files.
+// parent chain is held and the opened inode is verified against the inspected
+// target, so a swap between the two fails with ErrTargetFileChanged. Symlinks
+// are refused unless the policy resolves them. A zero-byte result fails; use
+// TruncateFileContent to empty a file. Files at or above the large-file
+// threshold stream line-by-line, so multi-line patterns need smaller files.
 func (clerk FileClerk) FileContentRegexReplace(
 	settings FileRegexReplaceSettings,
 	regexPattern *regexp.Regexp,
@@ -1592,8 +1595,8 @@ func (clerk FileClerk) FileContentRegexReplace(
 		return 0, ErrFileEmpty
 	}
 
-	fileHandle, openErr := clerk.targetFileReadHandleOpener(
-		target.DirHandle, target.FileName, targetState,
+	fileHandle, openErr := clerk.inspectedTargetFileOpener(
+		target.DirHandle, target.FileName, targetState, targetFileReadOpenFlags,
 	)
 	if openErr != nil {
 		return 0, openErr
@@ -1629,10 +1632,11 @@ type FileAppendSettings struct {
 	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
 }
 
-// AppendFileContent appends to an existing file through an O_APPEND write, so
-// concurrent writers never lose data and the target's owner, group, and mode
-// stay untouched. A missing target fails with ErrFileMissing; create it with
-// UpsertFile. Symlinks are refused unless the policy resolves them.
+// AppendFileContent verifies the opened inode against the inspected target and
+// appends through an O_APPEND write, so concurrent writers never lose data and
+// the target's owner, group, and mode stay untouched. A missing target fails
+// with ErrFileMissing; create it with UpsertFile. Symlinks are refused unless
+// the policy resolves them.
 func (clerk FileClerk) AppendFileContent(
 	settings FileAppendSettings,
 	content string,
@@ -1665,25 +1669,11 @@ func (clerk FileClerk) AppendFileContent(
 		return targetStateErr
 	}
 
-	fileHandle, openErr := unix.Openat(
-		target.DirHandle,
-		target.FileName.String(),
-		targetFileAppendOpenFlags,
-		0,
+	fileHandle, openErr := clerk.inspectedTargetFileOpener(
+		target.DirHandle, target.FileName, targetState, targetFileAppendOpenFlags,
 	)
 	if openErr != nil {
-		switch {
-		case errors.Is(openErr, unix.ELOOP):
-			return ErrTargetIsSymlink
-		case errors.Is(openErr, unix.ENOENT):
-			return ErrFileMissing
-		case errors.Is(openErr, unix.EISDIR):
-			return ErrTargetIsDirectory
-		case errors.Is(openErr, unix.ENXIO):
-			return ErrTargetNotRegularFile
-		default:
-			return openErr
-		}
+		return openErr
 	}
 	targetFile := os.NewFile(uintptr(fileHandle), target.FileName.String())
 
