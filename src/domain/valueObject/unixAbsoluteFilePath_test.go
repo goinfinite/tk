@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -175,6 +176,17 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixAbsoluteFilePath("/home/file")},
 			{UnixAbsoluteFilePath("/home/.hidden"), UnixAbsoluteFilePath("/home/.hidden")},
 			{UnixAbsoluteFilePath("/home/.config.json"), UnixAbsoluteFilePath("/home/.config")},
+			{UnixAbsoluteFilePath("/home/README"), UnixAbsoluteFilePath("/home/README")},
+			{
+				UnixAbsoluteFilePath("/home/.htaccess"),
+				UnixAbsoluteFilePath("/home/.htaccess"),
+			},
+			{UnixAbsoluteFilePath("/home/file."), UnixAbsoluteFilePath("/home/file.")},
+			{UnixAbsoluteFilePath("/home/site.tar.gz"), UnixAbsoluteFilePath("/home/site")},
+			{
+				UnixAbsoluteFilePath("/home/file.someverylongextension"),
+				UnixAbsoluteFilePath("/home/file.someverylongextension"),
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -218,25 +230,47 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixAbsoluteFilePath
 			expectedOutput UnixFileExtension
-			expectError    bool
+			expectedError  error
 		}{
-			{UnixAbsoluteFilePath("/home/file.php"), UnixFileExtension("php"), false},
-			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileExtension("txt"), false},
-			{UnixAbsoluteFilePath("/home/file"), UnixFileExtension(""), true},
-			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileExtension("gz"), false},
+			{UnixAbsoluteFilePath("/home/file.php"), UnixFileExtension("php"), nil},
+			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileExtension("txt"), nil},
+			{UnixAbsoluteFilePath("/home/README"), UnixFileExtension(""), nil},
+			{UnixAbsoluteFilePath("/home/.htaccess"), UnixFileExtension(""), nil},
+			{UnixAbsoluteFilePath("/home/file."), UnixFileExtension(""), nil},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixFileExtension("json"), nil},
+			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileExtension("gz"), nil},
+			{UnixAbsoluteFilePath("/home/site.tar.gz"), UnixFileExtension("gz"), nil},
+			{
+				UnixAbsoluteFilePath("/home/file.someverylongextension"),
+				UnixFileExtension(""),
+				ErrFileExtensionInvalid,
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadFileExtension()
-			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
-			}
-			if !testCase.expectError && err != nil {
+			if testCase.expectedError == nil && err != nil {
 				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
-			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+			if testCase.expectedError != nil && !errors.Is(err, testCase.expectedError) {
+				t.Errorf(
+					"ExpectedError: '%v' vs '%v' [%v]",
+					testCase.expectedError, err, testCase.inputValue,
+				)
+			}
+			if actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
+		}
+	})
+
+	t.Run("ReadFileExtensionMethodPathError", func(t *testing.T) {
+		_, err := UnixAbsoluteFilePath("/root/dir/").ReadFileExtension()
+		if err == nil {
+			t.Fatal("MissingExpectedError")
+		}
+		if errors.Is(err, ErrFileExtensionInvalid) {
+			t.Errorf("PathErrorWrappedAsFileExtensionInvalid: '%v'", err)
 		}
 	})
 
@@ -248,8 +282,18 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 		}{
 			{UnixAbsoluteFilePath("/home/file.php"), UnixFileExtension("php"), false},
 			{UnixAbsoluteFilePath("/home/file.txt"), UnixFileExtension("txt"), false},
-			{UnixAbsoluteFilePath("/home/file"), UnixFileExtension(""), true},
+			{UnixAbsoluteFilePath("/home/file"), UnixFileExtension(""), false},
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileExtension("tar.gz"), false},
+			{UnixAbsoluteFilePath("/home/README"), UnixFileExtension(""), false},
+			{UnixAbsoluteFilePath("/home/.htaccess"), UnixFileExtension(""), false},
+			{UnixAbsoluteFilePath("/home/file."), UnixFileExtension(""), false},
+			{UnixAbsoluteFilePath("/home/.config.json"), UnixFileExtension("json"), false},
+			{UnixAbsoluteFilePath("/home/site.tar.gz"), UnixFileExtension("tar.gz"), false},
+			{
+				UnixAbsoluteFilePath("/home/file.someverylongextension"),
+				UnixFileExtension(""),
+				true,
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -278,6 +322,15 @@ func TestNewUnixAbsoluteFilePath(t *testing.T) {
 			{UnixAbsoluteFilePath("/home/file.tar.gz"), UnixFileName("file"), false},
 			{UnixAbsoluteFilePath("/home/.hidden"), UnixFileName(".hidden"), false},
 			{UnixAbsoluteFilePath("/home/.config.json"), UnixFileName(".config"), false},
+			{UnixAbsoluteFilePath("/home/README"), UnixFileName("README"), false},
+			{UnixAbsoluteFilePath("/home/.htaccess"), UnixFileName(".htaccess"), false},
+			{UnixAbsoluteFilePath("/home/file."), UnixFileName("file."), false},
+			{UnixAbsoluteFilePath("/home/site.tar.gz"), UnixFileName("site"), false},
+			{
+				UnixAbsoluteFilePath("/home/file.someverylongextension"),
+				UnixFileName("file.someverylongextension"),
+				false,
+			},
 			{UnixAbsoluteFilePath("/root/dir/"), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/."), UnixFileName(""), true},
 			{UnixAbsoluteFilePath("/home/user/.."), UnixFileName(""), true},

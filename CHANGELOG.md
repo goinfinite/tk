@@ -10,7 +10,9 @@ docs: attach the UpsertFile notes to the FileClerk entry in the infra README.
 refactor: FileClerk.UpsertFile settings use optional pointers: SymlinkPolicy, OverwritePolicy, OwnerSource, and Permissions. Defaults: strict-refuse, strict-refuse, existing-file, and target mode on replace / FileClerkDefaultNewFileMode (0600) on create. OwnerUsername/OwnerUserId set only the file owner; TrustedDirOwner* gate the directory chain, and a stated owner conflicts with the containing-directory or running-process source (ErrOwnerSourceConflict). Breaking change: ShouldFollowSymlinks, ShouldOverwrite, and ErrFilePermissionsInvalid are gone.
 feat: FileClerk.UpsertFile inherits the target's mode (special bits included) and owner/group on replace, and refuses a directory target with ErrTargetIsDirectory.
 fix: FileClerk.UpsertFile maps a chown EPERM to ErrFileOwnerChangeFailed, so an unprivileged process that cannot set the resolved owner fails with a named error and leaves the target untouched.
+fix: ReadFileExtension returns ('', nil) when the file has no extension; NewUnixFileExtension returns ErrFileExtensionInvalid when validation fails. ReadWithoutExtension and ReadFileNameWithoutExtension return the input unchanged on an empty extension. Breaking change: callers must check the extension value, not err == nil.
 test: cover UpsertFile owner-source precedence, group fallback, mode resolution, special-bit conversion, and the unprivileged chown failure; root-gated cases stay.
+test: cover ReadFileExtension and its siblings for README, .htaccess, file., .config.json, site.tar.gz, and an overlong extension.
 
 0.3.4 - 2026/09/10
 feat: add TransientDatabaseService, a shared in-memory SQLite key-value store. Has, Read (ErrKeyNotFound), and Set (upsert) work on a KeyValue model; every instance in the process shares the same data.

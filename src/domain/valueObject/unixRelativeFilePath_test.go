@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -94,6 +95,14 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./файл.txt"), UnixRelativeFilePath("./файл")},
 			{UnixRelativeFilePath("./.hidden"), UnixRelativeFilePath("./.hidden")},
 			{UnixRelativeFilePath("./.config.json"), UnixRelativeFilePath("./.config")},
+			{UnixRelativeFilePath("./README"), UnixRelativeFilePath("./README")},
+			{UnixRelativeFilePath("./.htaccess"), UnixRelativeFilePath("./.htaccess")},
+			{UnixRelativeFilePath("./file."), UnixRelativeFilePath("./file.")},
+			{UnixRelativeFilePath("./site.tar.gz"), UnixRelativeFilePath("./site")},
+			{
+				UnixRelativeFilePath("./file.someverylongextension"),
+				UnixRelativeFilePath("./file.someverylongextension"),
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -137,26 +146,53 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileExtension
-			expectError    bool
+			expectedError  error
 		}{
-			{UnixRelativeFilePath("./file.php"), UnixFileExtension("php"), false},
-			{UnixRelativeFilePath("./dir/file.txt"), UnixFileExtension("txt"), false},
-			{UnixRelativeFilePath("./file.tar.gz"), UnixFileExtension("gz"), false},
-			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
-			{UnixRelativeFilePath("./file.файл"), UnixFileExtension("файл"), true},
+			{UnixRelativeFilePath("./file.php"), UnixFileExtension("php"), nil},
+			{UnixRelativeFilePath("./dir/file.txt"), UnixFileExtension("txt"), nil},
+			{UnixRelativeFilePath("./file.tar.gz"), UnixFileExtension("gz"), nil},
+			{UnixRelativeFilePath("./README"), UnixFileExtension(""), nil},
+			{UnixRelativeFilePath("./.htaccess"), UnixFileExtension(""), nil},
+			{UnixRelativeFilePath("./file."), UnixFileExtension(""), nil},
+			{UnixRelativeFilePath("./.config.json"), UnixFileExtension("json"), nil},
+			{UnixRelativeFilePath("./site.tar.gz"), UnixFileExtension("gz"), nil},
+			{UnixRelativeFilePath("./file"), UnixFileExtension(""), nil},
+			{
+				UnixRelativeFilePath("./file.файл"),
+				UnixFileExtension(""),
+				ErrFileExtensionInvalid,
+			},
+			{
+				UnixRelativeFilePath("./file.someverylongextension"),
+				UnixFileExtension(""),
+				ErrFileExtensionInvalid,
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadFileExtension()
-			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
-			}
-			if !testCase.expectError && err != nil {
+			if testCase.expectedError == nil && err != nil {
 				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
-			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+			if testCase.expectedError != nil && !errors.Is(err, testCase.expectedError) {
+				t.Errorf(
+					"ExpectedError: '%v' vs '%v' [%v]",
+					testCase.expectedError, err, testCase.inputValue,
+				)
+			}
+			if actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
+		}
+	})
+
+	t.Run("ReadFileExtensionMethodPathError", func(t *testing.T) {
+		_, err := UnixRelativeFilePath("./dir/").ReadFileExtension()
+		if err == nil {
+			t.Fatal("MissingExpectedError")
+		}
+		if errors.Is(err, ErrFileExtensionInvalid) {
+			t.Errorf("PathErrorWrappedAsFileExtensionInvalid: '%v'", err)
 		}
 	})
 
@@ -169,8 +205,18 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./file.php"), UnixFileExtension("php"), false},
 			{UnixRelativeFilePath("./file.txt"), UnixFileExtension("txt"), false},
 			{UnixRelativeFilePath("./file.tar.gz"), UnixFileExtension("tar.gz"), false},
-			{UnixRelativeFilePath("./file"), UnixFileExtension(""), true},
+			{UnixRelativeFilePath("./file"), UnixFileExtension(""), false},
 			{UnixRelativeFilePath("./file.tar.gz.bz2"), UnixFileExtension("tar.gz.bz2"), true},
+			{UnixRelativeFilePath("./README"), UnixFileExtension(""), false},
+			{UnixRelativeFilePath("./.htaccess"), UnixFileExtension(""), false},
+			{UnixRelativeFilePath("./file."), UnixFileExtension(""), false},
+			{UnixRelativeFilePath("./.config.json"), UnixFileExtension("json"), false},
+			{UnixRelativeFilePath("./site.tar.gz"), UnixFileExtension("tar.gz"), false},
+			{
+				UnixRelativeFilePath("./file.someverylongextension"),
+				UnixFileExtension(""),
+				true,
+			},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -199,6 +245,15 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{UnixRelativeFilePath("./файл.txt"), UnixFileName("файл"), false},
 			{UnixRelativeFilePath("./.hidden"), UnixFileName(".hidden"), false},
 			{UnixRelativeFilePath("./.config.json"), UnixFileName(".config"), false},
+			{UnixRelativeFilePath("./README"), UnixFileName("README"), false},
+			{UnixRelativeFilePath("./.htaccess"), UnixFileName(".htaccess"), false},
+			{UnixRelativeFilePath("./file."), UnixFileName("file."), false},
+			{UnixRelativeFilePath("./site.tar.gz"), UnixFileName("site"), false},
+			{
+				UnixRelativeFilePath("./file.someverylongextension"),
+				UnixFileName("file.someverylongextension"),
+				false,
+			},
 			{UnixRelativeFilePath("./dir/"), UnixFileName(""), true},
 			{UnixRelativeFilePath("./dir/."), UnixFileName(""), true},
 		}

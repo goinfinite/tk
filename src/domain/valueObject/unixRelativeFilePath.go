@@ -62,6 +62,9 @@ func (vo UnixRelativeFilePath) ReadWithoutExtension() UnixRelativeFilePath {
 	if err != nil {
 		return vo
 	}
+	if fileExt == "" {
+		return vo
+	}
 
 	extStr := "." + fileExt.String()
 	rawFilePathWithoutExt := strings.TrimSuffix(string(vo), extStr)
@@ -80,16 +83,22 @@ func (vo UnixRelativeFilePath) ReadFileExtension() (UnixFileExtension, error) {
 		return "", fileNameErr
 	}
 
-	fileNameWithoutLeadingDots := strings.TrimLeft(fileName.String(), ".")
-	isExtensionlessDotfile := strings.HasPrefix(fileName.String(), ".") &&
+	fileNameStr := fileName.String()
+	fileNameWithoutLeadingDots := strings.TrimLeft(fileNameStr, ".")
+	isExtensionlessDotfile := strings.HasPrefix(fileNameStr, ".") &&
 		fileNameWithoutLeadingDots != "" &&
 		!strings.Contains(fileNameWithoutLeadingDots, ".")
 	if isExtensionlessDotfile {
-		return NewUnixFileExtension("")
+		return "", nil
 	}
 
-	unixFileExtensionStr := filepath.Ext(string(vo))
-	return NewUnixFileExtension(unixFileExtensionStr)
+	rawFileExtension := filepath.Ext(fileNameStr)
+	isTrailingDotName := rawFileExtension == "."
+	if rawFileExtension == "" || isTrailingDotName {
+		return "", nil
+	}
+
+	return NewUnixFileExtension(rawFileExtension)
 }
 
 func (vo UnixRelativeFilePath) ReadCompoundFileExtension() (UnixFileExtension, error) {
@@ -115,7 +124,7 @@ func (vo UnixRelativeFilePath) ReadFileNameWithoutExtension() (UnixFileName, err
 	}
 
 	fileExt, extErr := vo.ReadCompoundFileExtension()
-	if extErr != nil {
+	if extErr != nil || fileExt == "" {
 		return fileName, nil
 	}
 
