@@ -7,7 +7,7 @@ While developed primarily for Infinite ecosystem projects, this open-source libr
 If you're looking for UI components, please refer to the [Infinite UI](https://github.com/goinfinite/ui) repository.
 
 > [!TIP]
-> **Working with an AI agent?** Point it to [`skills/tk-usage/SKILL.md`](skills/tk-usage/SKILL.md) before it writes code that imports TK. Installed projects find the same file at `$(go env GOMODCACHE)/github.com/goinfinite/tk@<version>/skills/tk-usage/SKILL.md`.
+> **Working with an AI agent?** Point it to [`SKILL.md`](SKILL.md) before it writes code that imports TK. The skill maps the three layers and routes the agent to the right layer README. Installed projects find the same file at `$(go env GOMODCACHE)/github.com/goinfinite/tk@<version>/SKILL.md`.
 
 > [!IMPORTANT]
 > **Human Reviewed**: AI models assist development, but senior developers review every line for coherence, readability, and maintainability.
@@ -29,13 +29,3 @@ Infinite Toolkit _(TK)_ is organized in three Clean Architecture layers:
 - **[Presentation](src/presentation/README.md)** — request parsers, response wrappers, and Echo middleware.
 
 Each layer README documents its components with usage snippets.
-
-## Skills for Agents
-
-TK provides reusable agent skills for common workflows — testing, automation, and operational tasks. These skills are designed for agents working on projects that import TK as a dependency.
-
-**Available skills:**
-- **OpenAPI Testing** — generates deterministic shell scripts from Swagger/OpenAPI specs. Agents explore endpoints interactively, validate payloads, and write working curl commands. Subsequent runs diff the spec against the script and test only what changed.
-- **TK Usage** — orients agents in projects that import TK: presents the three layers, routes to the right layer README, and states the usage conventions.
-
-**For agents:** Reference skills from the Go module cache at `$(go env GOMODCACHE)/github.com/goinfinite/tk@*/skills/<skill-name>/SKILL.md`. See `skills/README.md` in the TK source for full documentation.
