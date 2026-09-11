@@ -20,21 +20,48 @@ import (
 )
 
 const (
-	RegexLargeFileThresholdBytes       int64 = 10 * 1024 * 1024
-	ReadFileContentDefaultMaxSizeBytes int64 = 500 * 1024 * 1024
-	tempFileNameSuffix                       = ".tk-tmp"
-	tempFileNameEntropyChars                 = 8
-)
+	tempFileNameSuffix       = ".tk-tmp"
+	tempFileNameEntropyChars = 8
 
-// A swapped-in FIFO would block the open before the swap verifier runs.
-const (
+	// A swapped-in FIFO would block the open before the swap verifier runs.
 	targetFileReadOpenFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC |
 		unix.O_NONBLOCK
 	targetFileAppendOpenFlags = unix.O_WRONLY | unix.O_APPEND | unix.O_NOFOLLOW |
 		unix.O_CLOEXEC | unix.O_NONBLOCK
 )
 
+type FileClerkSymlinkPolicy string
+
+// FileClerkDirChainPolicy selects how the directory-chain walk treats a
+// component writable by group or others.
+type FileClerkDirChainPolicy string
+
+type FileClerkOverwritePolicy string
+
+type FileClerkOwnerSource string
+
 var (
+	RegexLargeFileThresholdBytes       int64       = 10 * 1024 * 1024
+	ReadFileContentDefaultMaxSizeBytes int64       = 500 * 1024 * 1024
+	FileClerkDefaultNewFileMode        os.FileMode = 0o600
+
+	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
+	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
+
+	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
+	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
+
+	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
+	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
+	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
+
+	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
+	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
+
+	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
+	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
+	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
+
 	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
 	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
 	ErrFileMissing                  = errors.New("FileNotFound")
@@ -69,43 +96,6 @@ var (
 	ErrFileOwnerChangeFailed        = errors.New("FileOwnerChangeFailed")
 	ErrTargetFileChanged            = errors.New("TargetFileChanged")
 )
-
-type FileClerkSymlinkPolicy string
-
-const (
-	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
-	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
-)
-
-// FileClerkDirChainPolicy selects how the directory-chain walk treats a
-// component writable by group or others.
-type FileClerkDirChainPolicy string
-
-const (
-	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
-	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
-
-	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
-	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
-	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
-)
-
-type FileClerkOverwritePolicy string
-
-const (
-	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
-	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
-)
-
-type FileClerkOwnerSource string
-
-const (
-	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
-	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
-	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
-)
-
-const FileClerkDefaultNewFileMode os.FileMode = 0o600
 
 type FileClerk struct{}
 
@@ -1148,9 +1138,42 @@ func (FileClerk) ownerGroupIdResolver(
 	return resolvedGroupId, nil
 }
 
+type trustedDirOwnerIdSet map[uint64]struct{}
+
+func (clerk FileClerk) trustedDirOwnerIdSetResolver(
+	trustedDirOwnerUsernames []tkValueObject.UnixUsername,
+	trustedDirOwnerUserIds []tkValueObject.UnixUserId,
+) (trustedDirOwnerIds trustedDirOwnerIdSet, err error) {
+	trustedDirOwnerIds = trustedDirOwnerIdSet{}
+
+	for _, trustedDirOwnerUsername := range trustedDirOwnerUsernames {
+		resolvedUserId, resolveErr := clerk.ownerUserIdResolver(
+			&trustedDirOwnerUsername, nil,
+		)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		trustedDirOwnerIds[resolvedUserId.Uint64()] = struct{}{}
+	}
+
+	for _, trustedDirOwnerUserId := range trustedDirOwnerUserIds {
+		trustedDirOwnerIds[trustedDirOwnerUserId.Uint64()] = struct{}{}
+	}
+
+	if len(trustedDirOwnerIds) == 0 {
+		processUserId, resolveErr := clerk.ownerUserIdResolver(nil, nil)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		trustedDirOwnerIds[processUserId.Uint64()] = struct{}{}
+	}
+
+	return trustedDirOwnerIds, nil
+}
+
 func (FileClerk) openRedirectProofDirChain(
 	dirPath tkValueObject.UnixAbsoluteFilePath,
-	ownerUserId tkValueObject.UnixUserId,
+	trustedDirOwnerIds trustedDirOwnerIdSet,
 	dirChainPolicy FileClerkDirChainPolicy,
 ) (dirHandle int, err error) {
 	walkFlags := unix.O_PATH | unix.O_NOFOLLOW | unix.O_CLOEXEC
@@ -1206,10 +1229,11 @@ func (FileClerk) openRedirectProofDirChain(
 			)
 		}
 
-		ownedByRequestedUser := uint64(componentStat.Uid) == ownerUserId.Uint64()
-		ownedByRoot := componentStat.Uid == 0
-		ownedByTrustedAccount := ownedByRequestedUser || ownedByRoot
-		if !ownedByTrustedAccount {
+		_, componentOwnedByTrustedOwner := trustedDirOwnerIds[uint64(componentStat.Uid)]
+		componentOwnedByRoot := componentStat.Uid == 0
+		componentOwnedByTrustedAccount := componentOwnedByTrustedOwner ||
+			componentOwnedByRoot
+		if !componentOwnedByTrustedAccount {
 			return 0, fmt.Errorf(
 				"%w: %s", ErrDirectoryOwnerInvalid, pathComponent,
 			)
@@ -1236,8 +1260,7 @@ func (FileClerk) symlinkPolicyNormalizer(
 	symlinkPolicyPtr *FileClerkSymlinkPolicy,
 ) (*FileClerkSymlinkPolicy, error) {
 	if symlinkPolicyPtr == nil {
-		defaultSymlinkPolicy := FileClerkSymlinkPolicyStrictRefuse
-		return &defaultSymlinkPolicy, nil
+		return &FileClerkSymlinkPolicyStrictRefuse, nil
 	}
 	switch *symlinkPolicyPtr {
 	case FileClerkSymlinkPolicyStrictRefuse, FileClerkSymlinkPolicyResolve:
@@ -1251,8 +1274,7 @@ func (FileClerk) dirChainPolicyNormalizer(
 	dirChainPolicyPtr *FileClerkDirChainPolicy,
 ) (*FileClerkDirChainPolicy, error) {
 	if dirChainPolicyPtr == nil {
-		defaultDirChainPolicy := FileClerkDirChainPolicySharedWriteAllowed
-		return &defaultDirChainPolicy, nil
+		return &FileClerkDirChainPolicySharedWriteAllowed, nil
 	}
 	switch *dirChainPolicyPtr {
 	case FileClerkDirChainPolicySharedWriteAllowed, FileClerkDirChainPolicySharedWriteRefused:
@@ -1294,8 +1316,8 @@ func (clerk FileClerk) fileWriteTargetResolver(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	symlinkPolicy FileClerkSymlinkPolicy,
 	dirChainPolicy FileClerkDirChainPolicy,
-	trustedDirOwnerUsername *tkValueObject.UnixUsername,
-	trustedDirOwnerUserId *tkValueObject.UnixUserId,
+	trustedDirOwnerUsernames []tkValueObject.UnixUsername,
+	trustedDirOwnerUserIds []tkValueObject.UnixUserId,
 ) (target fileWriteTarget, err error) {
 	hasTrailingSeparator := strings.HasSuffix(filePath.String(), "/")
 	if hasTrailingSeparator {
@@ -1325,8 +1347,8 @@ func (clerk FileClerk) fileWriteTargetResolver(
 		return target, ErrFileNameInvalid
 	}
 
-	trustedDirOwnerId, trustErr := clerk.ownerUserIdResolver(
-		trustedDirOwnerUsername, trustedDirOwnerUserId,
+	trustedDirOwnerIds, trustErr := clerk.trustedDirOwnerIdSetResolver(
+		trustedDirOwnerUsernames, trustedDirOwnerUserIds,
 	)
 	if trustErr != nil {
 		return target, trustErr
@@ -1334,7 +1356,7 @@ func (clerk FileClerk) fileWriteTargetResolver(
 
 	dirPath := targetFilePath.ReadFileDir()
 	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
-		dirPath, trustedDirOwnerId, dirChainPolicy,
+		dirPath, trustedDirOwnerIds, dirChainPolicy,
 	)
 	if dirChainErr != nil {
 		return target, dirChainErr
@@ -1440,9 +1462,9 @@ type FileRegexReplaceSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
 
 func (clerk FileClerk) regexReplaceWholeFile(
@@ -1579,7 +1601,7 @@ func (clerk FileClerk) FileContentRegexReplace(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return 0, targetErr
@@ -1627,9 +1649,9 @@ type FileAppendSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
 
 // AppendFileContent verifies the opened inode against the inspected target and
@@ -1656,7 +1678,7 @@ func (clerk FileClerk) AppendFileContent(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, *symlinkPolicy, *dirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return targetErr
@@ -1689,9 +1711,9 @@ type FileUpsertSettings struct {
 	OverwritePolicy *FileClerkOverwritePolicy
 	SymlinkPolicy   *FileClerkSymlinkPolicy
 
-	// When unset, the running process account is trusted; root is always trusted.
-	TrustedDirOwnerUsername *tkValueObject.UnixUsername
-	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+	// When empty, the running process account is trusted; root is always trusted.
+	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
+	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 
 	Permissions *os.FileMode
 
@@ -1856,8 +1878,7 @@ func (clerk FileClerk) fileUpsertSettingsNormalizer(
 	settings.SymlinkPolicy = symlinkPolicy
 
 	if settings.OverwritePolicy == nil {
-		defaultOverwritePolicy := FileClerkOverwritePolicyStrictRefuse
-		settings.OverwritePolicy = &defaultOverwritePolicy
+		settings.OverwritePolicy = &FileClerkOverwritePolicyStrictRefuse
 	}
 	switch *settings.OverwritePolicy {
 	case FileClerkOverwritePolicyStrictRefuse, FileClerkOverwritePolicyReplace:
@@ -1866,8 +1887,7 @@ func (clerk FileClerk) fileUpsertSettingsNormalizer(
 	}
 
 	if settings.OwnerSource == nil {
-		defaultOwnerSource := FileClerkOwnerSourceExistingFile
-		settings.OwnerSource = &defaultOwnerSource
+		settings.OwnerSource = &FileClerkOwnerSourceExistingFile
 	}
 	switch *settings.OwnerSource {
 	case FileClerkOwnerSourceExistingFile, FileClerkOwnerSourceContainingDirectory,
@@ -1893,7 +1913,7 @@ func (clerk FileClerk) UpsertFile(
 
 	target, targetErr := clerk.fileWriteTargetResolver(
 		settings.FilePath, symlinkPolicy, *settings.DirChainPolicy,
-		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
+		settings.TrustedDirOwnerUsernames, settings.TrustedDirOwnerUserIds,
 	)
 	if targetErr != nil {
 		return targetErr

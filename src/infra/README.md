@@ -64,13 +64,12 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
     "/home/example/.config/systemd/user/service.service", false,
   )
   serviceFilePermissions := os.FileMode(0644)
-  overwritePolicy := FileClerkOverwritePolicyReplace
   fileUpsertErr := clerk.UpsertFile(FileUpsertSettings{
-    FilePath:                serviceFilePath,
-    OverwritePolicy:         &overwritePolicy,
-    TrustedDirOwnerUsername: &ownerUsername,
-    Permissions:             &serviceFilePermissions,
-    OwnerUsername:           &ownerUsername,
+    FilePath:                 serviceFilePath,
+    OverwritePolicy:          &FileClerkOverwritePolicyReplace,
+    TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{ownerUsername},
+    Permissions:              &serviceFilePermissions,
+    OwnerUsername:            &ownerUsername,
   }, []byte("unit content"))
 
   // CompressionOperations
@@ -109,11 +108,11 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
 
   **UpsertFile Notes**
 
-  `UpsertFile` writes through a held parent-directory handle and defaults to the safe policies: it refuses symlinked paths, refuses to replace an existing target, creates new files as `FileClerkDefaultNewFileMode` (0600), and inherits the target's mode and owner on replace. Callers opt in with `FileClerkSymlinkPolicyResolve`, `FileClerkOverwritePolicyReplace`, and a `FileClerkOwnerSource`; `TrustedDirOwner*` gates the directory chain. When unset, the walk trusts the running process account and root. Name a third-party owner only when you trust it. `DirChainPolicy` defaults to `FileClerkDirChainPolicySharedWriteAllowed`; `FileClerkDirChainPolicySharedWriteRefused` also rejects any parent component that group or others can write, unless it is sticky (`ErrDirectoryWritableByOthers`). A stated owner wins over the existing-file source and conflicts with the other sources (`ErrOwnerSourceConflict`); a stated group or mode wins, and an omitted mode inherits the target or defaults to 0600 on create. A directory target fails with `ErrTargetIsDirectory`, and a process that cannot set the resolved owner fails with `ErrFileOwnerChangeFailed`.
+  `UpsertFile` writes through a held parent-directory handle and defaults to the safe policies: it refuses symlinked paths, refuses to replace an existing target, creates new files as `FileClerkDefaultNewFileMode` (0600), and inherits the target's mode and owner on replace. Callers opt in with `FileClerkSymlinkPolicyResolve`, `FileClerkOverwritePolicyReplace`, and a `FileClerkOwnerSource`; `TrustedDirOwnerUsernames` and `TrustedDirOwnerUserIds` name the trusted directory owners. Every parent component must be owned by root or by one of them (`ErrDirectoryOwnerInvalid` names the offending component). When the set is empty, the walk trusts the running process account and root. Name a third-party owner only when you trust it. `DirChainPolicy` defaults to `FileClerkDirChainPolicySharedWriteAllowed`; `FileClerkDirChainPolicySharedWriteRefused` also rejects any parent component that group or others can write, unless it is sticky (`ErrDirectoryWritableByOthers`). A stated owner wins over the existing-file source and conflicts with the other sources (`ErrOwnerSourceConflict`); a stated group or mode wins, and an omitted mode inherits the target or defaults to 0600 on create. A directory target fails with `ErrTargetIsDirectory`, and a process that cannot set the resolved owner fails with `ErrFileOwnerChangeFailed`.
 
   **FileContentRegexReplace and AppendFileContent Notes**
 
-  `FileContentRegexReplace` takes `FileRegexReplaceSettings` and uses the same trust model as `UpsertFile`: it walks the parent directory chain through a held handle, opens the target through that handle, verifies the opened inode, and preserves the target's owner, group, and mode (special bits included). It refuses symlinks unless `SymlinkPolicy` resolves them. Empty files and directories are rejected. `AppendFileContent` verifies the opened inode and only appends to an existing file through an `O_APPEND` write, so the target's owner, group, and mode stay untouched and concurrent writers never lose data. A missing target fails with `ErrFileMissing`; create it with `UpsertFile` first. `FileAppendSettings` takes `SymlinkPolicy`, `DirChainPolicy`, and `TrustedDirOwner*`.
+  `FileContentRegexReplace` takes `FileRegexReplaceSettings` and uses the same trust model as `UpsertFile`: it walks the parent directory chain through a held handle, opens the target through that handle, verifies the opened inode, and preserves the target's owner, group, and mode (special bits included). It refuses symlinks unless `SymlinkPolicy` resolves them. Empty files and directories are rejected. `AppendFileContent` verifies the opened inode and only appends to an existing file through an `O_APPEND` write, so the target's owner, group, and mode stay untouched and concurrent writers never lose data. A missing target fails with `ErrFileMissing`; create it with `UpsertFile` first. `FileAppendSettings` takes `SymlinkPolicy`, `DirChainPolicy`, `TrustedDirOwnerUsernames`, and `TrustedDirOwnerUserIds`.
 
 - **Shell**: Execute system commands with configurable user, timeout, environment variables, and output redirection to files.
 
