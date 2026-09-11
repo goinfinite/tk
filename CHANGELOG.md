@@ -6,6 +6,7 @@ docs: move the TK usage skill to the repository root; delete the openapi-test sk
 docs: tighten the TK usage skill procedure and guardrails.
 docs: refresh the README blurb, installation, usage routing, and SonarCloud badge.
 docs: scope the domain dependency constraint to production code and note the test fixture exception.
+docs: attach the UpsertFile notes to the FileClerk entry in the infra README.
 refactor: FileClerk.UpsertFile settings use optional pointers: SymlinkPolicy, OverwritePolicy, OwnerSource, and Permissions. Defaults: strict-refuse, strict-refuse, existing-file, and target mode on replace / FileClerkDefaultNewFileMode (0600) on create. OwnerUsername/OwnerUserId set only the file owner; TrustedDirOwner* gate the directory chain, and a stated owner conflicts with the containing-directory or running-process source (ErrOwnerSourceConflict). Breaking change: ShouldFollowSymlinks, ShouldOverwrite, and ErrFilePermissionsInvalid are gone.
 feat: FileClerk.UpsertFile inherits the target's mode (special bits included) and owner/group on replace, and refuses a directory target with ErrTargetIsDirectory.
 fix: FileClerk.UpsertFile maps a chown EPERM to ErrFileOwnerChangeFailed, so an unprivileged process that cannot set the resolved owner fails with a named error and leaves the target untouched.
