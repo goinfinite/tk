@@ -41,9 +41,12 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   regexSearchFindings, regexSearchErr := clerk.FileContentRegexSearch(regexSearchFilePath, regexPattern)
   regexReplacement := `warn: $1`
   replacementCount, regexReplaceErr := clerk.FileContentRegexReplace(
-    regexSearchFilePath, regexPattern, regexReplacement,
+    FileRegexReplaceSettings{FilePath: regexSearchFilePath},
+    regexPattern, regexReplacement,
   )
-  fileAppendErr := clerk.AppendFileContent(regexSearchFilePath, "new content")
+  fileAppendErr := clerk.AppendFileContent(
+    FileAppendSettings{FilePath: regexSearchFilePath}, "new content",
+  )
   fileTruncationErr := clerk.TruncateFileContent(regexSearchFilePath)
 
   // FileManipulation
@@ -57,12 +60,6 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   filePermissions := 0755
   filePermissionsUpdateErr := clerk.UpdateFilePermissions("example.txt", &filePermissions)
   ownerUsername, ownerUsernameErr := tkValueObject.NewUnixUsername("example")
-  systemdUserDir, systemdUserDirErr := tkValueObject.NewUnixAbsoluteFilePath(
-    "/home/example/.config/systemd/user", false,
-  )
-  dirPathRedirectSafetyErr := clerk.VerifyDirPathRedirectSafety(
-    systemdUserDir, &ownerUsername, nil,
-  )
   serviceFilePath, serviceFilePathErr := tkValueObject.NewUnixAbsoluteFilePath(
     "/home/example/.config/systemd/user/service.service", false,
   )
@@ -112,7 +109,11 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
 
   **UpsertFile Notes**
 
-  `UpsertFile` writes through a held parent-directory handle and defaults to the safe policies: it refuses symlinked paths, refuses to replace an existing target, creates new files as `FileClerkDefaultNewFileMode` (0600), and inherits the target's mode and owner on replace. Callers opt in with `FileClerkSymlinkPolicyResolve`, `FileClerkOverwritePolicyReplace`, and a `FileClerkOwnerSource`; `TrustedDirOwner*` gates the directory chain. A stated owner wins over the existing-file source and conflicts with the other sources (`ErrOwnerSourceConflict`); a stated group or mode wins, and an omitted mode inherits the target or defaults to 0600 on create. A directory target fails with `ErrTargetIsDirectory`, and a process that cannot set the resolved owner fails with `ErrFileOwnerChangeFailed`.
+  `UpsertFile` writes through a held parent-directory handle and defaults to the safe policies: it refuses symlinked paths, refuses to replace an existing target, creates new files as `FileClerkDefaultNewFileMode` (0600), and inherits the target's mode and owner on replace. Callers opt in with `FileClerkSymlinkPolicyResolve`, `FileClerkOverwritePolicyReplace`, and a `FileClerkOwnerSource`; `TrustedDirOwner*` gates the directory chain. When unset, the walk trusts the running process account and root. Name a third-party owner only when you trust it. `DirChainPolicy` defaults to `FileClerkDirChainPolicySharedWriteAllowed`; `FileClerkDirChainPolicySharedWriteRefused` also rejects any parent component that group or others can write, unless it is sticky (`ErrDirectoryWritableByOthers`). A stated owner wins over the existing-file source and conflicts with the other sources (`ErrOwnerSourceConflict`); a stated group or mode wins, and an omitted mode inherits the target or defaults to 0600 on create. A directory target fails with `ErrTargetIsDirectory`, and a process that cannot set the resolved owner fails with `ErrFileOwnerChangeFailed`.
+
+  **FileContentRegexReplace and AppendFileContent Notes**
+
+  `FileContentRegexReplace` takes `FileRegexReplaceSettings` and uses the same trust model as `UpsertFile`: it walks the parent directory chain through a held handle, reads the target through that handle, and preserves the target's owner, group, and mode (special bits included). It refuses symlinks unless `SymlinkPolicy` resolves them. Empty files and directories are rejected. `AppendFileContent` only appends to an existing file through an `O_APPEND` write, so the target's owner, group, and mode stay untouched and concurrent writers never lose data. A missing target fails with `ErrFileMissing`; create it with `UpsertFile` first. `FileAppendSettings` takes `SymlinkPolicy`, `DirChainPolicy`, and `TrustedDirOwner*`.
 
 - **Shell**: Execute system commands with configurable user, timeout, environment variables, and output redirection to files.
 

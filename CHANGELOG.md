@@ -14,6 +14,13 @@ fix: ReadFileExtension returns ('', nil) when the file has no extension; NewUnix
 chore: use strings.Cut in UnixFileExtension.ReadMimeType.
 test: cover UpsertFile owner-source precedence, group fallback, mode resolution, special-bit conversion, and the unprivileged chown failure; root-gated cases stay.
 test: cover ReadFileExtension and its siblings for README, .htaccess, file., .config.json, site.tar.gz, and an overlong extension.
+refactor: FileClerk.AppendFileContent takes FileAppendSettings (FilePath, SymlinkPolicy, DirChainPolicy, TrustedDirOwner*) and no longer creates a missing file: a missing target fails with ErrFileMissing, and the append never changes the target's owner, group, or mode. Breaking change: the positional signature is gone.
+refactor: FileClerk.FileContentRegexReplace takes FileRegexReplaceSettings (FilePath, SymlinkPolicy, DirChainPolicy, TrustedDirOwner*) and walks the parent directory chain through a held handle with the same trust model as UpsertFile. It reads the target through that handle, so a swapped path cannot redirect the read or the write. Breaking change: the positional signature is gone and symlinks are refused by default.
+fix: FileClerk.FileContentRegexReplace preserves the target's owner, group, and mode, including setuid/setgid/sticky bits. It previously kept only the permission bits and left the replacement owned by the process account.
+feat: add DirChainPolicy to FileAppendSettings, FileUpsertSettings, and FileRegexReplaceSettings. It defaults to FileClerkDirChainPolicySharedWriteAllowed; FileClerkDirChainPolicySharedWriteRefused rejects a chain component writable by group or others unless the sticky bit is set (ErrDirectoryWritableByOthers).
+refactor: remove FileClerk.VerifyDirPathRedirectSafety. The fd walk stays internal to UpsertFile, AppendFileContent, and FileContentRegexReplace, which hold the directory handle through the write. Breaking change.
+fix: FileClerk write paths reject a file path that ends with a separator (ErrFileNameInvalid) before splitting the final component.
+test: reroute the directory-chain error coverage to UpsertFile and openRedirectProofDirChain; cover append's missing-target, metadata, symlink, and trust-anchor behavior.
 
 0.3.4 - 2026/09/10
 feat: add TransientDatabaseService, a shared in-memory SQLite key-value store. Has, Read (ErrKeyNotFound), and Set (upsert) work on a KeyValue model; every instance in the process shares the same data.

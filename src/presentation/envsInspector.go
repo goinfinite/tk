@@ -94,7 +94,10 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		}
 
 		err = fileClerk.AppendFileContent(
-			*envsInspector.envFilePath, separator+envVarStr,
+			tkInfra.FileAppendSettings{
+				FilePath: *envsInspector.envFilePath,
+			},
+			separator+envVarStr,
 		)
 		if err != nil {
 			return errors.New("EnvsInspectorEnvAppendFileError")

@@ -101,11 +101,11 @@ Resolves DNS records with configurable resolvers, timeouts, and an optional loca
 
 ## File Operations
 
-Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search.
+Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search/replace.
 
 **Flow:**
 
-1. `src/infra/fileClerk.go` — `FileClerk` provides filesystem operations: exclusive create, atomic move and upsert, copy, compress/decompress, permission management, symlink-safe directory-chain verification, and regex search
+1. `src/infra/fileClerk.go` — `FileClerk` provides filesystem operations: exclusive create, atomic move, upsert and append, copy, compress/decompress, permission management, and regex search/replace
 
 ---
 
