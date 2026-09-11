@@ -18,7 +18,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
 
-- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, cautious atomic writes that refuse symlinked or stranger-owned directory paths and only replace an existing target when the caller asks, collision-safe temp file naming, and symlink handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, collision-safe temp file naming, and symlink handling. `UpsertFile` writes through a held parent-directory handle and defaults to the safe policies: it refuses symlinked paths, refuses to replace an existing target, creates new files as `FileClerkDefaultNewFileMode` (0600), and inherits the target's mode and owner on replace. Callers opt in with `FileClerkSymlinkPolicyResolve` and `FileClerkOverwritePolicyReplace`. `TrustedDirOwnerUsername` and `TrustedDirOwnerUserId` name the account that must own every directory in the path; the default is the running process. `OwnerSource` chooses the file owner: `FileClerkOwnerSourceExistingFile` (default), `FileClerkOwnerSourceContainingDirectory`, or `FileClerkOwnerSourceRunningProcess`. A stated `OwnerUsername` or `OwnerUserId` wins over the existing-file source and conflicts with the other two (`ErrOwnerSourceConflict`). An omitted group follows the owner source; a stated `OwnerGroupId` wins. An omitted `Permissions` (nil) inherits the target mode on replace and uses `FileClerkDefaultNewFileMode` on create. A stated mode is used as given, mode 0000 included. Under the replace policy, any existing non-directory entry becomes a regular file; a directory target fails with `ErrTargetIsDirectory`. Changing a file owner needs privilege: a process that cannot set the resolved owner fails with `ErrFileOwnerChangeFailed` and leaves the target untouched.
 
   ```go
   clerk := FileClerk{}
@@ -66,10 +66,14 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   serviceFilePath, serviceFilePathErr := tkValueObject.NewUnixAbsoluteFilePath(
     "/home/example/.config/systemd/user/service.service", false,
   )
+  serviceFilePermissions := os.FileMode(0644)
+  overwritePolicy := FileClerkOverwritePolicyReplace
   fileUpsertErr := clerk.UpsertFile(FileUpsertSettings{
-    FilePath:     serviceFilePath,
-    Permissions:  0644,
-    OwnerUsername: &ownerUsername,
+    FilePath:                serviceFilePath,
+    OverwritePolicy:         &overwritePolicy,
+    TrustedDirOwnerUsername: &ownerUsername,
+    Permissions:             &serviceFilePermissions,
+    OwnerUsername:           &ownerUsername,
   }, []byte("unit content"))
 
   // CompressionOperations

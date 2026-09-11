@@ -49,10 +49,38 @@ var (
 	ErrDirPathTraversalInvalid      = errors.New("DirPathParentTraversalNotAllowed")
 	ErrSymlinkedPathInvalid         = errors.New("PathComponentIsSymlink")
 	ErrDirectoryOwnerInvalid        = errors.New("DirectoryNotOwnedByExpectedOwner")
-	ErrFilePermissionsInvalid       = errors.New("FilePermissionsUnset")
 	ErrFileNameInvalid              = errors.New("FilePathFinalComponentIsNotAFileName")
 	ErrTempFileNameTooLong          = errors.New("TempFileNameExceedsNameMax")
+	ErrSymlinkPolicyInvalid         = errors.New("SymlinkPolicyInvalid")
+	ErrOverwritePolicyInvalid       = errors.New("OverwritePolicyInvalid")
+	ErrOwnerSourceInvalid           = errors.New("OwnerSourceInvalid")
+	ErrOwnerSourceConflict          = errors.New("OwnerSourceConflictsWithStatedOwner")
+	ErrFileOwnerChangeFailed        = errors.New("FileOwnerChangeFailed")
 )
+
+type FileClerkSymlinkPolicy string
+
+const (
+	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
+	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
+)
+
+type FileClerkOverwritePolicy string
+
+const (
+	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
+	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
+)
+
+type FileClerkOwnerSource string
+
+const (
+	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
+	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
+	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
+)
+
+const FileClerkDefaultNewFileMode os.FileMode = 0o600
 
 type FileClerk struct{}
 
@@ -552,6 +580,10 @@ func (clerk FileClerk) writeFileAtomically(
 			int(settings.OwnerUserId.Uint64()),
 			int(settings.OwnerGroupId.Uint64()),
 		)
+		ownerChangeNotPermitted := errors.Is(chownErr, unix.EPERM)
+		if ownerChangeNotPermitted {
+			chownErr = fmt.Errorf("%w: %w", ErrFileOwnerChangeFailed, chownErr)
+		}
 	}
 	// Chmod last: chown clears the setuid and setgid bits a mode may carry.
 	chmodErr := tempFile.Chmod(settings.Permissions)
@@ -1348,6 +1380,190 @@ func (clerk FileClerk) AppendFileContent(
 	return errors.Join(writeErr, closeErr)
 }
 
+type FileUpsertSettings struct {
+	FilePath tkValueObject.UnixAbsoluteFilePath
+
+	SymlinkPolicy   *FileClerkSymlinkPolicy
+	OverwritePolicy *FileClerkOverwritePolicy
+
+	TrustedDirOwnerUsername *tkValueObject.UnixUsername
+	TrustedDirOwnerUserId   *tkValueObject.UnixUserId
+
+	Permissions *os.FileMode
+
+	OwnerSource   *FileClerkOwnerSource
+	OwnerUsername *tkValueObject.UnixUsername
+	OwnerUserId   *tkValueObject.UnixUserId
+	OwnerGroupId  *tkValueObject.UnixGroupId
+}
+
+type fileUpsertOwnership struct {
+	UserId  tkValueObject.UnixUserId
+	GroupId tkValueObject.UnixGroupId
+}
+
+func (clerk FileClerk) runningProcessOwnershipResolver() (
+	ownership fileUpsertOwnership, err error,
+) {
+	ownership.UserId, err = clerk.ownerUserIdResolver(nil, nil)
+	if err != nil {
+		return ownership, err
+	}
+
+	processGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
+	if groupIdErr != nil {
+		return ownership, groupIdErr
+	}
+	ownership.GroupId = processGroupId
+
+	return ownership, nil
+}
+
+type targetFileState struct {
+	Exists       bool
+	IsSymlink    bool
+	IsDirectory  bool
+	OwnerUserId  tkValueObject.UnixUserId
+	OwnerGroupId tkValueObject.UnixGroupId
+	Permissions  os.FileMode
+}
+
+func (clerk FileClerk) fileUpsertSourceOwnershipResolver(
+	ownerSource FileClerkOwnerSource,
+	targetState targetFileState,
+	containingDirStat unix.Stat_t,
+) (ownership fileUpsertOwnership, err error) {
+	switch ownerSource {
+	case FileClerkOwnerSourceExistingFile:
+		if targetState.Exists {
+			ownership.UserId = targetState.OwnerUserId
+			ownership.GroupId = targetState.OwnerGroupId
+			return ownership, nil
+		}
+		return clerk.runningProcessOwnershipResolver()
+	case FileClerkOwnerSourceContainingDirectory:
+		ownership.UserId, err = tkValueObject.NewUnixUserId(containingDirStat.Uid)
+		if err != nil {
+			return ownership, err
+		}
+		ownership.GroupId, err = tkValueObject.NewUnixGroupId(containingDirStat.Gid)
+		return ownership, err
+	case FileClerkOwnerSourceRunningProcess:
+		return clerk.runningProcessOwnershipResolver()
+	default:
+		return ownership, ErrOwnerSourceInvalid
+	}
+}
+
+func (clerk FileClerk) fileUpsertOwnerResolver(
+	ownerSource FileClerkOwnerSource,
+	ownerUsername *tkValueObject.UnixUsername,
+	ownerUserId *tkValueObject.UnixUserId,
+	ownerGroupId *tkValueObject.UnixGroupId,
+	targetState targetFileState,
+	containingDirStat unix.Stat_t,
+) (ownership fileUpsertOwnership, err error) {
+	ownerAccountStated := ownerUsername != nil || ownerUserId != nil
+	if ownerAccountStated {
+		ownerSourceContradictsAccount :=
+			ownerSource == FileClerkOwnerSourceContainingDirectory ||
+				ownerSource == FileClerkOwnerSourceRunningProcess
+		if ownerSourceContradictsAccount {
+			return ownership, ErrOwnerSourceConflict
+		}
+
+		ownership.UserId, err = clerk.ownerUserIdResolver(
+			ownerUsername, ownerUserId,
+		)
+		if err != nil {
+			return ownership, err
+		}
+		if ownerGroupId != nil {
+			ownership.GroupId = *ownerGroupId
+			return ownership, nil
+		}
+
+		ownership.GroupId, err = clerk.ownerGroupIdResolver(ownership.UserId)
+		return ownership, err
+	}
+
+	ownership, err = clerk.fileUpsertSourceOwnershipResolver(
+		ownerSource, targetState, containingDirStat,
+	)
+	if err != nil {
+		return ownership, err
+	}
+	if ownerGroupId != nil {
+		ownership.GroupId = *ownerGroupId
+	}
+
+	return ownership, nil
+}
+
+func (FileClerk) unixFileModeConverter(rawMode uint32) os.FileMode {
+	fileMode := os.FileMode(rawMode).Perm()
+	if rawMode&unix.S_ISUID != 0 {
+		fileMode |= os.ModeSetuid
+	}
+	if rawMode&unix.S_ISGID != 0 {
+		fileMode |= os.ModeSetgid
+	}
+	if rawMode&unix.S_ISVTX != 0 {
+		fileMode |= os.ModeSticky
+	}
+
+	return fileMode
+}
+
+func (clerk FileClerk) targetFileStateReader(
+	dirHandle int,
+	targetFileName tkValueObject.UnixFileName,
+) (fileState targetFileState, err error) {
+	entryStat := unix.Stat_t{}
+	statErr := unix.Fstatat(
+		dirHandle, targetFileName.String(), &entryStat, unix.AT_SYMLINK_NOFOLLOW,
+	)
+	if statErr != nil {
+		if errors.Is(statErr, unix.ENOENT) {
+			return fileState, nil
+		}
+		return fileState, statErr
+	}
+
+	fileState.Exists = true
+	entryFormat := entryStat.Mode & unix.S_IFMT
+	fileState.IsSymlink = entryFormat == unix.S_IFLNK
+	fileState.IsDirectory = entryFormat == unix.S_IFDIR
+	fileState.Permissions = clerk.unixFileModeConverter(entryStat.Mode)
+
+	ownerUserId, userIdErr := tkValueObject.NewUnixUserId(entryStat.Uid)
+	if userIdErr != nil {
+		return fileState, userIdErr
+	}
+	ownerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(entryStat.Gid)
+	if groupIdErr != nil {
+		return fileState, groupIdErr
+	}
+	fileState.OwnerUserId = ownerUserId
+	fileState.OwnerGroupId = ownerGroupId
+
+	return fileState, nil
+}
+
+func (FileClerk) fileUpsertPermissionsResolver(
+	statedPermissionsPtr *os.FileMode,
+	targetState targetFileState,
+) os.FileMode {
+	if statedPermissionsPtr != nil {
+		return *statedPermissionsPtr
+	}
+	if targetState.Exists {
+		return targetState.Permissions
+	}
+
+	return FileClerkDefaultNewFileMode
+}
+
 func (FileClerk) resolveSymlinkedFilePath(filePath string) (string, error) {
 	fileInfo, lstatErr := os.Lstat(filePath)
 	entryIsSymlink := lstatErr == nil && fileInfo.Mode()&os.ModeSymlink != 0
@@ -1363,25 +1579,57 @@ func (FileClerk) resolveSymlinkedFilePath(filePath string) (string, error) {
 	return filepath.Join(resolvedDirPath, fileName), nil
 }
 
-type FileUpsertSettings struct {
-	FilePath             tkValueObject.UnixAbsoluteFilePath
-	Permissions          os.FileMode
-	ShouldFollowSymlinks bool
-	ShouldOverwrite      bool
-	OwnerUsername        *tkValueObject.UnixUsername
-	OwnerUserId          *tkValueObject.UnixUserId
+func (FileClerk) fileUpsertSettingsNormalizer(
+	settings FileUpsertSettings,
+) (FileUpsertSettings, error) {
+	if settings.SymlinkPolicy == nil {
+		defaultSymlinkPolicy := FileClerkSymlinkPolicyStrictRefuse
+		settings.SymlinkPolicy = &defaultSymlinkPolicy
+	}
+	switch *settings.SymlinkPolicy {
+	case FileClerkSymlinkPolicyStrictRefuse, FileClerkSymlinkPolicyResolve:
+	default:
+		return settings, ErrSymlinkPolicyInvalid
+	}
+
+	if settings.OverwritePolicy == nil {
+		defaultOverwritePolicy := FileClerkOverwritePolicyStrictRefuse
+		settings.OverwritePolicy = &defaultOverwritePolicy
+	}
+	switch *settings.OverwritePolicy {
+	case FileClerkOverwritePolicyStrictRefuse, FileClerkOverwritePolicyReplace:
+	default:
+		return settings, ErrOverwritePolicyInvalid
+	}
+
+	if settings.OwnerSource == nil {
+		defaultOwnerSource := FileClerkOwnerSourceExistingFile
+		settings.OwnerSource = &defaultOwnerSource
+	}
+	switch *settings.OwnerSource {
+	case FileClerkOwnerSourceExistingFile, FileClerkOwnerSourceContainingDirectory,
+		FileClerkOwnerSourceRunningProcess:
+	default:
+		return settings, ErrOwnerSourceInvalid
+	}
+
+	return settings, nil
 }
 
 func (clerk FileClerk) UpsertFile(
 	settings FileUpsertSettings,
 	fileContent []byte,
 ) error {
-	if settings.Permissions == 0 {
-		return ErrFilePermissionsInvalid
+	settings, normalizeErr := clerk.fileUpsertSettingsNormalizer(settings)
+	if normalizeErr != nil {
+		return normalizeErr
 	}
+	symlinkPolicy := *settings.SymlinkPolicy
+	overwritePolicy := *settings.OverwritePolicy
+	ownerSource := *settings.OwnerSource
 
 	targetFilePath := settings.FilePath
-	if settings.ShouldFollowSymlinks {
+	if symlinkPolicy == FileClerkSymlinkPolicyResolve {
 		resolvedFilePathStr, resolveErr := clerk.resolveSymlinkedFilePath(
 			targetFilePath.String(),
 		)
@@ -1403,43 +1651,71 @@ func (clerk FileClerk) UpsertFile(
 		return ErrFileNameInvalid
 	}
 
-	ownerUserId, resolveErr := clerk.ownerUserIdResolver(
-		settings.OwnerUsername, settings.OwnerUserId,
+	trustedDirOwnerUserId, trustErr := clerk.ownerUserIdResolver(
+		settings.TrustedDirOwnerUsername, settings.TrustedDirOwnerUserId,
 	)
-	if resolveErr != nil {
-		return resolveErr
+	if trustErr != nil {
+		return trustErr
 	}
 
 	dirPath := targetFilePath.ReadFileDir()
-	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(dirPath, ownerUserId)
+	dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
+		dirPath, trustedDirOwnerUserId,
+	)
 	if dirChainErr != nil {
 		return dirChainErr
 	}
 	defer func() { _ = unix.Close(dirHandle) }()
 
+	targetState, stateErr := clerk.targetFileStateReader(dirHandle, targetFileName)
+	if stateErr != nil {
+		return stateErr
+	}
+	shouldRefuseSymlink := targetState.IsSymlink &&
+		symlinkPolicy == FileClerkSymlinkPolicyStrictRefuse
+	if shouldRefuseSymlink {
+		return ErrTargetIsSymlink
+	}
+	if targetState.IsDirectory {
+		return ErrTargetIsDirectory
+	}
+
+	shouldOverwrite := overwritePolicy == FileClerkOverwritePolicyReplace
+	if targetState.Exists && !shouldOverwrite {
+		return ErrTargetFileExists
+	}
+
+	permissions := clerk.fileUpsertPermissionsResolver(
+		settings.Permissions, targetState,
+	)
+
+	containingDirStat := unix.Stat_t{}
+	containingDirStatErr := unix.Fstat(dirHandle, &containingDirStat)
+	if containingDirStatErr != nil {
+		return containingDirStatErr
+	}
+
+	ownership, ownerErr := clerk.fileUpsertOwnerResolver(
+		ownerSource, settings.OwnerUsername, settings.OwnerUserId,
+		settings.OwnerGroupId, targetState, containingDirStat,
+	)
+	if ownerErr != nil {
+		return ownerErr
+	}
+
 	writeSettings := atomicFileWriteSettings{
 		DirHandle:       dirHandle,
 		TargetFileName:  targetFileName,
-		Permissions:     settings.Permissions,
-		ShouldOverwrite: settings.ShouldOverwrite,
+		Permissions:     permissions,
+		ShouldOverwrite: shouldOverwrite,
+		OwnerUserId:     &ownership.UserId,
+		OwnerGroupId:    &ownership.GroupId,
 	}
-	shouldChown := settings.OwnerUsername != nil || settings.OwnerUserId != nil
-	if shouldChown {
-		ownerGroupId, groupResolveErr := clerk.ownerGroupIdResolver(ownerUserId)
-		if groupResolveErr != nil {
-			return groupResolveErr
-		}
-
-		writeSettings.OwnerUserId = &ownerUserId
-		writeSettings.OwnerGroupId = &ownerGroupId
-	}
-
-	writeErr := clerk.writeFileAtomically(
+	return clerk.writeFileAtomically(
 		writeSettings,
 		func(writer io.Writer) error {
 			_, writeErr := writer.Write(fileContent)
 			return writeErr
 		},
 	)
-	return writeErr
 }
