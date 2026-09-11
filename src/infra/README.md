@@ -64,10 +64,9 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
     "/home/example/.config/systemd/user/service.service", false,
   )
   serviceFilePermissions := os.FileMode(0644)
-  overwritePolicy := FileClerkOverwritePolicyReplace
   fileUpsertErr := clerk.UpsertFile(FileUpsertSettings{
     FilePath:                 serviceFilePath,
-    OverwritePolicy:          &overwritePolicy,
+    OverwritePolicy:          &FileClerkOverwritePolicyReplace,
     TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{ownerUsername},
     Permissions:              &serviceFilePermissions,
     OwnerUsername:            &ownerUsername,

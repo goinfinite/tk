@@ -104,14 +104,11 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 		return certPath, keyPath, err
 	}
 
-	overwritePolicy := FileClerkOverwritePolicyReplace
-	symlinkPolicy := FileClerkSymlinkPolicyResolve
-
 	certificateFilePermissions := os.FileMode(0644)
 	err = fileClerk.UpsertFile(FileUpsertSettings{
 		FilePath:        certPath,
-		SymlinkPolicy:   &symlinkPolicy,
-		OverwritePolicy: &overwritePolicy,
+		SymlinkPolicy:   &FileClerkSymlinkPolicyResolve,
+		OverwritePolicy: &FileClerkOverwritePolicyReplace,
 		Permissions:     &certificateFilePermissions,
 	}, []byte(selfSignedCertPem))
 	if err != nil {
@@ -123,8 +120,8 @@ func (rt *ReadThrough) CertPairFilePathsReader() (
 	privateKeyFilePermissions := os.FileMode(0600)
 	err = fileClerk.UpsertFile(FileUpsertSettings{
 		FilePath:        keyPath,
-		SymlinkPolicy:   &symlinkPolicy,
-		OverwritePolicy: &overwritePolicy,
+		SymlinkPolicy:   &FileClerkSymlinkPolicyResolve,
+		OverwritePolicy: &FileClerkOverwritePolicyReplace,
 		Permissions:     &privateKeyFilePermissions,
 	}, []byte(selfSignedKeyPem))
 	if err != nil {

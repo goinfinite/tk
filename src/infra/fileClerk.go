@@ -20,21 +20,48 @@ import (
 )
 
 const (
-	RegexLargeFileThresholdBytes       int64 = 10 * 1024 * 1024
-	ReadFileContentDefaultMaxSizeBytes int64 = 500 * 1024 * 1024
-	tempFileNameSuffix                       = ".tk-tmp"
-	tempFileNameEntropyChars                 = 8
-)
+	tempFileNameSuffix       = ".tk-tmp"
+	tempFileNameEntropyChars = 8
 
-// A swapped-in FIFO would block the open before the swap verifier runs.
-const (
+	// A swapped-in FIFO would block the open before the swap verifier runs.
 	targetFileReadOpenFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC |
 		unix.O_NONBLOCK
 	targetFileAppendOpenFlags = unix.O_WRONLY | unix.O_APPEND | unix.O_NOFOLLOW |
 		unix.O_CLOEXEC | unix.O_NONBLOCK
 )
 
+type FileClerkSymlinkPolicy string
+
+// FileClerkDirChainPolicy selects how the directory-chain walk treats a
+// component writable by group or others.
+type FileClerkDirChainPolicy string
+
+type FileClerkOverwritePolicy string
+
+type FileClerkOwnerSource string
+
 var (
+	RegexLargeFileThresholdBytes       int64       = 10 * 1024 * 1024
+	ReadFileContentDefaultMaxSizeBytes int64       = 500 * 1024 * 1024
+	FileClerkDefaultNewFileMode        os.FileMode = 0o600
+
+	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
+	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
+
+	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
+	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
+
+	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
+	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
+	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
+
+	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
+	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
+
+	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
+	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
+	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
+
 	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
 	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
 	ErrFileMissing                  = errors.New("FileNotFound")
@@ -69,43 +96,6 @@ var (
 	ErrFileOwnerChangeFailed        = errors.New("FileOwnerChangeFailed")
 	ErrTargetFileChanged            = errors.New("TargetFileChanged")
 )
-
-type FileClerkSymlinkPolicy string
-
-const (
-	FileClerkSymlinkPolicyStrictRefuse FileClerkSymlinkPolicy = "strict-refuse"
-	FileClerkSymlinkPolicyResolve      FileClerkSymlinkPolicy = "resolve"
-)
-
-// FileClerkDirChainPolicy selects how the directory-chain walk treats a
-// component writable by group or others.
-type FileClerkDirChainPolicy string
-
-const (
-	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
-	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
-
-	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
-	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
-	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
-)
-
-type FileClerkOverwritePolicy string
-
-const (
-	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
-	FileClerkOverwritePolicyReplace      FileClerkOverwritePolicy = "replace"
-)
-
-type FileClerkOwnerSource string
-
-const (
-	FileClerkOwnerSourceExistingFile        FileClerkOwnerSource = "existing-file"
-	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
-	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
-)
-
-const FileClerkDefaultNewFileMode os.FileMode = 0o600
 
 type FileClerk struct{}
 
@@ -1270,8 +1260,7 @@ func (FileClerk) symlinkPolicyNormalizer(
 	symlinkPolicyPtr *FileClerkSymlinkPolicy,
 ) (*FileClerkSymlinkPolicy, error) {
 	if symlinkPolicyPtr == nil {
-		defaultSymlinkPolicy := FileClerkSymlinkPolicyStrictRefuse
-		return &defaultSymlinkPolicy, nil
+		return &FileClerkSymlinkPolicyStrictRefuse, nil
 	}
 	switch *symlinkPolicyPtr {
 	case FileClerkSymlinkPolicyStrictRefuse, FileClerkSymlinkPolicyResolve:
@@ -1285,8 +1274,7 @@ func (FileClerk) dirChainPolicyNormalizer(
 	dirChainPolicyPtr *FileClerkDirChainPolicy,
 ) (*FileClerkDirChainPolicy, error) {
 	if dirChainPolicyPtr == nil {
-		defaultDirChainPolicy := FileClerkDirChainPolicySharedWriteAllowed
-		return &defaultDirChainPolicy, nil
+		return &FileClerkDirChainPolicySharedWriteAllowed, nil
 	}
 	switch *dirChainPolicyPtr {
 	case FileClerkDirChainPolicySharedWriteAllowed, FileClerkDirChainPolicySharedWriteRefused:
@@ -1890,8 +1878,7 @@ func (clerk FileClerk) fileUpsertSettingsNormalizer(
 	settings.SymlinkPolicy = symlinkPolicy
 
 	if settings.OverwritePolicy == nil {
-		defaultOverwritePolicy := FileClerkOverwritePolicyStrictRefuse
-		settings.OverwritePolicy = &defaultOverwritePolicy
+		settings.OverwritePolicy = &FileClerkOverwritePolicyStrictRefuse
 	}
 	switch *settings.OverwritePolicy {
 	case FileClerkOverwritePolicyStrictRefuse, FileClerkOverwritePolicyReplace:
@@ -1900,8 +1887,7 @@ func (clerk FileClerk) fileUpsertSettingsNormalizer(
 	}
 
 	if settings.OwnerSource == nil {
-		defaultOwnerSource := FileClerkOwnerSourceExistingFile
-		settings.OwnerSource = &defaultOwnerSource
+		settings.OwnerSource = &FileClerkOwnerSourceExistingFile
 	}
 	switch *settings.OwnerSource {
 	case FileClerkOwnerSourceExistingFile, FileClerkOwnerSourceContainingDirectory,
