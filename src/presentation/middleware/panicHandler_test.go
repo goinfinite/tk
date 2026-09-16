@@ -127,6 +127,7 @@ func TestApiHandlePanic(t *testing.T) {
 		panicValue              any
 		requestUri              string
 		operatorIp              string
+		forwardedFor            string
 		trustedIpsEnv           string
 		expectedStatus          int
 		shouldExpectFullDetails bool
@@ -149,6 +150,16 @@ func TestApiHandlePanic(t *testing.T) {
 			expectedStatus:          http.StatusInternalServerError,
 			shouldExpectFullDetails: false,
 		},
+		{
+			name:                    "TrustedProxyWithUntrustedClient",
+			panicValue:              "database connection failed",
+			requestUri:              "/api/test",
+			operatorIp:              "192.168.1.1",
+			forwardedFor:            "203.0.113.5",
+			trustedIpsEnv:           "192.168.1.1",
+			expectedStatus:          http.StatusInternalServerError,
+			shouldExpectFullDetails: false,
+		},
 	}
 
 	for _, testCase := range testCaseStructs {
@@ -158,6 +169,9 @@ func TestApiHandlePanic(t *testing.T) {
 			echoInstance := echo.New()
 			httpRequest := httptest.NewRequest(http.MethodGet, testCase.requestUri, nil)
 			httpRequest.RemoteAddr = testCase.operatorIp + ":12345"
+			if testCase.forwardedFor != "" {
+				httpRequest.Header.Set("X-Forwarded-For", testCase.forwardedFor)
+			}
 			httpRecorder := httptest.NewRecorder()
 			echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
@@ -211,6 +225,15 @@ func TestApiHandlePanic(t *testing.T) {
 				}
 				if len(responseBody["exceptionCode"].(string)) > panicHandlerMaxErrorLength {
 					t.Errorf("ExceptionCodeTooLong: ExpectedTruncated")
+				}
+				if responseBody["uri"] != nil {
+					t.Errorf("RequestUriLeaked: ExpectedRedacted")
+				}
+				if responseBody["queryParams"] != nil {
+					t.Errorf("QueryParamsLeaked: ExpectedRedacted")
+				}
+				if responseBody["exceptionTrace"] != nil {
+					t.Errorf("ExceptionTraceLeaked: ExpectedRedacted")
 				}
 			}
 		})

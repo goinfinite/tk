@@ -155,7 +155,7 @@ Extracts the real requester IP from an HTTP request by walking an ordered header
 
 **Flow:**
 
-1. `src/presentation/requesterIpExtractor.go` — `NewRequesterIpExtractor` reads the `IP_EXTRACT_HEADER` chain and trusted CIDRs from `TrustedCidrsReader`; `Execute(*http.Request)` walks each header right-to-left and returns the first untrusted IP, falling back to `RemoteAddr`
+1. `src/presentation/requesterIpExtractor.go` — `NewRequesterIpExtractor` reads the `IP_EXTRACT_HEADER` chain and trusted CIDRs from `TrustedCidrsReader`; `Execute(*http.Request)` returns an untrusted `RemoteAddr` directly and ignores the headers. When `RemoteAddr` is trusted, it walks each header right-to-left and returns the first address that is not trusted (the likely requester); when every entry is trusted, it returns the original requester — the first entry of the first header that has one — matching Echo's `RealIP`; otherwise it returns `RemoteAddr`
 
 ---
 
@@ -255,6 +255,6 @@ Keeps ephemeral key-value pairs in a shared in-memory SQLite database. The data 
 
 **Flow:**
 
-1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Read` returns `ErrKeyNotFound` for a missing key
+1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Set` accepts an optional time-to-live and `Read`/`Has` treat expired entries as missing; `Read` returns `ErrKeyNotFound` for a missing key
 
 ---

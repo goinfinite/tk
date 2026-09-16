@@ -249,12 +249,13 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   trailDatabaseService.Handler.Model(&ActivityRecord{}).Find(&activityRecords)
   ```
 
-- **TransientDatabaseService**: Initialize a shared in-memory SQLite key-value store with `Set`, `Read`, and `Has`. Every instance in the process shares the same data, which vanishes when the process ends; `Read` returns `ErrKeyNotFound` for a missing key.
+- **TransientDatabaseService**: Initialize a shared in-memory SQLite key-value store with `Set`, `Read`, and `Has`. Every instance in the process shares the same data, which vanishes when the process ends; `Read` returns `ErrKeyNotFound` for a missing key. `Set` accepts an optional time-to-live; pass `nil` to store an entry that never expires. `Read` and `Has` treat an expired entry as missing.
 
   ```go
   transientDatabaseService, serviceInitializationErr := NewTransientDatabaseService()
 
-  setErr := transientDatabaseService.Set("key", "value")
+  ttl := 5 * time.Minute
+  setErr := transientDatabaseService.Set("key", "value", &ttl)
 
   value, readErr := transientDatabaseService.Read("key")
 

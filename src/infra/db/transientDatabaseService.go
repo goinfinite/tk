@@ -39,10 +39,15 @@ func NewTransientDatabaseService() (*TransientDatabaseService, error) {
 	return &TransientDatabaseService{Handler: ormSvc}, nil
 }
 
+func (service *TransientDatabaseService) unexpiredKeyQueryBuilder(key string) *gorm.DB {
+	return service.Handler.Model(&tkInfraDbModel.KeyValue{}).
+		Where("key = ?", key).
+		Where("expires_at IS NULL OR expires_at > ?", time.Now().UTC())
+}
+
 func (service *TransientDatabaseService) Has(key string) bool {
 	var count int64
-	result := service.Handler.Model(&tkInfraDbModel.KeyValue{}).
-		Where("key = ?", key).Count(&count)
+	result := service.unexpiredKeyQueryBuilder(key).Count(&count)
 	if result.Error != nil {
 		slog.Error(
 			"TransientDatabaseKeyCountFailed",
@@ -57,8 +62,7 @@ func (service *TransientDatabaseService) Has(key string) bool {
 
 func (service *TransientDatabaseService) Read(key string) (string, error) {
 	var keyValue tkInfraDbModel.KeyValue
-	result := service.Handler.Model(&tkInfraDbModel.KeyValue{}).
-		Where("key = ?", key).Find(&keyValue)
+	result := service.unexpiredKeyQueryBuilder(key).Find(&keyValue)
 	if result.Error != nil {
 		return "", result.Error
 	}
@@ -70,8 +74,13 @@ func (service *TransientDatabaseService) Read(key string) (string, error) {
 	return keyValue.Value, nil
 }
 
-func (service *TransientDatabaseService) Set(key string, value string) error {
+func (service *TransientDatabaseService) Set(key string, value string, ttlPtr *time.Duration) error {
 	keyValue := tkInfraDbModel.KeyValue{Key: key, Value: value}
+
+	if ttlPtr != nil {
+		expiresAt := time.Now().UTC().Add(*ttlPtr)
+		keyValue.ExpiresAt = &expiresAt
+	}
 
 	result := service.Handler.Clauses(clause.OnConflict{UpdateAll: true}).
 		Create(&keyValue)
