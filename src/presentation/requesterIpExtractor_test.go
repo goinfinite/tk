@@ -93,12 +93,12 @@ func TestRequesterIpExtractor(t *testing.T) {
 			expectedIp:         "127.0.0.1",
 		},
 		{
-			description:        "XffFromUntrustedRemoteExtractsHeaderValue",
+			description:        "UntrustedRemoteIgnoresXffEntries",
 			headerChainEnvVal:  "X-Forwarded-For",
 			trustedCidrsEnvVal: "",
 			remoteAddr:         "203.0.113.20:5555",
 			requestHeaders:     map[string]string{"X-Forwarded-For": "1.2.3.4"},
-			expectedIp:         "1.2.3.4",
+			expectedIp:         "203.0.113.20",
 		},
 		{
 			description:        "Ipv6RemoteAddrTrustedLoopback",
@@ -208,6 +208,22 @@ func TestRequesterIpExtractor(t *testing.T) {
 			remoteAddr:         "198.51.100.1:8080",
 			requestHeaders:     map[string]string{},
 			expectedIp:         "198.51.100.1",
+		},
+		{
+			description:        "RemoteAddrKeywordWithTrustedPeerParsesRemoteAddr",
+			headerChainEnvVal:  "X-Real-IP,RemoteAddr",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "127.0.0.1:8080",
+			requestHeaders:     map[string]string{"X-Real-IP": "10.0.0.1"},
+			expectedIp:         "127.0.0.1",
+		},
+		{
+			description:        "UnparsableRemoteAddrFails",
+			headerChainEnvVal:  "X-Forwarded-For",
+			trustedCidrsEnvVal: "",
+			remoteAddr:         "not-an-ip",
+			requestHeaders:     map[string]string{"X-Forwarded-For": "1.2.3.4"},
+			expectError:        true,
 		},
 	}
 

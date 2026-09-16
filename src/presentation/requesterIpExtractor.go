@@ -131,7 +131,31 @@ func (extractor RequesterIpExtractor) headerEntriesParser(
 	return parsedEntries
 }
 
-func (extractor RequesterIpExtractor) originalRequesterIpExtractor(
+func (extractor RequesterIpExtractor) firstUntrustedIpExtractor(
+	httpRequest *http.Request,
+	remoteAddrIpAddress tkValueObject.IpAddress,
+) (ipAddress tkValueObject.IpAddress, found bool) {
+	for _, extractionHeader := range extractor.extractionHeaders {
+		headerStr := extractionHeader.String()
+		if headerStr == ipExtractDirectKeyword ||
+			headerStr == ipExtractRemoteAddrKeyword {
+			return remoteAddrIpAddress, true
+		}
+
+		headerEntries := extractor.headerEntriesParser(
+			httpRequest, extractionHeader,
+		)
+		for _, candidateIp := range slices.Backward(headerEntries) {
+			if !extractor.isIpTrusted(candidateIp) {
+				return candidateIp, true
+			}
+		}
+	}
+
+	return ipAddress, false
+}
+
+func (extractor RequesterIpExtractor) firstChainEntryIpExtractor(
 	httpRequest *http.Request,
 ) (ipAddress tkValueObject.IpAddress, found bool) {
 	for _, extractionHeader := range extractor.extractionHeaders {
@@ -147,30 +171,7 @@ func (extractor RequesterIpExtractor) originalRequesterIpExtractor(
 	return ipAddress, false
 }
 
-func (extractor RequesterIpExtractor) likelyRequesterIpExtractor(
-	httpRequest *http.Request,
-) (ipAddress tkValueObject.IpAddress, err error) {
-	for _, extractionHeader := range extractor.extractionHeaders {
-		headerStr := extractionHeader.String()
-		if headerStr == ipExtractDirectKeyword ||
-			headerStr == ipExtractRemoteAddrKeyword {
-			return extractor.remoteAddrParser(httpRequest.RemoteAddr)
-		}
-
-		headerEntries := extractor.headerEntriesParser(
-			httpRequest, extractionHeader,
-		)
-		for _, candidateIp := range slices.Backward(headerEntries) {
-			if !extractor.isIpTrusted(candidateIp) {
-				return candidateIp, nil
-			}
-		}
-	}
-
-	return ipAddress, errors.New("NoLikelyRequesterIpInChain")
-}
-
-func (extractor RequesterIpExtractor) fallbackIpResolver(
+func (extractor RequesterIpExtractor) Execute(
 	httpRequest *http.Request,
 ) (tkValueObject.IpAddress, error) {
 	remoteAddrIpAddress, remoteAddrIpErr := extractor.remoteAddrParser(
@@ -180,25 +181,23 @@ func (extractor RequesterIpExtractor) fallbackIpResolver(
 		return remoteAddrIpAddress, remoteAddrIpErr
 	}
 
-	originalRequesterIp, requesterFound := extractor.originalRequesterIpExtractor(
+	if !extractor.isIpTrusted(remoteAddrIpAddress) {
+		return remoteAddrIpAddress, nil
+	}
+
+	firstUntrustedIp, untrustedIpFound := extractor.firstUntrustedIpExtractor(
+		httpRequest, remoteAddrIpAddress,
+	)
+	if untrustedIpFound {
+		return firstUntrustedIp, nil
+	}
+
+	firstChainEntryIp, chainEntryFound := extractor.firstChainEntryIpExtractor(
 		httpRequest,
 	)
-	if extractor.isIpTrusted(remoteAddrIpAddress) && requesterFound {
-		return originalRequesterIp, nil
+	if chainEntryFound {
+		return firstChainEntryIp, nil
 	}
 
 	return remoteAddrIpAddress, nil
-}
-
-func (extractor RequesterIpExtractor) Execute(
-	httpRequest *http.Request,
-) (tkValueObject.IpAddress, error) {
-	likelyRequesterIp, likelyRequesterErr := extractor.likelyRequesterIpExtractor(
-		httpRequest,
-	)
-	if likelyRequesterErr == nil {
-		return likelyRequesterIp, nil
-	}
-
-	return extractor.fallbackIpResolver(httpRequest)
 }

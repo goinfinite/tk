@@ -3,9 +3,10 @@
 ```log
 0.3.7 - 2026/09/16
 fix: RequesterIpExtractor returns the original requester when every chain entry and RemoteAddr are trusted. It previously returned RemoteAddr, so a local proxy masked the client address. Breaking change: HeaderIpExtractor is gone; Execute is the entry point.
-test: cover the fully trusted chain fallback for IPv4, IPv6, malformed entries, multi-header chains, and the untrusted-peer guard.
-refactor: split Execute into likelyRequesterIpExtractor and fallbackIpResolver, and name the trusted-chain values around requester semantics.
-docs: document the trusted-chain fallback and the panic handler trust-keying caveat in the presentation README.
+fix: RequesterIpExtractor returns an untrusted RemoteAddr and ignores the forwarded headers, so a client on an untrusted network cannot choose the reported address. Breaking change: a proxy with a public address must be listed in TRUSTED_IPS/TRUSTED_CIDRS.
+test: cover the fully trusted chain fallback for IPv4, IPv6, malformed entries, multi-header chains, the untrusted-peer guard, and header rejection from an untrusted RemoteAddr.
+refactor: name the chain steps firstUntrustedIpExtractor and firstChainEntryIpExtractor; both report a missing address with a found flag.
+docs: document the peer trust gate, the malformed-entry skip, and the panic handler trust-keying caveat in the presentation README.
 
 0.3.6 - 2026/09/11
 feat: FileClerk trusts a set of directory owners. FileRegexReplaceSettings, FileAppendSettings, and FileUpsertSettings take TrustedDirOwnerUsernames and TrustedDirOwnerUserIds slices. Every parent component must be owned by root or a named account; an empty set trusts the running process account. Breaking change: the singular TrustedDirOwnerUsername and TrustedDirOwnerUserId fields are gone.
