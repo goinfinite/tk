@@ -3,6 +3,7 @@ package tkInfraDb
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 // Note: Setup/teardown are intentionally inline — test independence
@@ -60,13 +61,13 @@ func TestTransientDatabaseServiceSet(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			if testCase.presetValuePtr != nil {
-				err := dbSvc.Set(testCase.key, *testCase.presetValuePtr)
+				err := dbSvc.Set(testCase.key, *testCase.presetValuePtr, nil)
 				if err != nil {
 					t.Fatalf("PresetFailed: '%s'", err.Error())
 				}
 			}
 
-			err := dbSvc.Set(testCase.key, testCase.valueToSet)
+			err := dbSvc.Set(testCase.key, testCase.valueToSet, nil)
 			if err != nil {
 				t.Fatalf("SetFailed: '%s'", err.Error())
 			}
@@ -92,7 +93,7 @@ func TestTransientDatabaseServiceRead(t *testing.T) {
 	}
 
 	existingKey := "readExistingKey"
-	err = dbSvc.Set(existingKey, "existingValue")
+	err = dbSvc.Set(existingKey, "existingValue", nil)
 	if err != nil {
 		t.Fatalf("SetupSetFailed: '%s'", err.Error())
 	}
@@ -148,7 +149,7 @@ func TestTransientDatabaseServiceHas(t *testing.T) {
 	}
 
 	existingKey := "hasExistingKey"
-	err = dbSvc.Set(existingKey, "existingValue")
+	err = dbSvc.Set(existingKey, "existingValue", nil)
 	if err != nil {
 		t.Fatalf("SetupSetFailed: '%s'", err.Error())
 	}
@@ -178,4 +179,134 @@ func TestTransientDatabaseServiceHas(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTransientDatabaseServiceExpiration(t *testing.T) {
+	dbSvc, err := NewTransientDatabaseService()
+	if err != nil {
+		t.Fatalf("SetupFailed: '%s'", err.Error())
+	}
+
+	expiredTtl := -time.Minute
+	unexpiredTtl := time.Hour
+
+	testCases := []struct {
+		name              string
+		key               string
+		valueToSet        string
+		ttlPtr            *time.Duration
+		expectedHasKey    bool
+		expectedReadValue string
+		expectedError     error
+	}{
+		{
+			name:           "ExpiredKeyIsMissing",
+			key:            "expirationExpiredKey",
+			valueToSet:     "expiredValue",
+			ttlPtr:         &expiredTtl,
+			expectedHasKey: false,
+			expectedError:  ErrKeyNotFound,
+		},
+		{
+			name:              "UnexpiredKeyIsFound",
+			key:               "expirationUnexpiredKey",
+			valueToSet:        "unexpiredValue",
+			ttlPtr:            &unexpiredTtl,
+			expectedHasKey:    true,
+			expectedReadValue: "unexpiredValue",
+		},
+		{
+			name:              "KeyWithoutTtlNeverExpires",
+			key:               "expirationPersistentKey",
+			valueToSet:        "persistentValue",
+			expectedHasKey:    true,
+			expectedReadValue: "persistentValue",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := dbSvc.Set(testCase.key, testCase.valueToSet, testCase.ttlPtr)
+			if err != nil {
+				t.Fatalf("SetFailed: '%s'", err.Error())
+			}
+
+			hasKey := dbSvc.Has(testCase.key)
+			if hasKey != testCase.expectedHasKey {
+				t.Fatalf(
+					"UnexpectedHasResult: '%t' vs '%t'",
+					hasKey, testCase.expectedHasKey,
+				)
+			}
+
+			readValue, err := dbSvc.Read(testCase.key)
+			if testCase.expectedError != nil {
+				if !errors.Is(err, testCase.expectedError) {
+					t.Fatalf(
+						"ExpectedError: '%s', got: '%v'",
+						testCase.expectedError.Error(), err,
+					)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ReadFailed: '%s'", err.Error())
+			}
+			if readValue != testCase.expectedReadValue {
+				t.Fatalf(
+					"UnexpectedValue: '%s' vs '%s'",
+					readValue, testCase.expectedReadValue,
+				)
+			}
+		})
+	}
+}
+
+func TestTransientDatabaseServiceSetOverwritesTtl(t *testing.T) {
+	dbSvc, err := NewTransientDatabaseService()
+	if err != nil {
+		t.Fatalf("SetupFailed: '%s'", err.Error())
+	}
+
+	expiredTtl := -time.Minute
+
+	t.Run("SetWithoutTtlClearsPreviousTtl", func(t *testing.T) {
+		key := "overwriteTtlClearedKey"
+		err := dbSvc.Set(key, "expiredValue", &expiredTtl)
+		if err != nil {
+			t.Fatalf("PresetFailed: '%s'", err.Error())
+		}
+
+		err = dbSvc.Set(key, "persistentValue", nil)
+		if err != nil {
+			t.Fatalf("OverwriteFailed: '%s'", err.Error())
+		}
+
+		readValue, err := dbSvc.Read(key)
+		if err != nil {
+			t.Fatalf("ReadFailed: '%s'", err.Error())
+		}
+		if readValue != "persistentValue" {
+			t.Fatalf("UnexpectedValue: '%s' vs 'persistentValue'", readValue)
+		}
+	})
+
+	t.Run("SetWithTtlExpiresPreviousValue", func(t *testing.T) {
+		key := "overwriteTtlAppliedKey"
+		err := dbSvc.Set(key, "persistentValue", nil)
+		if err != nil {
+			t.Fatalf("PresetFailed: '%s'", err.Error())
+		}
+
+		err = dbSvc.Set(key, "expiredValue", &expiredTtl)
+		if err != nil {
+			t.Fatalf("OverwriteFailed: '%s'", err.Error())
+		}
+
+		_, err = dbSvc.Read(key)
+		if !errors.Is(err, ErrKeyNotFound) {
+			t.Fatalf("ExpectedError: '%s', got: '%v'", ErrKeyNotFound.Error(), err)
+		}
+	})
 }

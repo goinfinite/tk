@@ -2,6 +2,7 @@
 
 ```log
 0.3.7 - 2026/09/16
+feat: TransientDatabaseService.Set takes an optional ttlPtr *time.Duration; nil stores an entry that never expires. Read and Has treat an entry past its expires_at deadline as missing. Breaking change: Set gains the ttlPtr parameter, and the KeyValue model gains a nullable expires_at column.
 fix: RequesterIpExtractor returns the original requester when every chain entry and RemoteAddr are trusted. It previously returned RemoteAddr, so a local proxy masked the client address. Breaking change: HeaderIpExtractor is gone; Execute is the entry point.
 fix: RequesterIpExtractor returns an untrusted RemoteAddr and ignores the forwarded headers, so a client on an untrusted network cannot choose the reported address. Breaking change: a proxy with a public address must be listed in TRUSTED_IPS/TRUSTED_CIDRS.
 test: cover the fully trusted chain fallback for IPv4, IPv6, malformed entries, multi-header chains, the untrusted-peer guard, and header rejection from an untrusted RemoteAddr.

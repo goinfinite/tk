@@ -255,6 +255,6 @@ Keeps ephemeral key-value pairs in a shared in-memory SQLite database. The data 
 
 **Flow:**
 
-1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Read` returns `ErrKeyNotFound` for a missing key
+1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Set` accepts an optional time-to-live and `Read`/`Has` treat expired entries as missing; `Read` returns `ErrKeyNotFound` for a missing key
 
 ---
