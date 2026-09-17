@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -295,7 +296,8 @@ func (lookup *DnsLookup) defaultDnsRecordsResolver(
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 		var ipv4Addresses []string
 		for _, dnsRecord := range queryResults {
-			if net.ParseIP(dnsRecord).To4() != nil {
+			ipAddress, parseErr := netip.ParseAddr(dnsRecord)
+			if parseErr == nil && ipAddress.Unmap().Is4() {
 				ipv4Addresses = append(ipv4Addresses, dnsRecord)
 			}
 		}
@@ -304,8 +306,8 @@ func (lookup *DnsLookup) defaultDnsRecordsResolver(
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
 		var ipv6Addresses []string
 		for _, dnsRecord := range queryResults {
-			parsedIp := net.ParseIP(dnsRecord)
-			if parsedIp != nil && parsedIp.To4() == nil {
+			ipAddress, parseErr := netip.ParseAddr(dnsRecord)
+			if parseErr == nil && ipAddress.Unmap().Is6() {
 				ipv6Addresses = append(ipv6Addresses, dnsRecord)
 			}
 		}
