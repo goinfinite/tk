@@ -1,6 +1,9 @@
 # Changelog
 
 ```log
+0.3.8 - 2026/09/17
+feat: NewUnixHostname accepts IPv6 literals, including zone-scoped addresses such as fe80::1%eth0. The zone must contain only the RFC 6874 unreserved characters. The constructor returns the canonical address form and preserves the zone case. ToUrlHost returns the bracketed form for url.URL.Host; ToUrlEncodedHost percent-encodes the zone separator for URL strings.
+
 0.3.7 - 2026/09/16
 test: cover the panic handler trusted-proxy case where RemoteAddr is trusted but the X-Forwarded-For client is not; the redacted response now asserts uri, queryParams, and exceptionTrace are absent.
 feat: TransientDatabaseService.Set takes an optional ttlPtr *time.Duration; nil stores an entry that never expires. Read and Has treat an entry past its expires_at deadline as missing. Breaking change: Set gains the ttlPtr parameter, and the KeyValue model gains a nullable expires_at column.
