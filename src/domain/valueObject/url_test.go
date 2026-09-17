@@ -41,6 +41,12 @@ func TestNewUrl(t *testing.T) {
 			{"https://user:password@localhost:8080", Url("https://user:password@localhost:8080"), false},
 			{"https://user:password@localhost:8080/path", Url("https://user:password@localhost:8080/path"), false},
 			{"https://user:password@localhost:8080/path?query=param", Url("https://user:password@localhost:8080/path?query=param"), false},
+			{"https://[2001:db8::1]:1618/abc/", Url("https://[2001:db8::1]:1618/abc/"), false},
+			{"https://[2001:db8::1]/", Url("https://[2001:db8::1]/"), false},
+			{"https://[2001:DB8::1]/", Url("https://[2001:db8::1]/"), false},
+			{"https://[fe80::1%25eth0]:1618/", Url("https://[fe80::1%25eth0]:1618/"), false},
+			{"https://10.0.0.1/", Url("https://10.0.0.1/"), false},
+			{"https://192.168.1.10:8080/", Url("https://192.168.1.10:8080/"), false},
 			{123456, Url("tel:123456"), false},
 			{"tel:5511999999999", Url("tel:5511999999999"), false},
 			{"tel:+5511999999999", Url("tel:+5511999999999"), false},
@@ -69,6 +75,10 @@ func TestNewUrl(t *testing.T) {
 			{"http://localhost:65536", Url(""), true},
 			{"http://localhost:-1", Url(""), true},
 			{"http://localhost:999999", Url(""), true},
+			{"https://[::::]/", Url(""), true},
+			{"https://[1.2.3.4]/", Url(""), true},
+			{"https://[fe80::1%eth0]/", Url(""), true},
+			{"https://[2001:db8::1/", Url(""), true},
 			// cSpell:enable
 		}
 

@@ -4,6 +4,7 @@
 0.3.8 - 2026/09/17
 feat: NewUnixHostname accepts IPv6 literals, including zone-scoped addresses such as fe80::1%eth0. The zone must contain only the RFC 6874 unreserved characters. The constructor returns the canonical address form and preserves the zone case. ToUrlHost returns the bracketed form for url.URL.Host; ToUrlEncodedHost percent-encodes the zone separator for URL strings.
 fix: DnsLookup returns zone-scoped IPv6 literals. The A and AAAA filters used net.ParseIP, which rejects a zone, so a literal such as fe80::1%eth0 was dropped and the lookup returned an empty result.
+fix: NewUrl accepts IPv6 literals and single-character labels. The hostname pattern required two characters per label, so 10.0.0.1 failed. The constructor validates a bracketed literal with netip.ParseAddr and rejects bracketed IPv4.
 
 0.3.7 - 2026/09/16
 test: cover the panic handler trusted-proxy case where RemoteAddr is trusted but the X-Forwarded-For client is not; the redacted response now asserts uri, queryParams, and exceptionTrace are absent.
