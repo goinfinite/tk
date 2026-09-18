@@ -4,8 +4,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-
-	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
 var catalogItemEnvRegex = regexp.MustCompile(`^\w{1,1000}=.{1,1000}$`)
@@ -13,8 +11,12 @@ var catalogItemEnvRegex = regexp.MustCompile(`^\w{1,1000}=.{1,1000}$`)
 type CatalogItemEnv string
 
 func NewCatalogItemEnv(value any) (catalogItemEnv CatalogItemEnv, err error) {
-	stringValue, err := tkVoUtil.InterfaceToString(value)
-	if err != nil {
+	if existentCatalogItemEnv, assertOk := value.(CatalogItemEnv); assertOk {
+		return existentCatalogItemEnv, nil
+	}
+
+	stringValue, assertOk := value.(string)
+	if !assertOk {
 		return catalogItemEnv, errors.New("CatalogItemEnvMustBeString")
 	}
 

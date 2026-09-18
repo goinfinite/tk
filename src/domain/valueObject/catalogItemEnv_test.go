@@ -10,7 +10,10 @@ func TestNewCatalogItemEnv(t *testing.T) {
 			expectError    bool
 		}{
 			{"KEY=value", CatalogItemEnv("KEY=value"), false},
+			{CatalogItemEnv("KEY=value"), CatalogItemEnv("KEY=value"), false},
 			{"DATABASE_URL=postgres://localhost:5432", CatalogItemEnv("DATABASE_URL=postgres://localhost:5432"), false},
+			{"TOKEN=secret ", CatalogItemEnv("TOKEN=secret "), false},
+			{"KEY= ", CatalogItemEnv("KEY= "), false},
 			{"EMPTY=", CatalogItemEnv(""), true},
 			// Invalid envs
 			{"", CatalogItemEnv(""), true},
