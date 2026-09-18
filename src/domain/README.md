@@ -4,7 +4,7 @@ Business logic layer of Infinite Toolkit _(TK)_. It holds validated value object
 
 ## Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IpAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. These components are thoroughly tested, ensuring 100% coverage.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. Table-driven tests cover the validation rules.
 
 ## Value Object Utilities
 
@@ -43,6 +43,24 @@ The library offers a diverse range of value objects (VO) to represent domain ent
 
   ```go
   truncated := tkVoUtil.SafeTruncateString("command output", 4096)
+  ```
+
+- **NamedGroupsExtractor**: Extract named capture groups from a regex match into a map keyed by group name.
+
+  ```go
+  namedGroups := tkVoUtil.NamedGroupsExtractor(urlRegex, "https://example.com")
+  ```
+
+- **StripAccents**: Remove diacritical marks from a string and trim it.
+
+  ```go
+  normalized, stripErr := tkVoUtil.StripAccents("Café")
+  ```
+
+- **StripHexSeparators**: Remove colons and spaces from a hexadecimal string.
+
+  ```go
+  normalized := tkVoUtil.StripHexSeparators("AA:BB:CC")
   ```
 
 ## DTOs
@@ -123,17 +141,22 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
   ```go
   func readFailedLoginAttemptsCount(
       activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
-      createDto dto.CreateSessionToken,
+      operatorIpAddress tkValueObject.IpAddress,
   ) (attemptsCount uint, err error) {
-      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
-          CreateSessionTokenFailedLoginAttemptsInterval,
+      recordLevel := tkValueObject.ActivityRecordLevelSecurity
+      recordCode, _ := tkValueObject.NewActivityRecordCode(
+          "CreateSessionTokenFailed",
       )
+      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
+          24 * time.Hour,
+      )
+
       readResponseDto, err := tkUseCase.ReadActivityRecords(
           activityRecordQueryRepo, tkDto.ReadActivityRecordsRequest{
               Pagination:        tkUseCase.ActivityRecordsDefaultPagination,
-              RecordLevel:       &tkValueObject.ActivityRecordLevelSecurity,
-              RecordCode:        &CreateSessionTokenActivityRecordCodeFailed,
-              OperatorIpAddress: &createDto.OperatorIpAddress,
+              RecordLevel:       &recordLevel,
+              RecordCode:        &recordCode,
+              OperatorIpAddress: &operatorIpAddress,
               CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
           })
       if err != nil {

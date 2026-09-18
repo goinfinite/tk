@@ -24,6 +24,7 @@ refactor: CatalogItemEnv accepts an existent value and rejects a non-string inpu
 feat: add String to X509BasicConstraints and X509CertificatePolicy.
 feat: add tkVoUtil.SafeTruncateString. ScheduledTaskOutput and UnixCommandOutput use it, so a truncation never splits a UTF-8 rune.
 feat: add tkVoUtil.IsFractionalFloat and tkVoUtil.TruncateFloat.
+docs: correct the layer READMEs and the feature map. The domain README names the real value objects and drops the false 100% coverage claim. It also documents NamedGroupsExtractor, StripAccents, and StripHexSeparators. The infra README documents ShellEscape and PaginationPagesTotalResolver. The feature map names FileDeserializer and StringDeserializer.
 
 0.3.7 - 2026/09/16
 test: cover the panic handler trusted-proxy case where RemoteAddr is trusted but the X-Forwarded-For client is not; the redacted response now asserts uri, queryParams, and exceptionTrace are absent.
