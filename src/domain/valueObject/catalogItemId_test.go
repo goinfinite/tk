@@ -17,6 +17,8 @@ func TestNewCatalogItemId(t *testing.T) {
 			// Invalid ids
 			{"-1", CatalogItemId(0), true},
 			{int(-1), CatalogItemId(0), true},
+			{float32(11.9), CatalogItemId(0), true},
+			{float64(11.9), CatalogItemId(0), true},
 			{uint32(65536), CatalogItemId(0), true},
 			{"invalid", CatalogItemId(0), true},
 			{[]string{"1"}, CatalogItemId(0), true},

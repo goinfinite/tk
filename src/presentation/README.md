@@ -57,7 +57,7 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   envsValidationErr := envsInspector.Inspect()
   ```
 
-- **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests. A zero itemsPerPage fails with `InvalidItemsPerPage`.
+- **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests. A zero itemsPerPage fails with `InvalidItemsPerPage`; a fractional pageNumber or itemsPerPage fails with `InvalidPageNumber` or `InvalidItemsPerPage`.
 
   ```go
   defaultPagination := tkDto.Pagination{PageNumber: 0, ItemsPerPage: 10}

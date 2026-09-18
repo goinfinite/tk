@@ -17,6 +17,8 @@ func TestNewScheduledTaskId(t *testing.T) {
 			// Invalid ids
 			{"-1", ScheduledTaskId(0), true},
 			{int(-1), ScheduledTaskId(0), true},
+			{float32(42.5), ScheduledTaskId(0), true},
+			{float64(42.5), ScheduledTaskId(0), true},
 			{"invalid", ScheduledTaskId(0), true},
 			{[]string{"1"}, ScheduledTaskId(0), true},
 		}

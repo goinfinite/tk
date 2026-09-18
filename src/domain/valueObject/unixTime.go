@@ -2,6 +2,7 @@ package tkValueObject
 
 import (
 	"errors"
+	"math"
 	"strconv"
 	"time"
 
@@ -14,6 +15,8 @@ func NewUnixTime(value any) (unixTime UnixTime, err error) {
 	if existentUnixTime, assertOk := value.(UnixTime); assertOk {
 		return existentUnixTime, nil
 	}
+
+	value = tkVoUtil.TruncateFloat(value)
 
 	intValue, err := tkVoUtil.InterfaceToInt64(value)
 	if err != nil {
@@ -28,7 +31,12 @@ func NewUnixTimeNow() UnixTime {
 }
 
 func NewUnixTimeBeforeNow(duration time.Duration) UnixTime {
-	return UnixTime(time.Now().Add(-duration).UTC().Unix())
+	now := time.Now()
+	if duration == math.MinInt64 {
+		return UnixTime(now.Add(math.MaxInt64).Add(time.Nanosecond).UTC().Unix())
+	}
+
+	return UnixTime(now.Add(-duration).UTC().Unix())
 }
 
 func NewUnixTimeAfterNow(duration time.Duration) UnixTime {

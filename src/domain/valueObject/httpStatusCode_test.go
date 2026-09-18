@@ -21,9 +21,11 @@ func TestNewHttpStatusCode(t *testing.T) {
 			{300, HttpStatusCode(300), false},
 			{"100", HttpStatusCode(100), false},
 			{599, HttpStatusCode(599), false},
+			{200.0, HttpStatusCode(200), false},
 			// Invalid status codes
 			{"600", HttpStatusCode(0), true},
 			{666, HttpStatusCode(0), true},
+			{200.5, HttpStatusCode(0), true},
 			{"99", HttpStatusCode(0), true},
 			{"abc", HttpStatusCode(0), true},
 			{"", HttpStatusCode(0), true},

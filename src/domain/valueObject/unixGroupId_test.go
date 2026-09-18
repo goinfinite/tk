@@ -21,6 +21,7 @@ func TestNewUnixGroupId(t *testing.T) {
 			// Invalid group IDs
 			{-1, UnixGroupId(0), true},
 			{-10000, UnixGroupId(0), true},
+			{1000.5, UnixGroupId(0), true},
 			{"", UnixGroupId(0), true},
 			{"abc", UnixGroupId(0), true},
 			{true, UnixGroupId(0), true},

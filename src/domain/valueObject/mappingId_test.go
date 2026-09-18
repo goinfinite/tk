@@ -17,6 +17,7 @@ func TestNewMappingId(t *testing.T) {
 			// Invalid ids
 			{"-1", MappingId(0), true},
 			{int(-1), MappingId(0), true},
+			{float64(42.5), MappingId(0), true},
 			{"invalid", MappingId(0), true},
 			{[]string{"1"}, MappingId(0), true},
 		}

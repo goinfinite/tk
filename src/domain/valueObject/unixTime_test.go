@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -304,6 +305,17 @@ func TestNewUnixTime(t *testing.T) {
 		actualTime := unixTimeBefore.Int64()
 		if actualTime < beforeTime-1 || actualTime > afterTime+1 {
 			t.Errorf("UnexpectedOutputValue: time %d should be approximately %d", actualTime, beforeTime)
+		}
+	})
+
+	t.Run("NewUnixTimeBeforeNowMinDuration", func(t *testing.T) {
+		unixTimeBefore := NewUnixTimeBeforeNow(math.MinInt64)
+
+		if !unixTimeBefore.IsFuture() {
+			t.Errorf(
+				"UnexpectedOutputValue: expected future time, got %v",
+				unixTimeBefore,
+			)
 		}
 	})
 
