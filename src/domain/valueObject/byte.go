@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -25,6 +26,10 @@ func NewKibibyte(value any) (byteVo Byte, err error) {
 		return byteVo, errors.New("KibibytesMustBeUint64")
 	}
 
+	if valueUint64 > math.MaxUint64/1024 {
+		return byteVo, errors.New("KibibytesOverflow")
+	}
+
 	return Byte(valueUint64 * 1024), nil
 }
 
@@ -32,6 +37,10 @@ func NewMebibyte(value any) (byteVo Byte, err error) {
 	valueUint64, err := tkVoUtil.InterfaceToUint64(value)
 	if err != nil {
 		return byteVo, errors.New("MebibytesMustBeUint64")
+	}
+
+	if valueUint64 > math.MaxUint64/1048576 {
+		return byteVo, errors.New("MebibytesOverflow")
 	}
 
 	return Byte(valueUint64 * 1048576), nil
@@ -43,6 +52,10 @@ func NewGibibyte(value any) (byteVo Byte, err error) {
 		return byteVo, errors.New("GibibytesMustBeUint64")
 	}
 
+	if valueUint64 > math.MaxUint64/1073741824 {
+		return byteVo, errors.New("GibibytesOverflow")
+	}
+
 	return Byte(valueUint64 * 1073741824), nil
 }
 
@@ -52,10 +65,18 @@ func NewTebibyte(value any) (byteVo Byte, err error) {
 		return byteVo, errors.New("TebibytesMustBeUint64")
 	}
 
+	if valueUint64 > math.MaxUint64/1099511627776 {
+		return byteVo, errors.New("TebibytesOverflow")
+	}
+
 	return Byte(valueUint64 * 1099511627776), nil
 }
 
 func (vo Byte) Int64() int64 {
+	if vo > Byte(math.MaxInt64) {
+		return math.MaxInt64
+	}
+
 	return int64(vo)
 }
 
@@ -84,7 +105,7 @@ func (vo Byte) ToTiB() uint64 {
 }
 
 func (vo Byte) String() string {
-	return fmt.Sprintf("%d", vo.Int64())
+	return strconv.FormatUint(uint64(vo), 10)
 }
 
 func (vo Byte) StringWithSuffix() string {
