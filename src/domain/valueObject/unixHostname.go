@@ -31,6 +31,10 @@ func NewUnixHostname(value any) (hostname UnixHostname, err error) {
 
 	stringValue = strings.ToLower(stringValue)
 
+	if len(stringValue) > 253 {
+		return hostname, errors.New("UnixHostnameTooBig")
+	}
+
 	if !unixHostnameRegex.MatchString(stringValue) {
 		return hostname, errors.New("InvalidUnixHostname")
 	}

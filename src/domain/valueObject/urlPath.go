@@ -23,6 +23,10 @@ func NewUrlPath(value any) (urlPath UrlPath, err error) {
 		stringValue = "/" + stringValue
 	}
 
+	if len(stringValue) > 2048 {
+		return urlPath, errors.New("UrlPathTooBig")
+	}
+
 	if !urlPathRegex.MatchString(stringValue) {
 		return urlPath, errors.New("InvalidUrlPath")
 	}

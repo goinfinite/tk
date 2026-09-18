@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewUrlPath(t *testing.T) {
 	t.Run("StringInput", func(t *testing.T) {
@@ -26,6 +29,7 @@ func TestNewUrlPath(t *testing.T) {
 			{"/path to download", UrlPath(""), true},
 			{"index.js=", UrlPath(""), true},
 			{"spaces are invalid", UrlPath(""), true},
+			{strings.Repeat("a", 2048), UrlPath(""), true},
 			{123, UrlPath("/123"), false},
 			{true, UrlPath("/true"), false},
 			{[]string{"/path"}, UrlPath(""), true},

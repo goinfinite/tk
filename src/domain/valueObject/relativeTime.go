@@ -17,6 +17,10 @@ func NewRelativeTime(value any) (relativeTime RelativeTime, err error) {
 		return relativeTime, errors.New("RelativeTimeMustBeString")
 	}
 
+	if len(stringValue) > 64 {
+		return relativeTime, errors.New("RelativeTimeTooBig")
+	}
+
 	if !relativeTimeRegex.MatchString(stringValue) {
 		return relativeTime, errors.New("InvalidRelativeTime")
 	}

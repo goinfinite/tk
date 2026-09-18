@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewX509PolicyOID(t *testing.T) {
 	t.Run("ValidPolicyOID", func(t *testing.T) {
@@ -33,6 +36,7 @@ func TestNewX509PolicyOID(t *testing.T) {
 			{"1.2.3.4.5.", X509PolicyOID(""), true},
 			{".1.2.3", X509PolicyOID(""), true},
 			{"invalid.oid", X509PolicyOID(""), true},
+			{strings.Repeat("1.", 128) + "1", X509PolicyOID(""), true},
 			{123, X509PolicyOID(""), true},
 			{nil, X509PolicyOID(""), true},
 		}

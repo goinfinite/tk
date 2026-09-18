@@ -19,7 +19,11 @@ func NewEncodedContent(value any) (encodedContent EncodedContent, err error) {
 	}
 
 	if len(stringValue) == 0 {
-		return encodedContent, errors.New("EmptyEncodedContent")
+		return encodedContent, errors.New("EncodedContentCannotBeEmpty")
+	}
+
+	if len(stringValue) > 10485760 {
+		return encodedContent, errors.New("EncodedContentTooBig")
 	}
 
 	if !encodedContentRegex.MatchString(stringValue) {

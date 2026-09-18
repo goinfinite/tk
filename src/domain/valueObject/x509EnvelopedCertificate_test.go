@@ -56,6 +56,12 @@ func TestNewX509EnvelopedCertificate(t *testing.T) {
 				true,
 			},
 			{
+				"-----BEGIN CERTIFICATE-----\n" + strings.Repeat("A", 1048576) +
+					"\n-----END CERTIFICATE-----",
+				X509EnvelopedCertificate(""),
+				true,
+			},
+			{
 				"malicious payload" + validCert,
 				X509EnvelopedCertificate(""),
 				true,

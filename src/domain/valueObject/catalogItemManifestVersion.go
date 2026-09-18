@@ -23,6 +23,12 @@ func NewCatalogItemManifestVersion(value any) (
 	}
 	stringValue = strings.ToLower(stringValue)
 
+	if len(stringValue) > 64 {
+		return catalogItemManifestVersion, errors.New(
+			"CatalogItemManifestVersionTooBig",
+		)
+	}
+
 	if !catalogItemManifestVersionRegex.MatchString(stringValue) {
 		return catalogItemManifestVersion, errors.New(
 			"InvalidCatalogItemManifestVersion",

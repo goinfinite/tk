@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewEncodedContent(t *testing.T) {
 	t.Run("ValidEncodedContent", func(t *testing.T) {
@@ -15,6 +18,7 @@ func TestNewEncodedContent(t *testing.T) {
 			// Invalid content
 			{"", EncodedContent(""), true},
 			{"not base64!", EncodedContent(""), true},
+			{strings.Repeat("A", 10485764), EncodedContent(""), true},
 			{"a", EncodedContent(""), true},
 			{123, EncodedContent(""), true},
 			{[]string{"aGVsbG8="}, EncodedContent(""), true},

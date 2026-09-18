@@ -21,6 +21,10 @@ func NewHttpHeader(value any) (httpHeader HttpHeader, err error) {
 		return httpHeader, errors.New("HttpHeaderCannotBeEmpty")
 	}
 
+	if len(stringValue) > 256 {
+		return httpHeader, errors.New("HttpHeaderTooBig")
+	}
+
 	if !httpHeaderRegex.MatchString(stringValue) {
 		return httpHeader, errors.New("InvalidHttpHeader")
 	}

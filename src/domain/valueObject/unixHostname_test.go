@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -39,8 +40,9 @@ func TestNewUnixHostname(t *testing.T) {
 			{"-hostname", UnixHostname(""), true},  // starts with dash
 			{"hostname-", UnixHostname(""), true},  // ends with dash
 			{"host..name", UnixHostname(""), true}, // double dot
-			{"host name", UnixHostname(""), true},  // space
-			{"host!name", UnixHostname(""), true},  // special char
+			{strings.Repeat("a.", 126) + "aa", UnixHostname(""), true},
+			{"host name", UnixHostname(""), true}, // space
+			{"host!name", UnixHostname(""), true}, // special char
 			{"[2001:db8::1]", UnixHostname(""), true},
 			{"[2001:db8::1]:8080", UnixHostname(""), true},
 			{"fe80::1%", UnixHostname(""), true},

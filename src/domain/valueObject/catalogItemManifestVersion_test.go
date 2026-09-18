@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewCatalogItemManifestVersion(t *testing.T) {
 	t.Run("ValidCatalogItemManifestVersion", func(t *testing.T) {
@@ -22,6 +25,7 @@ func TestNewCatalogItemManifestVersion(t *testing.T) {
 			{"v1.2.", CatalogItemManifestVersion(""), true},
 			{"vv1", CatalogItemManifestVersion(""), true},
 			{"invalid", CatalogItemManifestVersion(""), true},
+			{"v" + strings.Repeat("1", 64), CatalogItemManifestVersion(""), true},
 			{123, CatalogItemManifestVersion(""), true},
 			{[]string{"v1"}, CatalogItemManifestVersion(""), true},
 		}
