@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type X509BasicConstraints struct {
 	IsAuthority   bool `json:"isAuthority"`
@@ -24,4 +27,12 @@ func NewX509BasicConstraints(
 		IsAuthority:   isAuthority,
 		MaxPathLength: maxPathLength,
 	}, nil
+}
+
+func (vo X509BasicConstraints) String() string {
+	if vo.MaxPathLength == nil {
+		return fmt.Sprintf("CA:%t", vo.IsAuthority)
+	}
+
+	return fmt.Sprintf("CA:%t, pathlen:%d", vo.IsAuthority, *vo.MaxPathLength)
 }

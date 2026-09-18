@@ -17,6 +17,10 @@ func NewX509PublicKeyValue(value any) (key X509PublicKeyValue, err error) {
 		return key, errors.New("X509PublicKeyValueMustBeString")
 	}
 
+	if len(stringValue) > 1048576 {
+		return key, errors.New("InvalidX509PublicKeyValueTooBig")
+	}
+
 	if !x509PublicKeyValueRegex.MatchString(stringValue) {
 		return key, errors.New("InvalidX509PublicKeyValue")
 	}

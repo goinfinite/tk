@@ -12,7 +12,7 @@ type UnixGroupId uint64
 func NewUnixGroupId(value any) (UnixGroupId, error) {
 	uint64Value, err := tkVoUtil.InterfaceToUint64(value)
 	if err != nil {
-		return 0, errors.New("InvalidGroupId")
+		return 0, errors.New("InvalidUnixGroupId")
 	}
 
 	return UnixGroupId(uint64Value), nil

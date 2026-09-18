@@ -11,7 +11,7 @@ import (
 
 var unixFileExtensionRegex = regexp.MustCompile(`^([\w\-]{1,15}\.)?[\w\-]{1,15}$`)
 
-var ErrFileExtensionInvalid = errors.New("FileExtensionInvalid")
+var ErrInvalidFileExtension = errors.New("InvalidFileExtension")
 
 type UnixFileExtension string
 
@@ -25,7 +25,7 @@ func NewUnixFileExtension(value any) (
 	stringValue = strings.TrimPrefix(stringValue, ".")
 
 	if !unixFileExtensionRegex.MatchString(stringValue) {
-		return unixFileExtension, ErrFileExtensionInvalid
+		return unixFileExtension, ErrInvalidFileExtension
 	}
 
 	return UnixFileExtension(stringValue), nil

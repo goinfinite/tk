@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"math"
 	"testing"
 )
 
@@ -20,6 +21,7 @@ func TestNewByte(t *testing.T) {
 			{"invalid", Byte(0), true},
 			{true, Byte(0), true},
 			{[]string{"1024"}, Byte(0), true},
+			{1024.5, Byte(0), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -47,10 +49,13 @@ func TestNewByte(t *testing.T) {
 			{2, Byte(2048), false},
 			{"1", Byte(1024), false},
 			{int64(3), Byte(3072), false},
+			{uint64(math.MaxUint64 / 1024), Byte(18446744073709550592), false},
 			// Invalid inputs
 			{"invalid", Byte(0), true},
 			{true, Byte(0), true},
 			{[]string{"1"}, Byte(0), true},
+			{1.5, Byte(0), true},
+			{uint64(math.MaxUint64/1024 + 1), Byte(0), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -78,10 +83,13 @@ func TestNewByte(t *testing.T) {
 			{2, Byte(2097152), false},
 			{"1", Byte(1048576), false},
 			{int64(3), Byte(3145728), false},
+			{uint64(math.MaxUint64 / 1048576), Byte(18446744073708503040), false},
 			// Invalid inputs
 			{"invalid", Byte(0), true},
 			{true, Byte(0), true},
 			{[]string{"1"}, Byte(0), true},
+			{1.5, Byte(0), true},
+			{uint64(math.MaxUint64/1048576 + 1), Byte(0), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -109,10 +117,13 @@ func TestNewByte(t *testing.T) {
 			{2, Byte(2147483648), false},
 			{"1", Byte(1073741824), false},
 			{int64(3), Byte(3221225472), false},
+			{uint64(math.MaxUint64 / 1073741824), Byte(18446744072635809792), false},
 			// Invalid inputs
 			{"invalid", Byte(0), true},
 			{true, Byte(0), true},
 			{[]string{"1"}, Byte(0), true},
+			{1.5, Byte(0), true},
+			{uint64(math.MaxUint64/1073741824 + 1), Byte(0), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -140,10 +151,13 @@ func TestNewByte(t *testing.T) {
 			{2, Byte(2199023255552), false},
 			{"1", Byte(1099511627776), false},
 			{int64(3), Byte(3298534883328), false},
+			{uint64(math.MaxUint64 / 1099511627776), Byte(18446742974197923840), false},
 			// Invalid inputs
 			{"invalid", Byte(0), true},
 			{true, Byte(0), true},
 			{[]string{"1"}, Byte(0), true},
+			{1.5, Byte(0), true},
+			{uint64(math.MaxUint64/1099511627776 + 1), Byte(0), true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -168,6 +182,8 @@ func TestNewByte(t *testing.T) {
 			{Byte(0), 0},
 			{Byte(1024), 1024},
 			{Byte(1048576), 1048576},
+			{Byte(math.MaxInt64), math.MaxInt64},
+			{Byte(math.MaxUint64), math.MaxInt64},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -298,6 +314,7 @@ func TestNewByte(t *testing.T) {
 			{Byte(0), "0"},
 			{Byte(1024), "1024"},
 			{Byte(1048576), "1048576"},
+			{Byte(math.MaxUint64), "18446744073709551615"},
 		}
 
 		for _, testCase := range testCaseStructs {

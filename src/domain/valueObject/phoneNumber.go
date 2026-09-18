@@ -7,6 +7,8 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
+var phoneNumberNonNumericRegex = regexp.MustCompile(`[^\d]`)
+
 type PhoneNumber string
 
 func NewPhoneNumber(value any) (phoneNumber PhoneNumber, err error) {
@@ -15,8 +17,7 @@ func NewPhoneNumber(value any) (phoneNumber PhoneNumber, err error) {
 		return phoneNumber, errors.New("PhoneNumberMustBeString")
 	}
 
-	nonNumericRegexp := regexp.MustCompile(`[^\d]`)
-	numericStringValue := nonNumericRegexp.ReplaceAllString(stringValue, "")
+	numericStringValue := phoneNumberNonNumericRegex.ReplaceAllString(stringValue, "")
 
 	if len(numericStringValue) < 5 {
 		return phoneNumber, errors.New("PhoneNumberTooSmall")

@@ -20,6 +20,10 @@ func NewFqdn(value any) (fqdn Fqdn, err error) {
 	}
 	stringValue = strings.ToLower(stringValue)
 
+	if len(stringValue) > 253 {
+		return fqdn, errors.New("FqdnTooBig")
+	}
+
 	isIpAddress := net.ParseIP(stringValue) != nil
 	if isIpAddress {
 		return fqdn, errors.New("FqdnCannotBeIpAddress")

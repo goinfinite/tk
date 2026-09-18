@@ -115,7 +115,7 @@ Deserializes JSON and YAML from files or readers into maps.
 
 **Flow:**
 
-1. `src/infra/deserializer.go` — `DataDeserializeFile` reads a file and deserializes based on extension; `dataDeserializer` handles reader-based deserialization
+1. `src/infra/deserializer.go` — `FileDeserializer` reads a file and deserializes based on extension; `StringDeserializer` deserializes a string; both call `dataDeserializer`, which decodes JSON or YAML from a reader
 
 ---
 

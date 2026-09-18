@@ -7,17 +7,17 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-// Password must be at least 5 characters long and at most 128 characters long. It must
-// contain at least one letter, one number, and one special character. If you cannot
-// control the password being validated (e.g. a password from an external service),
-// use WeakPassword instead.
-type Password string
-
 var (
 	hasLetterRegex       = regexp.MustCompile(`[a-zA-Z]`)
 	hasNumberRegex       = regexp.MustCompile(`[0-9]`)
 	hasSpecialCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9]`)
 )
+
+// Password must be at least 5 characters long and at most 128 characters long. It must
+// contain at least one letter, one number, and one special character. If you cannot
+// control the password being validated (e.g. a password from an external service),
+// use WeakPassword instead.
+type Password string
 
 const (
 	errPasswordMustBeString             string = "PasswordMustBeString"

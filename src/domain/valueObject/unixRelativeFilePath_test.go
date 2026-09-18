@@ -160,12 +160,12 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 			{
 				UnixRelativeFilePath("./file.файл"),
 				UnixFileExtension(""),
-				ErrFileExtensionInvalid,
+				ErrInvalidFileExtension,
 			},
 			{
 				UnixRelativeFilePath("./file.someverylongextension"),
 				UnixFileExtension(""),
-				ErrFileExtensionInvalid,
+				ErrInvalidFileExtension,
 			},
 		}
 
@@ -191,8 +191,8 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		if err == nil {
 			t.Fatal("MissingExpectedError")
 		}
-		if errors.Is(err, ErrFileExtensionInvalid) {
-			t.Errorf("PathErrorWrappedAsFileExtensionInvalid: '%v'", err)
+		if errors.Is(err, ErrInvalidFileExtension) {
+			t.Errorf("PathErrorWrappedAsInvalidFileExtension: '%v'", err)
 		}
 	})
 

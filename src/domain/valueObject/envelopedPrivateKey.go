@@ -32,6 +32,10 @@ func NewEnvelopedPrivateKey(
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyTooShort")
 	}
 
+	if len(stringValue) > 1048576 {
+		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyTooBig")
+	}
+
 	beginTagCount := strings.Count(stringValue, "-----BEGIN")
 	if beginTagCount == 0 {
 		return envelopedKey, errors.New("InvalidEnvelopedPrivateKeyMissingBeginTag")

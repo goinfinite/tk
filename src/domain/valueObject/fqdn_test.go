@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -25,6 +26,7 @@ func TestNewFqdn(t *testing.T) {
 			{"*example.com", Fqdn(""), true},
 			{"192.168.1.1", Fqdn(""), true}, // IP address
 			{"", Fqdn(""), true},
+			{strings.Repeat("a.", 126) + "bc.com", Fqdn(""), true},
 			{123, Fqdn(""), true},
 			{true, Fqdn(""), true},
 			{[]string{"example.com"}, Fqdn(""), true},

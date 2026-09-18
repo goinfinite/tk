@@ -36,6 +36,11 @@ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/+/+/+/==`
 				X509PublicKeyValue(""),
 				true,
 			},
+			{
+				strings.Repeat("A", 1048577),
+				X509PublicKeyValue(""),
+				true,
+			},
 			{123, X509PublicKeyValue(""), true},
 			{nil, X509PublicKeyValue(""), true},
 		}

@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -24,6 +25,12 @@ func TestNewUnixHostname(t *testing.T) {
 			{"EXAMPLE.COM", UnixHostname("example.com"), false}, // should be lowercased
 			{"a", UnixHostname("a"), false},
 			{"host.with.many.subdomains.example.com", UnixHostname("host.with.many.subdomains.example.com"), false},
+			{"2001:db8::1", UnixHostname("2001:db8::1"), false},
+			{"::1", UnixHostname("::1"), false},
+			{"fe80::1%eth0", UnixHostname("fe80::1%eth0"), false},
+			{"fe80::1%ETH0", UnixHostname("fe80::1%ETH0"), false}, // zone case is preserved
+			{"2001:0DB8:0000::1", UnixHostname("2001:db8::1"), false},
+			{"::ffff:192.168.1.10", UnixHostname("::ffff:192.168.1.10"), false},
 			// Invalid hostnames
 			{"", UnixHostname(""), true},
 			{"UNION SELECT * FROM USERS", UnixHostname(""), true},
@@ -33,10 +40,18 @@ func TestNewUnixHostname(t *testing.T) {
 			{"-hostname", UnixHostname(""), true},  // starts with dash
 			{"hostname-", UnixHostname(""), true},  // ends with dash
 			{"host..name", UnixHostname(""), true}, // double dot
-			{"host name", UnixHostname(""), true},  // space
-			{"host!name", UnixHostname(""), true},  // special char
-			{"123", UnixHostname("123"), false},    // numeric string is valid hostname
-			{"true", UnixHostname("true"), false},  // boolean string is valid hostname
+			{strings.Repeat("a.", 126) + "aa", UnixHostname(""), true},
+			{"host name", UnixHostname(""), true}, // space
+			{"host!name", UnixHostname(""), true}, // special char
+			{"[2001:db8::1]", UnixHostname(""), true},
+			{"[2001:db8::1]:8080", UnixHostname(""), true},
+			{"fe80::1%", UnixHostname(""), true},
+			{"1.2.3.4%eth0", UnixHostname(""), true},
+			{"fe80::1%eth 0", UnixHostname(""), true},     // space in zone
+			{"fe80::1%eth/0", UnixHostname(""), true},     // slash in zone
+			{"fe80::1%eth0%eth1", UnixHostname(""), true}, // percent in zone
+			{"123", UnixHostname("123"), false},           // numeric string is valid hostname
+			{"true", UnixHostname("true"), false},         // boolean string is valid hostname
 			{[]string{"localhost"}, UnixHostname(""), true},
 			{nil, UnixHostname(""), true},
 		}
@@ -64,10 +79,49 @@ func TestNewUnixHostname(t *testing.T) {
 			{UnixHostname("example.com"), "example.com"},
 			{UnixHostname("sub.domain.com"), "sub.domain.com"},
 			{UnixHostname("123-abc.com"), "123-abc.com"},
+			{UnixHostname("2001:db8::1"), "2001:db8::1"},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("ToUrlHostMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     UnixHostname
+			expectedOutput string
+		}{
+			{UnixHostname("example.com"), "example.com"},
+			{UnixHostname("192.168.1.10"), "192.168.1.10"},
+			{UnixHostname("2001:db8::1"), "[2001:db8::1]"},
+			{UnixHostname("fe80::1%eth0"), "[fe80::1%eth0]"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.ToUrlHost()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("ToUrlEncodedHostMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     UnixHostname
+			expectedOutput string
+		}{
+			{UnixHostname("example.com"), "example.com"},
+			{UnixHostname("192.168.1.10"), "192.168.1.10"},
+			{UnixHostname("2001:db8::1"), "[2001:db8::1]"},
+			{UnixHostname("fe80::1%eth0"), "[fe80::1%25eth0]"},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.ToUrlEncodedHost()
 			if actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}

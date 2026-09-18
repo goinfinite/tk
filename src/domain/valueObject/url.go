@@ -2,6 +2,7 @@ package tkValueObject
 
 import (
 	"errors"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var urlRegex = regexp.MustCompile(`^(?:(?:mailto:)?(?P<mailUsername>[a-z0-9._%+-]+)@(?i:(?P<mailHostname>[a-z0-9.-]+\.[a-z]{2,}))|(?:tel:)?(?P<phone>\+?\d{6,15}(?:-\d{1,12})?)|(?:(?P<scheme>(?:https?|wss?|grpcs?|tcp|udp|ftp|ftps|file|data|irc|imap|nntp|pop3|smtp|telnet):\/\/)?(?:(?P<userAuthUsername>[a-z0-9._~%!$&'()*+,;=-]+)(?::(?P<userAuthPassword>[a-z0-9._~%!$&'()*+,;=:-]+))?@)?(?i:(?P<hostname>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9][a-z0-9-]{0,61}[a-z0-9])*))(?::(?P<networkPort>\d{1,6}))?(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?))$`)
+var urlRegex = regexp.MustCompile(`^(?:(?:mailto:)?(?P<mailUsername>[a-z0-9._%+-]+)@(?i:(?P<mailHostname>[a-z0-9.-]+\.[a-z]{2,}))|(?:tel:)?(?P<phone>\+?\d{6,15}(?:-\d{1,12})?)|(?:(?P<scheme>(?:https?|wss?|grpcs?|tcp|udp|ftp|ftps|file|data|irc|imap|nntp|pop3|smtp|telnet):\/\/)?(?:(?P<userAuthUsername>[a-z0-9._~%!$&'()*+,;=-]+)(?::(?P<userAuthPassword>[a-z0-9._~%!$&'()*+,;=:-]+))?@)?(?i:(?P<hostname>(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*|\[[0-9a-f:.]{2,45}(?:%25[a-z0-9._~-]{1,255})?\]))(?::(?P<networkPort>\d{1,6}))?(?P<path>\/[A-Za-z0-9\/\_\.\-]*)?(?P<query>\?[\w\/#=&%\-]*)?))$`)
 
 type Url string
 
@@ -17,6 +18,10 @@ func NewUrl(value any) (url Url, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
 		return url, errors.New("UrlValueMustBeString")
+	}
+
+	if len(stringValue) > 2048 {
+		return url, errors.New("UrlTooBig")
 	}
 
 	if !urlRegex.MatchString(stringValue) {
@@ -38,11 +43,25 @@ func NewUrl(value any) (url Url, err error) {
 		}
 	}
 
-	if namedGroupsValuesMap["hostname"] != "" {
-		lowercaseHostname := strings.ToLower(namedGroupsValuesMap["hostname"])
+	hostname := namedGroupsValuesMap["hostname"]
+	if hostname != "" {
+		normalizedHostname := strings.ToLower(hostname)
+		if zoneStart := strings.Index(hostname, "%25"); zoneStart >= 0 {
+			normalizedHostname = strings.ToLower(hostname[:zoneStart]) +
+				hostname[zoneStart:]
+		}
 		stringValue = strings.ReplaceAll(
-			stringValue, namedGroupsValuesMap["hostname"], lowercaseHostname,
+			stringValue, hostname, normalizedHostname,
 		)
+	}
+
+	if strings.HasPrefix(hostname, "[") {
+		ipLiteral := strings.Trim(hostname, "[]")
+		ipLiteral = strings.ReplaceAll(ipLiteral, "%25", "%")
+		ipAddress, parseErr := netip.ParseAddr(ipLiteral)
+		if parseErr != nil || ipAddress.Is4() {
+			return url, errors.New("InvalidUrl")
+		}
 	}
 
 	if namedGroupsValuesMap["mailHostname"] != "" {
