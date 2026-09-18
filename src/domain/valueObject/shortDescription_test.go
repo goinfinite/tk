@@ -20,6 +20,7 @@ func TestNewShortDescription(t *testing.T) {
 			{"a", ShortDescription(""), true},
 			{"invalid\nnewline", ShortDescription(""), true},
 			{"invalid\ttab", ShortDescription(""), true},
+			{"invalid\u0085description", ShortDescription(""), true},
 			{strings.Repeat("a", 2049), ShortDescription(""), true},
 			{123, ShortDescription("123"), false},
 			{[]string{"description"}, ShortDescription(""), true},

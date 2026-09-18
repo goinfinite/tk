@@ -7,7 +7,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-var shortDescriptionRegex = regexp.MustCompile(`^[^\x00-\x1F\x7F]+$`)
+var shortDescriptionRegex = regexp.MustCompile(`^[^\p{Cc}]+$`)
 
 type ShortDescription string
 
