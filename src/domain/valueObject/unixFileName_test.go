@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -54,7 +55,9 @@ func TestNewUnixFileName(t *testing.T) {
 			{"file~", UnixFileName("file~"), false},
 			{"backup~1.txt", UnixFileName("backup~1.txt"), false},
 			{"log[2024].txt", UnixFileName("log[2024].txt"), false},
+			{strings.Repeat("a", 255), UnixFileName(strings.Repeat("a", 255)), false},
 			// Invalid file names
+			{strings.Repeat("a", 256), UnixFileName(""), true},
 			{"~", UnixFileName(""), true},
 			{"(file).txt", UnixFileName(""), true},
 			{"+leading.txt", UnixFileName(""), true},

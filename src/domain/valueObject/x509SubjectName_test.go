@@ -1,6 +1,9 @@
 package tkValueObject
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewX509SubjectName(t *testing.T) {
 	t.Run("ValidSubjectName", func(t *testing.T) {
@@ -17,7 +20,11 @@ func TestNewX509SubjectName(t *testing.T) {
 			{"server123", X509SubjectName("server123"), false},
 			{"localhost", X509SubjectName("localhost"), false},
 			{"A", X509SubjectName("A"), false},
+			{strings.Repeat("a", 253), X509SubjectName(strings.Repeat("a", 253)), false},
+			{"*." + strings.Repeat("a", 251), X509SubjectName("*." + strings.Repeat("a", 251)), false},
 			{"", X509SubjectName(""), true},
+			{strings.Repeat("a", 254), X509SubjectName(""), true},
+			{"*." + strings.Repeat("a", 252), X509SubjectName(""), true},
 			{
 				"this-is-a-very-long-domain-name-that-exceeds-the-maximum-allowed-length-of-253-characters-which-is-the-standard-limit-for-dns-names-and-x509-certificate-common-names-this-string-continues-until-it-reaches-the-required-length-to-fail-the-validation-test-so-we-need-to-keep-typing-more",
 				X509SubjectName(""),

@@ -9,11 +9,11 @@ import (
 )
 
 var x509SubjectNameRegex = regexp.MustCompile(
-	`^[a-zA-Z0-9 .\-_]+$`,
+	`^[a-zA-Z0-9 .\-_]{1,253}$`,
 )
 
 var x509WildcardSubjectNameRegex = regexp.MustCompile(
-	`^\*\.[a-zA-Z0-9.\-_]+$`,
+	`^\*\.[a-zA-Z0-9.\-_]{1,251}$`,
 )
 
 type X509SubjectName string

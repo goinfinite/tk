@@ -18,9 +18,9 @@ var (
 	// Strict blocks control chars and shell-dangerous chars (;|&$`><{}!#?@%\/); allow all else.
 	// Unsafe only blocks control chars (\x00-\x1f, \x7f) and directory separators (/, \);
 	// shell-dangerous chars are allowed — the caller is responsible for quoting.
-	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*\~][^\x00-\x1f\x7f;|&$` + "`" + `><{}!#?@%\\/]*$`)
-	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*\~][^\x00-\x1f\x7f\\/]*$`)
-	forbiddenUnixFileNameRegex = regexp.MustCompile(`^(\.|\.\.|\~|\^|\*|\/|\\)$|[\|\/\\]|\*{2,}`)
+	unixFileNameStrictRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*\~][^\x00-\x1f\x7f;|&$` + "`" + `><{}!#?@%\\/]{0,254}$`)
+	unixFileNameUnsafeRegex    = regexp.MustCompile(`^[\p{L}\p{N}\p{Pc}\p{Pd}\.\*\~][^\x00-\x1f\x7f\\/]{0,254}$`)
+	forbiddenUnixFileNameRegex = regexp.MustCompile(`^(\.|\.\.|\~|\^|\*|\/|\\)$|[\|\/\\]|\*{2,255}`)
 )
 
 type UnixFileName string
@@ -51,7 +51,7 @@ func NewUnixFileName(value any, allowUnsafeChars bool) (fileName UnixFileName, e
 	}
 
 	if forbiddenUnixFileNameRegex.MatchString(stringValue) {
-		return fileName, errors.New("ForbiddenUnixFileName")
+		return fileName, errors.New("InvalidUnixFileNameForbidden")
 	}
 
 	return UnixFileName(stringValue), nil
