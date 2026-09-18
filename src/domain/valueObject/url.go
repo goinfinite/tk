@@ -20,6 +20,10 @@ func NewUrl(value any) (url Url, err error) {
 		return url, errors.New("UrlValueMustBeString")
 	}
 
+	if len(stringValue) > 2048 {
+		return url, errors.New("UrlTooBig")
+	}
+
 	if !urlRegex.MatchString(stringValue) {
 		return url, errors.New("InvalidUrl")
 	}
@@ -41,9 +45,13 @@ func NewUrl(value any) (url Url, err error) {
 
 	hostname := namedGroupsValuesMap["hostname"]
 	if hostname != "" {
-		lowercaseHostname := strings.ToLower(hostname)
+		normalizedHostname := strings.ToLower(hostname)
+		if zoneStart := strings.Index(hostname, "%25"); zoneStart >= 0 {
+			normalizedHostname = strings.ToLower(hostname[:zoneStart]) +
+				hostname[zoneStart:]
+		}
 		stringValue = strings.ReplaceAll(
-			stringValue, hostname, lowercaseHostname,
+			stringValue, hostname, normalizedHostname,
 		)
 	}
 
