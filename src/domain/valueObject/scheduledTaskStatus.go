@@ -19,10 +19,10 @@ const (
 	ScheduledTaskStatusTimeout   ScheduledTaskStatus = "timeout"
 )
 
-var ValidScheduledTaskStatuses = []string{
-	ScheduledTaskStatusPending.String(), ScheduledTaskStatusRunning.String(),
-	ScheduledTaskStatusCompleted.String(), ScheduledTaskStatusFailed.String(),
-	ScheduledTaskStatusCancelled.String(), ScheduledTaskStatusTimeout.String(),
+var validScheduledTaskStatuses = []ScheduledTaskStatus{
+	ScheduledTaskStatusPending, ScheduledTaskStatusRunning,
+	ScheduledTaskStatusCompleted, ScheduledTaskStatusFailed,
+	ScheduledTaskStatusCancelled, ScheduledTaskStatusTimeout,
 }
 
 func NewScheduledTaskStatus(value any) (
@@ -36,11 +36,12 @@ func NewScheduledTaskStatus(value any) (
 	stringValue = strings.TrimSpace(stringValue)
 	stringValue = strings.ToLower(stringValue)
 
-	if !slices.Contains(ValidScheduledTaskStatuses, stringValue) {
+	status := ScheduledTaskStatus(stringValue)
+	if !slices.Contains(validScheduledTaskStatuses, status) {
 		return scheduledTaskStatus, errors.New("InvalidScheduledTaskStatus")
 	}
 
-	return ScheduledTaskStatus(stringValue), nil
+	return status, nil
 }
 
 func (vo ScheduledTaskStatus) String() string {
