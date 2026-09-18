@@ -78,4 +78,35 @@ func TestNewX509BasicConstraints(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("StringMethod", func(t *testing.T) {
+		maxPathZero := 0
+		maxPathFive := 5
+
+		testCaseStructs := []struct {
+			inputValue     X509BasicConstraints
+			expectedOutput string
+		}{
+			{X509BasicConstraints{IsAuthority: true}, "CA:true"},
+			{X509BasicConstraints{IsAuthority: false}, "CA:false"},
+			{
+				X509BasicConstraints{IsAuthority: true, MaxPathLength: &maxPathZero},
+				"CA:true, pathlen:0",
+			},
+			{
+				X509BasicConstraints{IsAuthority: true, MaxPathLength: &maxPathFive},
+				"CA:true, pathlen:5",
+			},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.String()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v'",
+					actualOutput, testCase.expectedOutput,
+				)
+			}
+		}
+	})
 }
