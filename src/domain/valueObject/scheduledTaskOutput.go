@@ -20,9 +20,9 @@ func NewScheduledTaskOutput(value any) (
 	}
 
 	stringValue = strings.TrimSpace(stringValue)
-	if len(stringValue) > maxScheduledTaskOutputBytes {
-		stringValue = stringValue[:maxScheduledTaskOutputBytes]
-	}
+	stringValue = tkVoUtil.SafeTruncateString(
+		stringValue, maxScheduledTaskOutputBytes,
+	)
 
 	return ScheduledTaskOutput(stringValue), nil
 }

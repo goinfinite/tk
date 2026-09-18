@@ -16,6 +16,8 @@ func TestNewUnixCommandOutput(t *testing.T) {
 			{"", UnixCommandOutput(""), false},
 			{strings.Repeat("a", 4096), UnixCommandOutput(strings.Repeat("a", 4096)), false},
 			{strings.Repeat("a", 4097), UnixCommandOutput(strings.Repeat("a", 4096)), false},
+			{strings.Repeat("a", 4093) + "€", UnixCommandOutput(strings.Repeat("a", 4093) + "€"), false},
+			{strings.Repeat("a", 4095) + "€", UnixCommandOutput(strings.Repeat("a", 4095)), false},
 			{123, UnixCommandOutput("123"), false},
 			{true, UnixCommandOutput("true"), false},
 			{[]string{"output"}, UnixCommandOutput(""), true},

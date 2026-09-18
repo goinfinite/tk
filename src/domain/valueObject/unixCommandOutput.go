@@ -18,9 +18,9 @@ func NewUnixCommandOutput(value any) (
 		return unixCommandOutput, errors.New("UnixCommandOutputMustBeString")
 	}
 
-	if len(stringValue) > maxUnixCommandOutputBytes {
-		stringValue = stringValue[:maxUnixCommandOutputBytes]
-	}
+	stringValue = tkVoUtil.SafeTruncateString(
+		stringValue, maxUnixCommandOutputBytes,
+	)
 
 	return UnixCommandOutput(stringValue), nil
 }

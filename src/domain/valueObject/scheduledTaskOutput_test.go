@@ -17,6 +17,8 @@ func TestNewScheduledTaskOutput(t *testing.T) {
 			{"", ScheduledTaskOutput(""), false},
 			{strings.Repeat("a", 65536), ScheduledTaskOutput(strings.Repeat("a", 65536)), false},
 			{strings.Repeat("a", 65537), ScheduledTaskOutput(strings.Repeat("a", 65536)), false},
+			{strings.Repeat("a", 65534) + "é", ScheduledTaskOutput(strings.Repeat("a", 65534) + "é"), false},
+			{strings.Repeat("a", 65535) + "é", ScheduledTaskOutput(strings.Repeat("a", 65535)), false},
 			{123, ScheduledTaskOutput("123"), false},
 			{true, ScheduledTaskOutput("true"), false},
 			{[]string{"output"}, ScheduledTaskOutput(""), true},
