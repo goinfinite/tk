@@ -21,9 +21,15 @@ func isValidCronStep(stepValue string) bool {
 	return err == nil && stepNumber >= 1
 }
 
-func isValidCronNumber(numberValue string, minValue, maxValue int) bool {
-	number, err := strconv.ParseUint(numberValue, 10, 64)
-	return err == nil && number >= uint64(minValue) && number <= uint64(maxValue)
+func parseCronNumber(numberValue string, minValue, maxValue int) (uint64, bool) {
+	parsedNumber, err := strconv.ParseUint(numberValue, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	numberWithinRange := parsedNumber >= uint64(minValue) &&
+		parsedNumber <= uint64(maxValue)
+	return parsedNumber, numberWithinRange
 }
 
 func isValidCronFieldItem(fieldItem string, minValue, maxValue int) bool {
@@ -40,11 +46,16 @@ func isValidCronFieldItem(fieldItem string, minValue, maxValue int) bool {
 	}
 
 	startValue, endValue, hasRange := strings.Cut(baseValue, "-")
-	if !isValidCronNumber(startValue, minValue, maxValue) {
+	startNumber, startIsValid := parseCronNumber(startValue, minValue, maxValue)
+	if !startIsValid {
 		return false
 	}
+	if !hasRange {
+		return true
+	}
 
-	return !hasRange || isValidCronNumber(endValue, minValue, maxValue)
+	endNumber, endIsValid := parseCronNumber(endValue, minValue, maxValue)
+	return endIsValid && startNumber <= endNumber
 }
 
 func isValidCronField(fieldValue string, minValue, maxValue int) bool {
@@ -59,8 +70,8 @@ func isValidCronField(fieldValue string, minValue, maxValue int) bool {
 
 // A schedule holds five space-separated fields: minute, hour, day, month, weekday.
 // A field is a comma-separated list of items (isValidCronFieldItem).
-// An item is a number (N), a range (N-M), or a step (*/S, N/S, N-M/S).
-// A number (isValidCronNumber) is an unsigned value inside the field range.
+// An item is a number (N), an ascending range (N-M), or a step (*/S, N/S, N-M/S).
+// A number (parseCronNumber) is an unsigned value inside the field range.
 // A step (isValidCronStep) is an interval of one or more.
 // The grammar follows the standard crontab(5) format.
 func NewCronSchedule(value any) (cronSchedule CronSchedule, err error) {

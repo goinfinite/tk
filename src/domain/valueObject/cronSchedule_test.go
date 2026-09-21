@@ -44,6 +44,8 @@ func TestNewCronSchedule(t *testing.T) {
 			{"0 0 * * 8", CronSchedule(""), true},
 			{"*/0 * * * *", CronSchedule(""), true},
 			{"1-5/0 * * * *", CronSchedule(""), true},
+			{"5-1 * * * *", CronSchedule(""), true},
+			{"5-1/2 * * * *", CronSchedule(""), true},
 			{"+5 * * * *", CronSchedule(""), true},
 			{"*/+5 * * * *", CronSchedule(""), true},
 			{"1-+5 * * * *", CronSchedule(""), true},
