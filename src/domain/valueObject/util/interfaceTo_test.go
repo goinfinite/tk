@@ -2,6 +2,7 @@ package tkVoUtil
 
 import (
 	"math"
+	"strconv"
 	"testing"
 )
 
@@ -685,6 +686,9 @@ func TestInterfaceToInt64(t *testing.T) {
 }
 
 func TestInterfaceToUint(t *testing.T) {
+	aboveMaxUint32 := uint64(1) << 32
+	uintIs32Bit := strconv.IntSize == 32
+
 	t.Run("StringInput", func(t *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
@@ -693,8 +697,9 @@ func TestInterfaceToUint(t *testing.T) {
 		}{
 			{"4294967295", 4294967295, false},
 			{"0", 0, false},
-			{"4294967296", 0, true}, // Overflow
-			{"-1", 0, true},         // Negative
+			{strconv.FormatUint(aboveMaxUint32, 10), uint(aboveMaxUint32), uintIs32Bit},
+			{"18446744073709551616", 0, true}, // Overflow
+			{"-1", 0, true},                   // Negative
 			{"invalid", 0, true},
 			{"123.45", 0, true},
 			{"", 0, true},
@@ -736,11 +741,42 @@ func TestInterfaceToUint(t *testing.T) {
 			// Values outside uint range or negative
 			{int32(-1), 0, true},
 			{int64(-100), 0, true},
-			{uint64(4294967296), 0, true},
+			{int64(aboveMaxUint32), uint(aboveMaxUint32), uintIs32Bit},
+			{aboveMaxUint32, uint(aboveMaxUint32), uintIs32Bit},
+			{float64(aboveMaxUint32), uint(aboveMaxUint32), uintIs32Bit},
 			{float64(-0.1), 0, true},
 			{float64(5000000000.1), 0, true},
 			{math.Inf(1), 0, true},
 			{math.NaN(), 0, true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := InterfaceToUint(testCase.inputValue)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("NativeUintBoundary", func(t *testing.T) {
+		if strconv.IntSize != 64 {
+			t.Skip("native uint is 32-bit on this target")
+		}
+
+		testCaseStructs := []struct {
+			inputValue     any
+			expectedOutput uint
+			expectError    bool
+		}{
+			{uint64(math.MaxUint), math.MaxUint, false},
+			{strconv.FormatUint(uint64(math.MaxUint), 10), math.MaxUint, false},
+			{float64(math.MaxUint), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
