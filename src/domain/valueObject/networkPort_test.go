@@ -33,6 +33,8 @@ func TestNewNetworkPort(t *testing.T) {
 			{int64(-1), NetworkPort(0), true},
 			{float32(-1), NetworkPort(0), true},
 			{float64(-1), NetworkPort(0), true},
+			{float32(8080.9), NetworkPort(0), true},
+			{float64(8443.5), NetworkPort(0), true},
 			{"abc", NetworkPort(0), true},
 			{true, NetworkPort(0), true},
 			{[]string{"8080"}, NetworkPort(0), true},

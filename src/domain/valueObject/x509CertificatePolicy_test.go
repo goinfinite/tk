@@ -43,4 +43,33 @@ func TestNewX509CertificatePolicy(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("StringMethod", func(t *testing.T) {
+		oid, _ := NewX509PolicyOID("2.5.29.32.0")
+		policyName, _ := NewX509PolicyName("Extended Validation")
+
+		testCaseStructs := []struct {
+			inputValue     X509CertificatePolicy
+			expectedOutput string
+		}{
+			{
+				X509CertificatePolicy{PolicyIdentifier: oid},
+				"2.5.29.32.0",
+			},
+			{
+				X509CertificatePolicy{PolicyIdentifier: oid, PolicyName: &policyName},
+				"2.5.29.32.0 (Extended Validation)",
+			},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.String()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v'",
+					actualOutput, testCase.expectedOutput,
+				)
+			}
+		}
+	})
 }

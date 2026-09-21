@@ -9,7 +9,7 @@ import (
 
 type NetworkPort uint16
 
-func NewNetworkPort(value interface{}) (networkPort NetworkPort, err error) {
+func NewNetworkPort(value any) (networkPort NetworkPort, err error) {
 	uintValue, err := tkVoUtil.InterfaceToUint16(value)
 	if err != nil {
 		return networkPort, errors.New("NetworkPortMustBeUint16")

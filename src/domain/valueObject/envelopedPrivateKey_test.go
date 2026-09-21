@@ -144,6 +144,12 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 				true,
 			},
 			{
+				"-----BEGIN PRIVATE KEY-----\n" + strings.Repeat("A", 1048576) +
+					"\n-----END PRIVATE KEY-----",
+				EnvelopedPrivateKey(""),
+				true,
+			},
+			{
 				"-----BEGIN CERTIFICATE-----\n" + validPrivateKey[28:],
 				EnvelopedPrivateKey(""),
 				true,

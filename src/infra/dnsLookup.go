@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -283,6 +284,20 @@ func (lookup *DnsLookup) directIpAddressResolver(
 	return lookup.dnsMessageIpAddrExtractor(responseMessage), nil
 }
 
+func (lookup *DnsLookup) isIpAddressMatchingRecordType(
+	ipAddress netip.Addr,
+	recordType tkValueObject.DnsRecordType,
+) bool {
+	unmappedAddress := ipAddress.Unmap()
+	switch recordType {
+	case tkValueObject.DnsRecordTypeA:
+		return unmappedAddress.Is4()
+	case tkValueObject.DnsRecordTypeAAAA:
+		return unmappedAddress.Is6()
+	}
+	return false
+}
+
 func (lookup *DnsLookup) defaultDnsRecordsResolver(
 	dnsContext context.Context,
 	dnsResolver *net.Resolver,
@@ -291,25 +306,17 @@ func (lookup *DnsLookup) defaultDnsRecordsResolver(
 ) (queryResults []string, queryError error) {
 	hostnameStr := hostname.String()
 	switch recordType {
-	case tkValueObject.DnsRecordTypeA:
+	case tkValueObject.DnsRecordTypeA, tkValueObject.DnsRecordTypeAAAA:
 		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
-		var ipv4Addresses []string
+		var ipAddresses []string
 		for _, dnsRecord := range queryResults {
-			if net.ParseIP(dnsRecord).To4() != nil {
-				ipv4Addresses = append(ipv4Addresses, dnsRecord)
+			ipAddress, parseErr := netip.ParseAddr(dnsRecord)
+			if parseErr == nil &&
+				lookup.isIpAddressMatchingRecordType(ipAddress, recordType) {
+				ipAddresses = append(ipAddresses, dnsRecord)
 			}
 		}
-		queryResults = ipv4Addresses
-	case tkValueObject.DnsRecordTypeAAAA:
-		queryResults, queryError = dnsResolver.LookupHost(dnsContext, hostnameStr)
-		var ipv6Addresses []string
-		for _, dnsRecord := range queryResults {
-			parsedIp := net.ParseIP(dnsRecord)
-			if parsedIp != nil && parsedIp.To4() == nil {
-				ipv6Addresses = append(ipv6Addresses, dnsRecord)
-			}
-		}
-		queryResults = ipv6Addresses
+		queryResults = ipAddresses
 	case tkValueObject.DnsRecordTypeMX:
 		mxRecords, err := dnsResolver.LookupMX(dnsContext, hostnameStr)
 		if err != nil {
@@ -361,6 +368,11 @@ func (lookup *DnsLookup) dnsRecordsResolver(
 	hostname tkValueObject.UnixHostname,
 	recordType tkValueObject.DnsRecordType,
 ) ([]string, error) {
+	ipAddress, parseErr := netip.ParseAddr(hostname.String())
+	if parseErr == nil && lookup.isIpAddressMatchingRecordType(ipAddress, recordType) {
+		return []string{hostname.String()}, nil
+	}
+
 	isIpAddressRecordType := recordType == tkValueObject.DnsRecordTypeA ||
 		recordType == tkValueObject.DnsRecordTypeAAAA
 	if lookup.shouldBypassLocalResolver && isIpAddressRecordType {

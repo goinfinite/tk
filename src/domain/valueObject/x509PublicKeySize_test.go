@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"math/big"
 	"testing"
 )
 
@@ -26,11 +27,13 @@ func TestNewX509PublicKeySize(t *testing.T) {
 			{"2048", X509PublicKeySize(2048), false},
 			{"4096", X509PublicKeySize(4096), false},
 			{uint16(2048), X509PublicKeySize(2048), false},
+			{2048.0, X509PublicKeySize(2048), false},
 			{0, X509PublicKeySize(0), true},
 			{128, X509PublicKeySize(0), true},
 			{512, X509PublicKeySize(0), true},
 			{1536, X509PublicKeySize(0), true},
 			{16384, X509PublicKeySize(0), true},
+			{2048.5, X509PublicKeySize(0), true},
 			{"invalid", X509PublicKeySize(0), true},
 			{-1, X509PublicKeySize(0), true},
 			{nil, X509PublicKeySize(0), true},
@@ -115,6 +118,11 @@ func TestNewX509PublicKeySizeFromStdlib(t *testing.T) {
 	}
 	ecdsaPublicKey := &ecdsaPrivateKey.PublicKey
 
+	hugeRsaPublicKey := &rsa.PublicKey{N: new(big.Int).Lsh(big.NewInt(1), 67583)}
+	hugeEcdsaPublicKey := &ecdsa.PublicKey{
+		Curve: &elliptic.CurveParams{BitSize: 67584},
+	}
+
 	testCaseStructs := []struct {
 		inputValue     any
 		expectedOutput X509PublicKeySize
@@ -122,6 +130,17 @@ func TestNewX509PublicKeySizeFromStdlib(t *testing.T) {
 	}{
 		{rsaPublicKey, X509PublicKeySize(2048), false},
 		{ecdsaPublicKey, X509PublicKeySize(256), false},
+		{hugeRsaPublicKey, X509PublicKeySize(0), true},
+		{hugeEcdsaPublicKey, X509PublicKeySize(0), true},
+		{&rsa.PublicKey{}, X509PublicKeySize(0), true},
+		{&ecdsa.PublicKey{}, X509PublicKeySize(0), true},
+		{(*rsa.PublicKey)(nil), X509PublicKeySize(0), true},
+		{(*ecdsa.PublicKey)(nil), X509PublicKeySize(0), true},
+		{
+			&ecdsa.PublicKey{Curve: (*elliptic.CurveParams)(nil)},
+			X509PublicKeySize(0),
+			true,
+		},
 		{"not a valid public key", X509PublicKeySize(0), true},
 		{12345, X509PublicKeySize(0), true},
 		{nil, X509PublicKeySize(0), true},

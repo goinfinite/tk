@@ -17,6 +17,10 @@ func NewX509PolicyOID(value any) (oid X509PolicyOID, err error) {
 		return oid, errors.New("X509PolicyOIDMustBeString")
 	}
 
+	if len(stringValue) > 255 {
+		return oid, errors.New("InvalidX509PolicyOIDTooBig")
+	}
+
 	if !x509PolicyOidRegex.MatchString(stringValue) {
 		return oid, errors.New("InvalidX509PolicyOID")
 	}

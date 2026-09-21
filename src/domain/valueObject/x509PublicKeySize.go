@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"errors"
+	"math"
 	"strconv"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
@@ -30,11 +31,27 @@ func NewX509PublicKeySizeFromStdlib(
 ) (size X509PublicKeySize, err error) {
 	switch typedPublicKey := stdlibPublicKey.(type) {
 	case *rsa.PublicKey:
-		rsaKeyBitLength := uint16(typedPublicKey.N.BitLen())
-		return NewX509PublicKeySize(rsaKeyBitLength)
+		if typedPublicKey == nil || typedPublicKey.N == nil {
+			return size, errors.New("InvalidX509PublicKeySize")
+		}
+		rsaKeyBitLength := typedPublicKey.N.BitLen()
+		if rsaKeyBitLength > math.MaxUint16 {
+			return size, errors.New("InvalidX509PublicKeySize")
+		}
+		return NewX509PublicKeySize(uint16(rsaKeyBitLength))
 	case *ecdsa.PublicKey:
-		ecdsaCurveBitSize := uint16(typedPublicKey.Curve.Params().BitSize)
-		return NewX509PublicKeySize(ecdsaCurveBitSize)
+		if typedPublicKey == nil || typedPublicKey.Curve == nil {
+			return size, errors.New("InvalidX509PublicKeySize")
+		}
+		curveParams := typedPublicKey.Params()
+		if curveParams == nil {
+			return size, errors.New("InvalidX509PublicKeySize")
+		}
+		ecdsaCurveBitSize := curveParams.BitSize
+		if ecdsaCurveBitSize > math.MaxUint16 {
+			return size, errors.New("InvalidX509PublicKeySize")
+		}
+		return NewX509PublicKeySize(uint16(ecdsaCurveBitSize))
 	default:
 		return size, errors.New("UnsupportedPublicKeyType")
 	}

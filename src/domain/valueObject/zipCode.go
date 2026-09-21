@@ -7,6 +7,8 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
+var zipCodeNonNumericRegex = regexp.MustCompile(`[^\d]`)
+
 type ZipCode string
 
 func NewZipCode(value any) (ZipCode, error) {
@@ -15,8 +17,7 @@ func NewZipCode(value any) (ZipCode, error) {
 		return "", errors.New("ZipCodeMustBeString")
 	}
 
-	nonNumericRegex := regexp.MustCompile(`[^\d]`)
-	numericStringValue := nonNumericRegex.ReplaceAllString(stringValue, "")
+	numericStringValue := zipCodeNonNumericRegex.ReplaceAllString(stringValue, "")
 
 	if len(numericStringValue) < 3 {
 		return "", errors.New("ZipCodeTooSmall")

@@ -47,6 +47,8 @@ func TestNewActivityRecordId(t *testing.T) {
 			{int64(-1), true},
 			{float32(-1), true},
 			{float64(-1), true},
+			{float32(0.5), true},
+			{float64(0.5), true},
 		}
 
 		for _, testCase := range testCaseStructs {

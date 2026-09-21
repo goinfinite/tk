@@ -21,6 +21,7 @@ func TestNewUnixUserId(t *testing.T) {
 			// Invalid user IDs
 			{-1, UnixUserId(0), true},
 			{-10000, UnixUserId(0), true},
+			{1000.5, UnixUserId(0), true},
 			{"", UnixUserId(0), true},
 			{"abc", UnixUserId(0), true},
 			{true, UnixUserId(0), true},

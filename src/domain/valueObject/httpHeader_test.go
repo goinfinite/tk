@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -23,6 +24,7 @@ func TestNewHttpHeader(t *testing.T) {
 			{"X Forwarded For", HttpHeader(""), true},
 			{"X-Forwarded-For!", HttpHeader(""), true},
 			{"header\ninjection", HttpHeader(""), true},
+			{strings.Repeat("A", 257), HttpHeader(""), true},
 			{[]string{"X-Forwarded-For"}, HttpHeader(""), true},
 		}
 

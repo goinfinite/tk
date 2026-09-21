@@ -1,0 +1,31 @@
+package tkValueObject
+
+import (
+	"errors"
+	"strconv"
+
+	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
+)
+
+type ScheduledTaskId uint64
+
+func NewScheduledTaskId(value any) (scheduledTaskId ScheduledTaskId, err error) {
+	if existentScheduledTaskId, assertOk := value.(ScheduledTaskId); assertOk {
+		return existentScheduledTaskId, nil
+	}
+
+	uint64Value, err := tkVoUtil.InterfaceToUint64(value)
+	if err != nil {
+		return scheduledTaskId, errors.New("ScheduledTaskIdMustBeUint64")
+	}
+
+	return ScheduledTaskId(uint64Value), nil
+}
+
+func (vo ScheduledTaskId) Uint64() uint64 {
+	return uint64(vo)
+}
+
+func (vo ScheduledTaskId) String() string {
+	return strconv.FormatUint(uint64(vo), 10)
+}

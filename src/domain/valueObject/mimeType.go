@@ -19,11 +19,11 @@ type MimeType string
 func NewMimeType(value any) (mimeType MimeType, err error) {
 	stringValue, err := tkVoUtil.InterfaceToString(value)
 	if err != nil {
-		return mimeType, errors.New("MimeTypeValueMustBeString")
+		return mimeType, errors.New("MimeTypeMustBeString")
 	}
 
 	if !mimeTypeRegex.MatchString(stringValue) {
-		return mimeType, errors.New("InvalidMimeTypeValue")
+		return mimeType, errors.New("InvalidMimeType")
 	}
 
 	return MimeType(stringValue), nil

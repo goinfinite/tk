@@ -1,6 +1,7 @@
 package tkValueObject
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,7 @@ func TestNewRelativeTime(t *testing.T) {
 			{"5 invalid", RelativeTime(""), true},
 			{"5 minutes invalid", RelativeTime(""), true},
 			{"abc minutes", RelativeTime(""), true},
+			{strings.Repeat("1", 60) + " days", RelativeTime(""), true},
 			// Non-string
 			{123, RelativeTime(""), true},
 			{true, RelativeTime(""), true},

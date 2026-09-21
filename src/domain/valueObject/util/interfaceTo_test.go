@@ -2,6 +2,7 @@ package tkVoUtil
 
 import (
 	"math"
+	"strconv"
 	"testing"
 )
 
@@ -261,25 +262,41 @@ func TestInterfaceToInt(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int
+			expectError    bool
 		}{
-			{int(123), 123},
-			{int8(127), 127},
-			{int16(-32768), -32768},
-			{int32(2147483647), 2147483647},
-			{int64(-123), -123},
-			{uint(123), 123},
-			{uint8(255), 255},
-			{uint16(65535), 65535},
-			{float32(123.45), 123},
-			{float64(-987.65), -987},
+			{int(123), 123, false},
+			{int8(127), 127, false},
+			{int16(-32768), -32768, false},
+			{int32(2147483647), 2147483647, false},
+			{int64(-123), -123, false},
+			{int64(math.MaxInt), math.MaxInt, false},
+			{uint(123), 123, false},
+			{uint8(255), 255, false},
+			{uint16(65535), 65535, false},
+			{uint64(math.MaxInt), math.MaxInt, false},
+			{float32(123), 123, false},
+			{float64(-987), -987, false},
+			{float32(123.45), 0, true},
+			{float64(-987.65), 0, true},
+			// Values outside int range
+			{uint64(18446744073709551615), 0, true},
+			{float64(1 << 63), 0, true},
+			{float64(1e20), 0, true},
+			{float64(-1e20), 0, true},
+			{math.Inf(1), 0, true},
+			{math.Inf(-1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt(testCase.inputValue)
-			if conversionErr != nil {
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
 				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
-			if actualOutput != testCase.expectedOutput {
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
@@ -348,14 +365,17 @@ func TestInterfaceToInt8(t *testing.T) {
 			{uint(127), 127, false},
 			{uint8(127), 127, false},
 			{uint16(100), 100, false},
-			{float32(100.45), 100, false},
-			{float64(-100.65), -100, false},
+			{float32(100), 100, false},
+			{float64(-100), -100, false},
+			{float32(100.45), 0, true},
+			{float64(-100.65), 0, true},
 			// Values outside int8 range
 			{int(128), 0, true},
 			{int16(32767), 0, true},
 			{int32(-129), 0, true},
 			{uint(255), 0, true},
 			{float64(200.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -435,14 +455,17 @@ func TestInterfaceToInt16(t *testing.T) {
 			{uint(32767), 32767, false},
 			{uint8(255), 255, false},
 			{uint16(32767), 32767, false},
-			{float32(10000.45), 10000, false},
-			{float64(-10000.65), -10000, false},
+			{float32(10000), 10000, false},
+			{float64(-10000), -10000, false},
+			{float32(10000.45), 0, true},
+			{float64(-10000.65), 0, true},
 			// Values outside int16 range
 			{int(32768), 0, true},
 			{int32(2147483647), 0, true},
 			{int64(-32769), 0, true},
 			{uint(65535), 0, true},
 			{float64(40000.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -523,13 +546,16 @@ func TestInterfaceToInt32(t *testing.T) {
 			{uint8(255), 255, false},
 			{uint16(65535), 65535, false},
 			{uint32(2147483647), 2147483647, false},
-			{float32(1000000.45), 1000000, false},
-			{float64(-1000000.65), -1000000, false},
+			{float32(1000000), 1000000, false},
+			{float64(-1000000), -1000000, false},
+			{float32(1000000.45), 0, true},
+			{float64(-1000000.65), 0, true},
 			// Values outside int32 range
 			{int64(2147483648), 0, true},
 			{int64(-2147483649), 0, true},
 			{uint64(4294967295), 0, true},
 			{float64(3000000000.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -597,28 +623,45 @@ func TestInterfaceToInt64(t *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int64
+			expectError    bool
 		}{
-			{int(2147483647), 2147483647},
-			{int8(127), 127},
-			{int16(32767), 32767},
-			{int32(-2147483648), -2147483648},
-			{int64(9223372036854775807), 9223372036854775807},
-			{int64(-9223372036854775808), -9223372036854775808},
-			{uint(2147483647), 2147483647},
-			{uint8(255), 255},
-			{uint16(65535), 65535},
-			{uint32(4294967295), 4294967295},
-			{uint64(9223372036854775807), 9223372036854775807},
-			{float32(1000000.45), 1000000},
-			{float64(-1000000.65), -1000000},
+			{int(2147483647), 2147483647, false},
+			{int8(127), 127, false},
+			{int16(32767), 32767, false},
+			{int32(-2147483648), -2147483648, false},
+			{int64(9223372036854775807), 9223372036854775807, false},
+			{int64(-9223372036854775808), -9223372036854775808, false},
+			{uint(2147483647), 2147483647, false},
+			{uint8(255), 255, false},
+			{uint16(65535), 65535, false},
+			{uint32(4294967295), 4294967295, false},
+			{uint64(9223372036854775807), 9223372036854775807, false},
+			{float32(1000000), 1000000, false},
+			{float64(-1000000), -1000000, false},
+			{float32(1000000.45), 0, true},
+			{float64(-1000000.65), 0, true},
+			// Values at and outside int64 range
+			{-float64(1 << 63), -9223372036854775808, false},
+			{math.Nextafter(float64(1<<63), 0), 9223372036854774784, false},
+			{uint64(18446744073709551615), 0, true},
+			{float64(1 << 63), 0, true},
+			{math.Nextafter(-float64(1<<63), math.Inf(-1)), 0, true},
+			{float64(1e20), 0, true},
+			{float64(-1e20), 0, true},
+			{math.Inf(1), 0, true},
+			{math.Inf(-1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt64(testCase.inputValue)
-			if conversionErr != nil {
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
 				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
-			if actualOutput != testCase.expectedOutput {
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
 				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
@@ -635,6 +678,132 @@ func TestInterfaceToInt64(t *testing.T) {
 		}
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt64(invalidInput)
+			if conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+			}
+		}
+	})
+}
+
+func TestInterfaceToUint(t *testing.T) {
+	aboveMaxUint32 := uint64(1) << 32
+	uintIs32Bit := strconv.IntSize == 32
+
+	t.Run("StringInput", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputString    string
+			expectedOutput uint
+			expectError    bool
+		}{
+			{"4294967295", 4294967295, false},
+			{"0", 0, false},
+			{strconv.FormatUint(aboveMaxUint32, 10), uint(aboveMaxUint32), uintIs32Bit},
+			{"18446744073709551616", 0, true}, // Overflow
+			{"-1", 0, true},                   // Negative
+			{"invalid", 0, true},
+			{"123.45", 0, true},
+			{"", 0, true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := InterfaceToUint(testCase.inputString)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+			}
+		}
+	})
+
+	t.Run("NumericInput", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     any
+			expectedOutput uint
+			expectError    bool
+		}{
+			{int(2147483647), 2147483647, false},
+			{int8(127), 127, false},
+			{int16(32767), 32767, false},
+			{int32(2147483647), 2147483647, false},
+			{int64(1000000), 1000000, false},
+			{uint(4294967295), 4294967295, false},
+			{uint8(255), 255, false},
+			{uint16(65535), 65535, false},
+			{uint32(4294967295), 4294967295, false},
+			{uint64(4294967295), 4294967295, false},
+			{float32(1000000), 1000000, false},
+			{float64(4294967295.0), 4294967295, false},
+			{float32(1000000.45), 0, true},
+			// Values outside uint range or negative
+			{int32(-1), 0, true},
+			{int64(-100), 0, true},
+			{int64(aboveMaxUint32), uint(aboveMaxUint32), uintIs32Bit},
+			{aboveMaxUint32, uint(aboveMaxUint32), uintIs32Bit},
+			{float64(aboveMaxUint32), uint(aboveMaxUint32), uintIs32Bit},
+			{float64(-0.1), 0, true},
+			{float64(5000000000.1), 0, true},
+			{math.Inf(1), 0, true},
+			{math.NaN(), 0, true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := InterfaceToUint(testCase.inputValue)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("NativeUintBoundary", func(t *testing.T) {
+		if strconv.IntSize != 64 {
+			t.Skip("native uint is 32-bit on this target")
+		}
+
+		testCaseStructs := []struct {
+			inputValue     any
+			expectedOutput uint
+			expectError    bool
+		}{
+			{uint64(math.MaxUint), math.MaxUint, false},
+			{strconv.FormatUint(uint64(math.MaxUint), 10), math.MaxUint, false},
+			{float64(math.MaxUint), 0, true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput, conversionErr := InterfaceToUint(testCase.inputValue)
+			if testCase.expectError && conversionErr == nil {
+				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			}
+			if !testCase.expectError && conversionErr != nil {
+				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+			}
+			if !testCase.expectError && actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
+
+	t.Run("UnsupportedInput", func(t *testing.T) {
+		unsupportedInputs := []any{
+			[]int{1, 2, 3},
+			map[string]int{"key": 1},
+			struct{}{},
+			nil,
+			bool(true),
+			bool(false),
+		}
+		for _, invalidInput := range unsupportedInputs {
+			_, conversionErr := InterfaceToUint(invalidInput)
 			if conversionErr == nil {
 				t.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
@@ -688,8 +857,10 @@ func TestInterfaceToUint8(t *testing.T) {
 			{uint16(100), 100, false},
 			{uint32(200), 200, false},
 			{uint64(100), 100, false},
-			{float32(100.45), 100, false},
-			{float64(200.65), 200, false},
+			{float32(100), 100, false},
+			{float64(200), 200, false},
+			{float32(100.45), 0, true},
+			{float64(200.65), 0, true},
 			// Values outside uint8 range or negative
 			{int(256), 0, true},
 			{int16(32767), 0, true},
@@ -699,6 +870,7 @@ func TestInterfaceToUint8(t *testing.T) {
 			{uint16(65535), 0, true},
 			{float64(-0.1), 0, true},
 			{float64(300.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -779,8 +951,9 @@ func TestInterfaceToUint16(t *testing.T) {
 			{uint16(65535), 65535, false},
 			{uint32(10000), 10000, false},
 			{uint64(65535), 65535, false},
-			{float32(10000.45), 10000, false},
+			{float32(10000), 10000, false},
 			{float64(65535.0), 65535, false},
+			{float32(10000.45), 0, true},
 			// Values outside uint16 range or negative
 			{int(65536), 0, true},
 			{int32(-1), 0, true},
@@ -789,6 +962,7 @@ func TestInterfaceToUint16(t *testing.T) {
 			{uint32(70000), 0, true},
 			{float64(-0.1), 0, true},
 			{float64(70000.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -869,14 +1043,16 @@ func TestInterfaceToUint32(t *testing.T) {
 			{uint16(65535), 65535, false},
 			{uint32(4294967295), 4294967295, false},
 			{uint64(4294967295), 4294967295, false},
-			{float32(1000000.45), 1000000, false},
+			{float32(1000000), 1000000, false},
 			{float64(4294967295.0), 4294967295, false},
+			{float32(1000000.45), 0, true},
 			// Values outside uint32 range or negative
 			{int32(-1), 0, true},
 			{int64(-100), 0, true},
 			{uint64(4294967296), 0, true},
 			{float64(-0.1), 0, true},
 			{float64(5000000000.1), 0, true},
+			{math.NaN(), 0, true},
 		}
 
 		for _, testCase := range testCaseStructs {
@@ -956,8 +1132,17 @@ func TestInterfaceToUint64(t *testing.T) {
 			{uint16(65535), 65535, false},
 			{uint32(4294967295), 4294967295, false},
 			{uint64(18446744073709551615), 18446744073709551615, false},
-			{float32(1000000.45), 1000000, false},
+			{float32(1000000), 1000000, false},
 			{float64(9223372036854775807.0), 9223372036854775808, false}, // Float64 precision issue
+			{float32(1000000.45), 0, true},
+			// Values at and outside the uint64 range
+			{float64(1 << 64), 0, true},
+			{math.Nextafter(float64(1<<64), 0), 18446744073709549568, false},
+			{float32(1e20), 0, true},
+			{float64(1e20), 0, true},
+			{math.Inf(1), 0, true},
+			{math.Inf(-1), 0, true},
+			{math.NaN(), 0, true},
 			// Negative values
 			{int32(-1), 0, true},
 			{int64(-100), 0, true},
@@ -1151,4 +1336,53 @@ func TestInterfaceToFloat64(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestIsFractionalFloat(t *testing.T) {
+	testCaseStructs := []struct {
+		inputValue     any
+		expectedOutput bool
+	}{
+		{float32(11.9), true},
+		{float64(11.9), true},
+		{float64(-0.5), true},
+		{math.NaN(), true},
+		{float32(11), false},
+		{float64(11), false},
+		{float64(0), false},
+		{int(11), false},
+		{"11.9", false},
+		{nil, false},
+	}
+
+	for _, testCase := range testCaseStructs {
+		actualOutput := IsFractionalFloat(testCase.inputValue)
+		if actualOutput != testCase.expectedOutput {
+			t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+		}
+	}
+}
+
+func TestTruncateFloat(t *testing.T) {
+	testCaseStructs := []struct {
+		inputValue     any
+		expectedOutput any
+	}{
+		{float32(11.9), float64(11)},
+		{float64(11.9), float64(11)},
+		{float64(-11.9), float64(-11)},
+		{float64(-0.5), float64(0)},
+		{float32(11), float64(11)},
+		{float64(11), float64(11)},
+		{int(11), int(11)},
+		{"11.9", "11.9"},
+		{nil, nil},
+	}
+
+	for _, testCase := range testCaseStructs {
+		actualOutput := TruncateFloat(testCase.inputValue)
+		if actualOutput != testCase.expectedOutput {
+			t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+		}
+	}
 }

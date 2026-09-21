@@ -2,6 +2,7 @@ package tkVoUtil
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -61,20 +62,37 @@ func InterfaceToString(input any) (output string, conversionErr error) {
 }
 
 func InterfaceToInt(input any) (output int, conversionErr error) {
+	conversionErrMsg := errors.New("CannotConvertToInt")
+
 	switch inputValue := input.(type) {
 	case string:
 		return strconv.Atoi(inputValue)
 	case int, int8, int16, int32, int64:
 		intValue := reflect.ValueOf(inputValue).Int()
+		if intValue < math.MinInt || intValue > math.MaxInt {
+			return 0, conversionErrMsg
+		}
 		return int(intValue), nil
 	case uint, uint8, uint16, uint32, uint64:
 		uintValue := reflect.ValueOf(inputValue).Uint()
+		if uintValue > math.MaxInt {
+			return 0, conversionErrMsg
+		}
 		return int(uintValue), nil
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		return int(floatValue), nil
+		int64RangeEnd := float64(1 << 63)
+		isOutOfRange := floatValue < -int64RangeEnd || floatValue >= int64RangeEnd
+		if isOutOfRange || math.IsNaN(floatValue) || IsFractionalFloat(inputValue) {
+			return 0, conversionErrMsg
+		}
+		int64Value := int64(floatValue)
+		if int64Value < math.MinInt || int64Value > math.MaxInt {
+			return 0, conversionErrMsg
+		}
+		return int(int64Value), nil
 	default:
-		return 0, errors.New("CannotConvertToInt")
+		return 0, conversionErrMsg
 	}
 }
 
@@ -102,7 +120,7 @@ func InterfaceToInt8(input any) (output int8, conversionErr error) {
 		output = int8(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < -128 || floatValue > 127 {
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < -128 || floatValue > 127 {
 			return 0, conversionErrMsg
 		}
 		output = int8(floatValue)
@@ -137,7 +155,7 @@ func InterfaceToInt16(input any) (output int16, conversionErr error) {
 		output = int16(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < -32768 || floatValue > 32767 {
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < -32768 || floatValue > 32767 {
 			return 0, conversionErrMsg
 		}
 		output = int16(floatValue)
@@ -172,7 +190,7 @@ func InterfaceToInt32(input any) (output int32, conversionErr error) {
 		output = int32(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < -2147483648 || floatValue > 2147483647 {
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < -2147483648 || floatValue > 2147483647 {
 			return 0, conversionErrMsg
 		}
 		output = int32(floatValue)
@@ -184,6 +202,8 @@ func InterfaceToInt32(input any) (output int32, conversionErr error) {
 }
 
 func InterfaceToInt64(input any) (output int64, conversionErr error) {
+	conversionErrMsg := errors.New("CannotConvertToInt64")
+
 	switch inputValue := input.(type) {
 	case string:
 		return strconv.ParseInt(inputValue, 10, 64)
@@ -192,12 +212,20 @@ func InterfaceToInt64(input any) (output int64, conversionErr error) {
 		return int64(intValue), nil
 	case uint, uint8, uint16, uint32, uint64:
 		uintValue := reflect.ValueOf(inputValue).Uint()
+		if uintValue > math.MaxInt64 {
+			return 0, conversionErrMsg
+		}
 		return int64(uintValue), nil
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
+		int64RangeEnd := float64(1 << 63)
+		isOutOfRange := floatValue < -int64RangeEnd || floatValue >= int64RangeEnd
+		if isOutOfRange || math.IsNaN(floatValue) || IsFractionalFloat(inputValue) {
+			return 0, conversionErrMsg
+		}
 		return int64(floatValue), nil
 	default:
-		return 0, errors.New("CannotConvertToInt64")
+		return 0, conversionErrMsg
 	}
 }
 
@@ -206,29 +234,28 @@ func InterfaceToUint(input any) (output uint, conversionErr error) {
 
 	switch inputValue := input.(type) {
 	case string:
-		uint64Value, parseErr := strconv.ParseUint(inputValue, 10, 64)
+		uint64Value, parseErr := strconv.ParseUint(inputValue, 10, strconv.IntSize)
 		if parseErr != nil {
-			return 0, conversionErrMsg
-		}
-		if uint64Value > 4294967295 {
 			return 0, conversionErrMsg
 		}
 		output = uint(uint64Value)
 	case int, int8, int16, int32, int64:
 		intValue := reflect.ValueOf(inputValue).Int()
-		if intValue < 0 || intValue > 4294967295 {
+		if intValue < 0 || uint64(intValue) > uint64(math.MaxUint) {
 			return 0, conversionErrMsg
 		}
 		output = uint(intValue)
 	case uint, uint8, uint16, uint32, uint64:
-		uintValue := uint(reflect.ValueOf(inputValue).Uint())
-		if uintValue > 4294967295 {
+		uintValue := reflect.ValueOf(inputValue).Uint()
+		if uintValue > uint64(math.MaxUint) {
 			return 0, conversionErrMsg
 		}
-		output = uintValue
+		output = uint(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < 0 || floatValue > 4294967295 {
+		uintRangeEnd := float64(1 << strconv.IntSize)
+		isOutOfRange := floatValue < 0 || floatValue >= uintRangeEnd
+		if isOutOfRange || math.IsNaN(floatValue) || IsFractionalFloat(inputValue) {
 			return 0, conversionErrMsg
 		}
 		output = uint(floatValue)
@@ -263,7 +290,7 @@ func InterfaceToUint8(input any) (output uint8, conversionErr error) {
 		output = uint8(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < 0 || floatValue > 255 {
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < 0 || floatValue > 255 {
 			return 0, conversionErrMsg
 		}
 		output = uint8(floatValue)
@@ -290,26 +317,26 @@ func InterfaceToUint16(input any) (output uint16, conversionErr error) {
 	case int, int8, int16, int32, int64:
 		intValue := reflect.ValueOf(inputValue).Int()
 		if intValue < 0 || intValue > 65535 {
-			conversionErr = conversionErrMsg
+			return 0, conversionErrMsg
 		}
 		output = uint16(intValue)
 	case uint, uint8, uint16, uint32, uint64:
 		uintValue := reflect.ValueOf(inputValue).Uint()
 		if uintValue > 65535 {
-			conversionErr = conversionErrMsg
+			return 0, conversionErrMsg
 		}
 		output = uint16(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < 0 || floatValue > 65535 {
-			conversionErr = conversionErrMsg
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < 0 || floatValue > 65535 {
+			return 0, conversionErrMsg
 		}
 		output = uint16(floatValue)
 	default:
-		conversionErr = conversionErrMsg
+		return 0, conversionErrMsg
 	}
 
-	return output, conversionErr
+	return output, nil
 }
 
 func InterfaceToUint32(input any) (output uint32, conversionErr error) {
@@ -327,26 +354,26 @@ func InterfaceToUint32(input any) (output uint32, conversionErr error) {
 	case int, int8, int16, int32, int64:
 		intValue := reflect.ValueOf(inputValue).Int()
 		if intValue < 0 || intValue > 4294967295 {
-			conversionErr = conversionErrMsg
+			return 0, conversionErrMsg
 		}
 		output = uint32(intValue)
 	case uint, uint8, uint16, uint32, uint64:
 		uintValue := reflect.ValueOf(inputValue).Uint()
 		if uintValue > 4294967295 {
-			conversionErr = conversionErrMsg
+			return 0, conversionErrMsg
 		}
 		output = uint32(uintValue)
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < 0 || floatValue > 4294967295 {
-			conversionErr = conversionErrMsg
+		if math.IsNaN(floatValue) || IsFractionalFloat(inputValue) || floatValue < 0 || floatValue > 4294967295 {
+			return 0, conversionErrMsg
 		}
 		output = uint32(floatValue)
 	default:
-		conversionErr = conversionErrMsg
+		return 0, conversionErrMsg
 	}
 
-	return output, conversionErr
+	return output, nil
 }
 
 func InterfaceToUint64(input any) (output uint64, conversionErr error) {
@@ -354,26 +381,28 @@ func InterfaceToUint64(input any) (output uint64, conversionErr error) {
 
 	switch inputValue := input.(type) {
 	case string:
-		output, conversionErr = strconv.ParseUint(inputValue, 10, 64)
+		uint64Value, parseErr := strconv.ParseUint(inputValue, 10, 64)
+		if parseErr != nil {
+			return 0, conversionErrMsg
+		}
+		output = uint64Value
 	case int, int8, int16, int32, int64:
 		intValue := reflect.ValueOf(inputValue).Int()
 		if intValue < 0 {
-			conversionErr = conversionErrMsg
+			return 0, conversionErrMsg
 		}
 		output = uint64(intValue)
 	case uint, uint8, uint16, uint32, uint64:
 		output = uint64(reflect.ValueOf(inputValue).Uint())
 	case float32, float64:
 		floatValue := reflect.ValueOf(inputValue).Float()
-		if floatValue < 0 {
-			conversionErr = conversionErrMsg
+		uint64RangeEnd := float64(1 << 64)
+		isOutOfRange := floatValue < 0 || floatValue >= uint64RangeEnd
+		if isOutOfRange || math.IsNaN(floatValue) || IsFractionalFloat(inputValue) {
+			return 0, conversionErrMsg
 		}
 		output = uint64(floatValue)
 	default:
-		conversionErr = conversionErrMsg
-	}
-
-	if conversionErr != nil {
 		return 0, conversionErrMsg
 	}
 
@@ -429,4 +458,26 @@ func InterfaceToFloat64(input any) (output float64, conversionErr error) {
 	}
 
 	return output, nil
+}
+
+func IsFractionalFloat(input any) bool {
+	switch floatValue := input.(type) {
+	case float32:
+		return floatValue != float32(math.Trunc(float64(floatValue)))
+	case float64:
+		return floatValue != math.Trunc(floatValue)
+	}
+
+	return false
+}
+
+func TruncateFloat(input any) any {
+	switch floatValue := input.(type) {
+	case float32:
+		return math.Trunc(float64(floatValue))
+	case float64:
+		return math.Trunc(floatValue)
+	}
+
+	return input
 }

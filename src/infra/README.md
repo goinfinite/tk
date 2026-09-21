@@ -125,6 +125,13 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   fmt.Println(commandOutput)
   ```
 
+- **ShellEscape**: Quote a string for safe interpolation into a POSIX shell command, or strip non-printable characters.
+
+  ```go
+  escapedArg := ShellEscape{}.Quote("hello world")
+  printableStr := ShellEscape{}.StripUnsafe("hello\x00world")
+  ```
+
 - **Synthesizer**: Generate cryptographically secure random integers, passwords with charset guarantees, filler usernames/emails, private keys, and TLS certificates (including CA certificates).
 
   ```go
@@ -234,6 +241,12 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
 
   modelRecords := []YourModel{}
   queryExecutionErr := paginatedQuery.Find(&modelRecords).Error
+  ```
+
+- **PaginationPagesTotalResolver**: Compute the total page count from an item count and a page size. A zero page size fails with `ErrItemsPerPageCannotBeZero`; a count above uint32 fails with `ErrPagesTotalOverflow`. A partial page counts as a page.
+
+  ```go
+  pagesTotal, pagesTotalErr := PaginationPagesTotalResolver(250, 20)
   ```
 
 - **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable.

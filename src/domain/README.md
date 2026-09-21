@@ -4,11 +4,11 @@ Business logic layer of Infinite Toolkit _(TK)_. It holds validated value object
 
 ## Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include Email, Password, URL, IpAddress, UnixFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, and many more. These components are thoroughly tested, ensuring 100% coverage.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. Table-driven tests cover the validation rules.
 
 ## Value Object Utilities
 
-- **InterfaceTo**: Safely convert interface{} to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
+- **InterfaceTo**: Safely convert any value to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
 
   ```go
   boolValue, boolConversionErr := tkVoUtil.InterfaceToBool("true")
@@ -17,7 +17,7 @@ The library offers a diverse range of value objects (VO) to represent domain ent
   int8Value, int8ConversionErr := tkVoUtil.InterfaceToInt8("127")
   int16Value, int16ConversionErr := tkVoUtil.InterfaceToInt16("32767")
   int32Value, int32ConversionErr := tkVoUtil.InterfaceToInt32("2147483647")
-  int64Value, int64ConversionErr := tkVoUtil.InterfaceToInt64(3.14159)
+  int64Value, int64ConversionErr := tkVoUtil.InterfaceToInt64("123")
   uintValue, uintConversionErr := tkVoUtil.InterfaceToUint("4294967295")
   uint8Value, uint8ConversionErr := tkVoUtil.InterfaceToUint8("255")
   uint16Value, uint16ConversionErr := tkVoUtil.InterfaceToUint16("65535")
@@ -25,6 +25,42 @@ The library offers a diverse range of value objects (VO) to represent domain ent
   uint64Value, uint64ConversionErr := tkVoUtil.InterfaceToUint64("18446744073709551615")
   float32Value, float32ConversionErr := tkVoUtil.InterfaceToFloat32("-987.654")
   float64Value, float64ConversionErr := tkVoUtil.InterfaceToFloat64("-123.456")
+  ```
+
+- **IsFractionalFloat**: Report whether a float input has a fractional part, so integer-domain constructors can reject it before conversion.
+
+  ```go
+  isFractional := tkVoUtil.IsFractionalFloat(42.5)
+  ```
+
+- **TruncateFloat**: Truncate a float input to its whole part; non-float input passes through unchanged.
+
+  ```go
+  truncated := tkVoUtil.TruncateFloat(42.9)
+  ```
+
+- **SafeTruncateString**: Truncate a string to a byte limit without splitting a UTF-8 rune.
+
+  ```go
+  truncated := tkVoUtil.SafeTruncateString("command output", 4096)
+  ```
+
+- **NamedGroupsExtractor**: Extract named capture groups from a regex match into a map keyed by group name.
+
+  ```go
+  namedGroups := tkVoUtil.NamedGroupsExtractor(urlRegex, "https://example.com")
+  ```
+
+- **StripAccents**: Remove diacritical marks from a string and trim it.
+
+  ```go
+  normalized, stripErr := tkVoUtil.StripAccents("Café")
+  ```
+
+- **StripHexSeparators**: Remove colons and spaces from a hexadecimal string.
+
+  ```go
+  normalized := tkVoUtil.StripHexSeparators("AA:BB:CC")
   ```
 
 ## DTOs
@@ -105,17 +141,22 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
   ```go
   func readFailedLoginAttemptsCount(
       activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
-      createDto dto.CreateSessionToken,
+      operatorIpAddress tkValueObject.IpAddress,
   ) (attemptsCount uint, err error) {
-      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
-          CreateSessionTokenFailedLoginAttemptsInterval,
+      recordLevel := tkValueObject.ActivityRecordLevelSecurity
+      recordCode, _ := tkValueObject.NewActivityRecordCode(
+          "CreateSessionTokenFailed",
       )
+      failedAttemptsIntervalStartsAt := tkValueObject.NewUnixTimeBeforeNow(
+          24 * time.Hour,
+      )
+
       readResponseDto, err := tkUseCase.ReadActivityRecords(
           activityRecordQueryRepo, tkDto.ReadActivityRecordsRequest{
               Pagination:        tkUseCase.ActivityRecordsDefaultPagination,
-              RecordLevel:       &tkValueObject.ActivityRecordLevelSecurity,
-              RecordCode:        &CreateSessionTokenActivityRecordCodeFailed,
-              OperatorIpAddress: &createDto.OperatorIpAddress,
+              RecordLevel:       &recordLevel,
+              RecordCode:        &recordCode,
+              OperatorIpAddress: &operatorIpAddress,
               CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
           })
       if err != nil {

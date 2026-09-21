@@ -214,6 +214,56 @@ func TestDnsLookupExecute(t *testing.T) {
 		}
 	})
 
+	t.Run("ZoneScopedIpv6LiteralReturnsItself", func(t *testing.T) {
+		zoneScopedHostname, err := tkValueObject.NewUnixHostname("fe80::1%eth0")
+		if err != nil {
+			t.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
+		}
+
+		results, lookupErr := dnsLookup.Execute(
+			zoneScopedHostname, &tkValueObject.DnsRecordTypeAAAA,
+		)
+		if lookupErr != nil {
+			t.Fatalf("ZoneScopedLookupFailed: %v", lookupErr)
+		}
+
+		if !slices.Contains(results, "fe80::1%eth0") {
+			t.Errorf(
+				"ZoneScopedLiteralMissing: got %v, expected to contain 'fe80::1%%eth0'",
+				results,
+			)
+		}
+	})
+
+	t.Run("ZoneScopedIpv6LiteralReturnsItselfWithBypass", func(t *testing.T) {
+		zoneScopedHostname, err := tkValueObject.NewUnixHostname("fe80::1%eth0")
+		if err != nil {
+			t.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
+		}
+
+		lookup := NewDnsLookup(DnsLookupSettings{
+			PrimaryResolver:           nonRoutableTestNetOneIpAddress,
+			SecondaryResolver:         nonRoutableTestNetOneIpAddress,
+			QueryTimeoutSecs:          1,
+			DialTimeoutMs:             500,
+			ShouldBypassLocalResolver: true,
+		})
+
+		results, lookupErr := lookup.Execute(
+			zoneScopedHostname, &tkValueObject.DnsRecordTypeAAAA,
+		)
+		if lookupErr != nil {
+			t.Fatalf("ZoneScopedBypassLookupFailed: %v", lookupErr)
+		}
+
+		if !slices.Contains(results, "fe80::1%eth0") {
+			t.Errorf(
+				"ZoneScopedLiteralMissing: got %v, expected to contain 'fe80::1%%eth0'",
+				results,
+			)
+		}
+	})
+
 	t.Run("LocalhostBypassedSkipsHostsFile", func(t *testing.T) {
 		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
 		if err != nil {

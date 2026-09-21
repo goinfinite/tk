@@ -1,6 +1,32 @@
 # Changelog
 
 ```log
+0.3.8 - 2026/09/18
+feat: NewUnixHostname accepts IPv6 literals, including zone-scoped addresses such as fe80::1%eth0. The zone must contain only the RFC 6874 unreserved characters. The constructor returns the canonical address form and preserves the zone case. ToUrlHost returns the bracketed form for url.URL.Host; ToUrlEncodedHost percent-encodes the zone separator for URL strings.
+fix: DnsLookup returns zone-scoped IPv6 literals. The A and AAAA filters used net.ParseIP, which rejects a zone, so a literal such as fe80::1%eth0 was dropped and the lookup returned an empty result.
+fix: DnsLookup returns an IP literal that matches the requested record type before it queries a resolver. The bypass path sent a zone-scoped literal such as fe80::1%eth0 to the resolver and failed with DnsLookupResponseNameError.
+fix: NewUrl accepts IPv6 literals and single-character labels. The hostname pattern required two characters per label, so 10.0.0.1 failed. The constructor validates a bracketed literal with netip.ParseAddr and rejects bracketed IPv4.
+feat: add catalog item value objects for the merged os-catalog project. CatalogItemName accepts service identifiers and human-readable marketplace names (1-64 characters). CatalogItemSlug lowercases and accepts 2-64 slug characters. CatalogItemDescription accepts 2-2048 characters. CatalogItemType accepts app, framework, stack, system, database, runtime, webserver, and other, and coerces an unknown value to other. CatalogItemManifestVersion accepts v followed by a digit and optional dot-separated digits, such as v1 or v1.2.3. CatalogItemId is a uint16. CatalogItemEnv accepts KEY=value pairs and reads the key and value separately.
+feat: add scheduled task value objects. ScheduledTaskId is a uint64. ScheduledTaskName accepts 2-769 characters. ScheduledTaskOutput trims and truncates at 64 KiB. ScheduledTaskStatus accepts pending, running, completed, failed, cancelled, and timeout, and exports a constant for each status. ScheduledTaskTag lowercases and accepts 2-257 characters.
+feat: add CronSchedule, EncodedContent, HardwareSpecs, MappingId, ShortDescription, UnixCommandOutput, and CpuModelName value objects. CronSchedule accepts standard and predefined expressions and prefixes a missing @. EncodedContent validates base64 and decodes it. HardwareSpecs carries the CPU model name, core count, GHz frequency, memory total, and storage total. ShortDescription rejects control characters. UnixCommandOutput truncates at 4 KiB. CpuModelName accepts 2-100 characters: an alphanumeric first character, then letters, digits, spaces, and the punctuation found in CPU names.
+fix: InterfaceTo* integer converters reject fractional floats, NaN, infinities, and out-of-range values. Breaking change: a fractional float now fails conversion instead of truncating. NewUnixTime truncates on purpose, so a fractional time parameter stays accepted. InterfaceToUint accepts the full native uint range instead of a 32-bit maximum.
+fix: NewUnixTimeBeforeNow handles math.MinInt64 without a duration overflow.
+fix: Byte rejects kibibyte, mebibyte, gibibyte, and tebibyte inputs that overflow uint64. Int64() saturates at MaxInt64 and String() returns the full uint64 value.
+fix: X509PublicKeySizeFromStdlib rejects a nil key, a nil curve, and a bit length above uint16.
+fix: value objects cap the input length before regex validation. Fqdn 253, UnixHostname 253, Url 2048, UrlPath 2048, HttpHeader 256, RelativeTime 64, CatalogItemManifestVersion 64, X509PolicyOID 255, X509PublicKeyValue 1 MiB, X509EnvelopedCertificate 1 MiB, EnvelopedPrivateKey 1 MiB, EncodedContent 10 MiB, and CronSchedule 256.
+fix: UnixFileName and X509SubjectName patterns carry explicit bounds: 255 characters for a file name, 253 for a subject name, and 251 for a wildcard suffix.
+fix: CronSchedule validates each field with a parser instead of one regex. It accepts stepped ranges (N-M/S) and comma lists that mix ranges and steps, matching crontab(5). It rejects signed items, a zero step, an out-of-range number, and a descending range.
+fix: NewUrl preserves the case of an IPv6 zone during host normalization.
+fix: ShortDescription rejects C1 control characters.
+refactor: rename value object errors to the {TypeName}{Constraint} pattern. ErrFileExtensionInvalid becomes ErrInvalidFileExtension, ForbiddenUnixFileName becomes InvalidUnixFileNameForbidden, InvalidGroupId becomes InvalidUnixGroupId, MimeTypeValueMustBeString becomes MimeTypeMustBeString, InvalidMimeTypeValue becomes InvalidMimeType, and EmptyEncodedContent becomes EncodedContentCannotBeEmpty. Breaking change.
+refactor: unexport HumanlyUsedCharsRegex and ValidScheduledTaskStatuses. Breaking change.
+refactor: hoist value object regexes to package level and replace interface{} with any.
+refactor: CatalogItemEnv accepts an existent value and rejects a non-string input.
+feat: add String to X509BasicConstraints and X509CertificatePolicy.
+feat: add tkVoUtil.SafeTruncateString. ScheduledTaskOutput and UnixCommandOutput use it, so a truncation never splits a UTF-8 rune.
+feat: add tkVoUtil.IsFractionalFloat and tkVoUtil.TruncateFloat.
+docs: correct the layer READMEs and the feature map. The domain README names the real value objects and drops the false 100% coverage claim. It also documents NamedGroupsExtractor, StripAccents, and StripHexSeparators. The infra README documents ShellEscape and PaginationPagesTotalResolver. The feature map names FileDeserializer and StringDeserializer.
+
 0.3.7 - 2026/09/16
 test: cover the panic handler trusted-proxy case where RemoteAddr is trusted but the X-Forwarded-For client is not; the redacted response now asserts uri, queryParams, and exceptionTrace are absent.
 feat: TransientDatabaseService.Set takes an optional ttlPtr *time.Duration; nil stores an entry that never expires. Read and Has treat an entry past its expires_at deadline as missing. Breaking change: Set gains the ttlPtr parameter, and the KeyValue model gains a nullable expires_at column.

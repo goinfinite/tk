@@ -1,5 +1,7 @@
 package tkValueObject
 
+import "fmt"
+
 type X509CertificatePolicy struct {
 	PolicyIdentifier X509PolicyOID         `json:"policyIdentifier"`
 	PolicyName       *X509PolicyName       `json:"policyName"`
@@ -16,4 +18,12 @@ func NewX509CertificatePolicy(
 		PolicyName:       policyName,
 		PolicyQualifiers: policyQualifiers,
 	}
+}
+
+func (vo X509CertificatePolicy) String() string {
+	if vo.PolicyName == nil {
+		return vo.PolicyIdentifier.String()
+	}
+
+	return fmt.Sprintf("%s (%s)", vo.PolicyIdentifier.String(), vo.PolicyName.String())
 }

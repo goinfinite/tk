@@ -22,6 +22,10 @@ func NewX509EnvelopedCertificate(
 		return envelopedCert, errors.New("X509EnvelopedCertificateMustBeString")
 	}
 
+	if len(stringValue) > 1048576 {
+		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateTooBig")
+	}
+
 	if !x509EnvelopedCertificateRegex.MatchString(stringValue) {
 		return envelopedCert, errors.New("InvalidX509EnvelopedCertificateFormat")
 	}
