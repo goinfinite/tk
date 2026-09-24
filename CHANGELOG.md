@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.3.9 - 2026/09/24
+feat: add tkVoUtil.IsAnyError. It reports whether an error matches any target error through errors.Is.
+feat: ShellSettings takes ExecutionDeadline, an optional absolute UnixTime. The timeout is ExecutionTimeoutSecs, ExecutionDeadline, or the earlier of the two when both are set. It is 1800 seconds when neither is set.
+refactor: remove the shell hard limit. ExecutionTimeoutSecs is honored as requested, and the deadline resolves to the earlier of the two. Breaking change: ShellExecutionTimeoutHardLimitSecs and ShellSettings.ShouldDisableTimeoutHardLimit are gone.
+
 0.3.8 - 2026/09/18
 feat: NewUnixHostname accepts IPv6 literals, including zone-scoped addresses such as fe80::1%eth0. The zone must contain only the RFC 6874 unreserved characters. The constructor returns the canonical address form and preserves the zone case. ToUrlHost returns the bracketed form for url.URL.Host; ToUrlEncodedHost percent-encodes the zone separator for URL strings.
 fix: DnsLookup returns zone-scoped IPv6 literals. The A and AAAA filters used net.ParseIP, which rejects a zone, so a literal such as fe80::1%eth0 was dropped and the lookup returned an empty result.
