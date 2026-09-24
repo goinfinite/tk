@@ -125,6 +125,17 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   fmt.Println(commandOutput)
   ```
 
+  Set `ExecutionTimeoutSecs` for a relative timeout, `ExecutionDeadline` (an absolute `UnixTime`) for an absolute one, or both. When both are set, the earlier wins. When neither is set, the timeout is 1800 seconds. `ShouldDisableTimeout` overrides both fields and runs the command without any timeout. `UnixTime` has 1-second granularity, so a deadline built with `NewUnixTimeAfterNow` can land up to 1 second earlier than the requested duration. The shell honors the requested value, so a caller that passes an untrusted `ExecutionTimeoutSecs` must bound it.
+
+  ```go
+  deadline := tkValueObject.NewUnixTimeAfterNow(4 * time.Hour)
+  shell := NewShell(ShellSettings{
+      Command:              "long-running-task",
+      ExecutionTimeoutSecs: 5 * 3600,
+      ExecutionDeadline:    &deadline,
+  })
+  ```
+
 - **ShellEscape**: Quote a string for safe interpolation into a POSIX shell command, or strip non-printable characters.
 
   ```go

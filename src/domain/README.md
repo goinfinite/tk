@@ -63,6 +63,12 @@ The library offers a diverse range of value objects (VO) to represent domain ent
   normalized := tkVoUtil.StripHexSeparators("AA:BB:CC")
   ```
 
+- **IsAnyError**: Report whether an error matches any of the target errors through `errors.Is`.
+
+  ```go
+  isTimeout := tkVoUtil.IsAnyError(err, context.DeadlineExceeded, context.Canceled)
+  ```
+
 ## DTOs
 
 - **Pagination**: General pagination DTO with page number, items per page, last seen ID, sort by, and sort direction.

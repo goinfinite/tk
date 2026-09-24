@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"os/user"
@@ -17,14 +18,17 @@ import (
 	"time"
 
 	"golang.org/x/term"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
 const (
-	ShellExecutionTimeoutDefaultSecs   uint64 = 1800
-	ShellExecutionTimeoutHardLimitSecs uint64 = 3600
-	ShellExecutionTimeoutGraceSecs     uint64 = 10
-	ShellCommandTimeoutExitCode        int    = 124
+	ShellExecutionTimeoutDefaultSecs uint64 = 1800
+	ShellExecutionTimeoutGraceSecs   uint64 = 10
+	ShellCommandTimeoutExitCode      int    = 124
 )
+
+const maxShellExecutionTimeoutSecs = uint64(math.MaxInt64 / int64(time.Second))
 
 // IsStdoutTerminal is the single interactivity check shared by the CLI logger
 // and response renderer. Both honor one contract: logs go to stderr, stdout
@@ -43,13 +47,13 @@ type ShellSettings struct {
 	Args                            []string
 	ShouldUseSubShell               bool
 	ShouldUseCleanEnv               bool
-	ShouldDisableTimeoutHardLimit   bool
 	ShouldDisableTimeout            bool
 	ShouldIgnoreUsernameLookupError bool
 	Username                        string
 	UserId                          *uint32
 	WorkingDirectory                string
 	ExecutionTimeoutSecs            uint64
+	ExecutionDeadline               *tkValueObject.UnixTime
 	Envs                            []string
 	StdoutFilePath                  string
 	StderrFilePath                  string
@@ -246,16 +250,27 @@ func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan 
 }
 
 func (shell Shell) executionTimeoutResolver() time.Duration {
-	timeoutSecs := shell.runtimeSettings.ExecutionTimeoutSecs
-	if timeoutSecs == 0 {
-		timeoutSecs = ShellExecutionTimeoutDefaultSecs
+	requestedSecs := shell.runtimeSettings.ExecutionTimeoutSecs
+	if requestedSecs == 0 {
+		requestedSecs = ShellExecutionTimeoutDefaultSecs
 	}
-	if timeoutSecs > ShellExecutionTimeoutHardLimitSecs &&
-		!shell.runtimeSettings.ShouldDisableTimeoutHardLimit {
-		timeoutSecs = ShellExecutionTimeoutHardLimitSecs
+	if requestedSecs > maxShellExecutionTimeoutSecs {
+		requestedSecs = maxShellExecutionTimeoutSecs
+	}
+	requestedTimeout := time.Duration(requestedSecs) * time.Second
+
+	effectiveTimeout := requestedTimeout
+	deadlinePtr := shell.runtimeSettings.ExecutionDeadline
+	if deadlinePtr != nil {
+		deadlineTimeout := time.Until(deadlinePtr.ReadAsGoTime())
+		effectiveTimeout = deadlineTimeout
+		durationWasStated := shell.runtimeSettings.ExecutionTimeoutSecs != 0
+		if durationWasStated && requestedTimeout < deadlineTimeout {
+			effectiveTimeout = requestedTimeout
+		}
 	}
 
-	return time.Duration(timeoutSecs) * time.Second
+	return effectiveTimeout
 }
 
 func (shell Shell) executionContextFactory() (
