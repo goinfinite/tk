@@ -2,12 +2,16 @@ package tkInfra
 
 import (
 	"context"
+	"math"
 	"os"
 	"os/user"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"testing"
+	"time"
+
+	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
 func TestShell(t *testing.T) {
@@ -194,6 +198,56 @@ func TestShell(t *testing.T) {
 		}
 	})
 
+	t.Run("ExecutionDeadlineEnforced", func(t *testing.T) {
+		deadline := tkValueObject.NewUnixTimeAfterNow(1 * time.Second)
+
+		_, err := NewShell(ShellSettings{
+			Command:           "sleep",
+			Args:              []string{"5"},
+			ExecutionDeadline: &deadline,
+		}).Run()
+
+		shellErr, assertOk := err.(*ShellError)
+		if !assertOk {
+			t.Fatalf("ExpectedShellError,Got%v", err)
+		}
+		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
+			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+		}
+	})
+
+	t.Run("PastExecutionDeadlineTimesOutImmediately", func(t *testing.T) {
+		pastDeadline := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
+
+		_, err := NewShell(ShellSettings{
+			Command:           "sleep",
+			Args:              []string{"5"},
+			ExecutionDeadline: &pastDeadline,
+		}).Run()
+
+		shellErr, assertOk := err.(*ShellError)
+		if !assertOk {
+			t.Fatalf("ExpectedShellError,Got%v", err)
+		}
+		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
+			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+		}
+	})
+
+	t.Run("ShouldDisableTimeoutOverridesDeadline", func(t *testing.T) {
+		pastDeadline := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
+
+		_, err := NewShell(ShellSettings{
+			Command:              "echo",
+			ShouldDisableTimeout: true,
+			ExecutionDeadline:    &pastDeadline,
+		}).Run()
+
+		if err != nil {
+			t.Errorf("ExpectedSuccess,Got%v", err)
+		}
+	})
+
 	t.Run("UserIdRunsCommandAsTargetAccount", func(t *testing.T) {
 		if os.Geteuid() != 0 {
 			t.Skip("RootPrivilegesRequired")
@@ -295,6 +349,93 @@ func TestShell(t *testing.T) {
 		}
 		if stdoutStr != "0" {
 			t.Errorf("ExpectedRootUid: %s", stdoutStr)
+		}
+	})
+}
+
+func TestShellExecutionTimeoutResolver(t *testing.T) {
+	secondsToDuration := func(seconds uint64) time.Duration {
+		return time.Duration(seconds) * time.Second
+	}
+
+	t.Run("DefaultWhenUnset", func(t *testing.T) {
+		timeout := NewShell(ShellSettings{}).executionTimeoutResolver()
+		expectedTimeout := secondsToDuration(ShellExecutionTimeoutDefaultSecs)
+
+		if timeout != expectedTimeout {
+			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+		}
+	})
+
+	t.Run("RequestedTimeoutAboveLegacyCapIsHonored", func(t *testing.T) {
+		timeout := NewShell(ShellSettings{
+			ExecutionTimeoutSecs: 7200,
+		}).executionTimeoutResolver()
+		expectedTimeout := secondsToDuration(7200)
+
+		if timeout != expectedTimeout {
+			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+		}
+	})
+
+	t.Run("HugeRequestedTimeoutSaturatesWithoutOverflow", func(t *testing.T) {
+		timeout := NewShell(ShellSettings{
+			ExecutionTimeoutSecs: math.MaxUint64,
+		}).executionTimeoutResolver()
+
+		if timeout <= 0 {
+			t.Errorf("HugeTimeoutOverflowed: %s", timeout)
+		}
+	})
+
+	t.Run("EarlierDeadlineWinsOverDuration", func(t *testing.T) {
+		deadline := tkValueObject.NewUnixTimeAfterNow(120 * time.Second)
+
+		timeout := NewShell(ShellSettings{
+			ExecutionTimeoutSecs: 600,
+			ExecutionDeadline:    &deadline,
+		}).executionTimeoutResolver()
+
+		if timeout > 121*time.Second || timeout < 118*time.Second {
+			t.Errorf("DeadlineDidNotWin: %s", timeout)
+		}
+	})
+
+	t.Run("EarlierDurationWinsOverDeadline", func(t *testing.T) {
+		deadline := tkValueObject.NewUnixTimeAfterNow(6000 * time.Second)
+
+		timeout := NewShell(ShellSettings{
+			ExecutionTimeoutSecs: 600,
+			ExecutionDeadline:    &deadline,
+		}).executionTimeoutResolver()
+		expectedTimeout := secondsToDuration(600)
+
+		if timeout != expectedTimeout {
+			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+		}
+	})
+
+	t.Run("DeadlineAloneDefinesTimeout", func(t *testing.T) {
+		deadline := tkValueObject.NewUnixTimeAfterNow(3000 * time.Second)
+
+		timeout := NewShell(ShellSettings{
+			ExecutionDeadline: &deadline,
+		}).executionTimeoutResolver()
+
+		if timeout > 3001*time.Second || timeout < 2998*time.Second {
+			t.Errorf("DeadlineAloneNotHonored: %s", timeout)
+		}
+	})
+
+	t.Run("FarDeadlineAloneIsHonored", func(t *testing.T) {
+		deadline := tkValueObject.NewUnixTimeAfterNow(7200 * time.Second)
+
+		timeout := NewShell(ShellSettings{
+			ExecutionDeadline: &deadline,
+		}).executionTimeoutResolver()
+
+		if timeout > 7201*time.Second || timeout < 7198*time.Second {
+			t.Errorf("FarDeadlineNotHonored: %s", timeout)
 		}
 	})
 }
