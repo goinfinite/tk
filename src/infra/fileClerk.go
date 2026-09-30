@@ -2487,6 +2487,12 @@ type FileFindSettings struct {
 	NamePattern *regexp.Regexp
 }
 
+func patternHasWildcardChars(
+	startingPathPattern tkValueObject.UnixAbsoluteGlobPath,
+) bool {
+	return strings.ContainsAny(startingPathPattern.String(), "*?[")
+}
+
 func (FileClerk) startingDirPathsResolver(
 	startingPath tkValueObject.UnixAbsoluteFilePath,
 	startingPathPattern tkValueObject.UnixAbsoluteGlobPath,
@@ -2508,7 +2514,7 @@ func (FileClerk) startingDirPathsResolver(
 			return nil, fmt.Errorf("%w: %s", ErrGlobPatternInvalid, patternStr)
 		}
 
-		patternHasWildcard := strings.ContainsAny(patternStr, "*?[")
+		patternHasWildcard := patternHasWildcardChars(startingPathPattern)
 		if len(matchedPaths) == 0 {
 			if patternHasWildcard {
 				return []tkValueObject.UnixAbsoluteFilePath{}, nil
@@ -2574,7 +2580,9 @@ func (FileClerk) startingDirPathsResolver(
 // wildcards * ? and [] and every directory it matches is walked. A
 // starting path that does not exist fails with ErrDirMissing, a
 // wildcard pattern that matches nothing returns an empty result, and
-// non-directories are skipped. NamePattern matches the entry name; nil
+// non-directories are skipped. A wildcard match that cannot be read is
+// skipped and a warning names it; a starting path that is named
+// directly fails with its read error. NamePattern matches the entry name; nil
 // matches every entry. MaxFiles 0 reads without a cap; a small MaxFiles
 // can stop the walk before later matches, and the cap counts across all
 // matched starting directories. A symlinked starting path is refused
@@ -2600,6 +2608,7 @@ func (clerk FileClerk) Find(
 		return nil, startingDirPathsErr
 	}
 
+	patternHasWildcard := patternHasWildcardChars(settings.StartingPathPattern)
 	unixFiles = []tkEntity.UnixFile{}
 	remainingMaxFiles := readSettings.MaxFiles
 	for _, startingDirPath := range startingDirPaths {
@@ -2615,7 +2624,18 @@ func (clerk FileClerk) Find(
 			settings.NamePattern,
 		)
 		if readErr != nil {
-			return nil, readErr
+			readErrorIsFatal := !patternHasWildcard ||
+				errors.Is(readErr, ErrTargetFileChanged) ||
+				errors.Is(readErr, ErrDirMissing)
+			if readErrorIsFatal {
+				return nil, readErr
+			}
+			slog.Warn(
+				"StartingDirReadFailed",
+				slog.String("startingDirPath", startingDirPath.String()),
+				slog.String("reason", readErr.Error()),
+			)
+			continue
 		}
 		unixFiles = append(unixFiles, startingDirUnixFiles...)
 		if maxFilesIsCapped {

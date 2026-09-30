@@ -6075,6 +6075,48 @@ func TestFind(t *testing.T) {
 		}
 	})
 
+	t.Run("SkipsUnreadableWildcardRoots", func(t *testing.T) {
+		patternRootDirPath := t.TempDir()
+		alphaDirPath := filepath.Join(patternRootDirPath, "alpha")
+		mkdirErr := os.MkdirAll(alphaDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		writeErr := os.WriteFile(
+			filepath.Join(alphaDirPath, "one.txt"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		betaDirPath := filepath.Join(patternRootDirPath, "beta")
+		mkdirErr = os.MkdirAll(betaDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		chmodErr := os.Chmod(betaDirPath, 0o777)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(
+				t, filepath.Join(patternRootDirPath, "*"),
+			),
+			DirChainPolicy: &sharedWriteRefusedPolicy,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 1 {
+			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+		expectedPath := filepath.Join(alphaDirPath, "one.txt")
+		if unixFiles[0].Path.String() != expectedPath {
+			t.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
+		}
+	})
+
 	t.Run("FailsOnMalformedWildcardPattern", func(t *testing.T) {
 		_, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(t, filepath.Join(tempDir, "[")),
