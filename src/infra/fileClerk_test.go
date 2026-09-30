@@ -6117,6 +6117,54 @@ func TestFind(t *testing.T) {
 		}
 	})
 
+	t.Run("SkipsUnstattableWildcardMatches", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
+		}
+		patternRootDirPath := t.TempDir()
+		goodDocsDirPath := filepath.Join(patternRootDirPath, "good", "docs")
+		mkdirErr := os.MkdirAll(goodDocsDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		writeErr := os.WriteFile(
+			filepath.Join(goodDocsDirPath, "one.txt"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		unsearchableDirPath := filepath.Join(patternRootDirPath, "unsearchable")
+		innerDirPath := filepath.Join(unsearchableDirPath, "inner")
+		mkdirErr = os.MkdirAll(innerDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		chmodErr := os.Chmod(unsearchableDirPath, 0o444)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+		t.Cleanup(func() {
+			_ = os.Chmod(unsearchableDirPath, 0o755)
+		})
+
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(
+				t, filepath.Join(patternRootDirPath, "*", "*"),
+			),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 1 {
+			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+		expectedPath := filepath.Join(goodDocsDirPath, "one.txt")
+		if unixFiles[0].Path.String() != expectedPath {
+			t.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
+		}
+	})
+
 	t.Run("FailsOnMalformedWildcardPattern", func(t *testing.T) {
 		_, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(t, filepath.Join(tempDir, "[")),

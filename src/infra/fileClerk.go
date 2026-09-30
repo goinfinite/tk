@@ -2506,6 +2506,7 @@ func (FileClerk) startingDirPathsResolver(
 		return nil, ErrStartingPathMissing
 	}
 
+	patternHasWildcard := patternHasWildcardChars(startingPathPattern)
 	var candidatePaths []string
 	if patternIsSet {
 		patternStr := startingPathPattern.String()
@@ -2514,7 +2515,6 @@ func (FileClerk) startingDirPathsResolver(
 			return nil, fmt.Errorf("%w: %s", ErrGlobPatternInvalid, patternStr)
 		}
 
-		patternHasWildcard := patternHasWildcardChars(startingPathPattern)
 		if len(matchedPaths) == 0 {
 			if patternHasWildcard {
 				return []tkValueObject.UnixAbsoluteFilePath{}, nil
@@ -2544,7 +2544,15 @@ func (FileClerk) startingDirPathsResolver(
 				)
 				continue
 			}
-			return nil, statErr
+			if !patternHasWildcard {
+				return nil, statErr
+			}
+			slog.Warn(
+				"StartingDirStatFailed",
+				slog.String("candidatePath", candidatePath),
+				slog.String("reason", statErr.Error()),
+			)
+			continue
 		}
 		if !candidateInfo.IsDir() {
 			continue
