@@ -4,7 +4,13 @@ Business logic layer of Infinite Toolkit _(TK)_. It holds validated value object
 
 ## Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. Table-driven tests cover the validation rules.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, UnixAbsoluteGlobPath, UnixFilePermissions, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. Table-driven tests cover the validation rules.
+
+## Entities
+
+- **ActivityRecord**: Audit trail entry recording a system event with its level, code, message, and affected resources.
+- **UnixFile**: Represents a directory entry with name, path, MIME type, permissions, size, extension, owner and group ids and names, update time, and a symlink flag. `FileClerk.ListDir` and `FileClerk.Find` return it.
+- **X509Certificate**: Parsed X.509 certificate with the standard fields: subject, issuer, SANs, policies, key usage, and more.
 
 ## Value Object Utilities
 
