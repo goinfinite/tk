@@ -2968,6 +2968,17 @@ func absoluteFilePathForTest(
 	return filePath
 }
 
+func absoluteGlobPathForTest(
+	t *testing.T, path string,
+) tkValueObject.UnixAbsoluteGlobPath {
+	t.Helper()
+	globPath, globPathErr := tkValueObject.NewUnixAbsoluteGlobPath(path)
+	if globPathErr != nil {
+		t.Fatalf("GlobPathInvalid: %v", globPathErr)
+	}
+	return globPath
+}
+
 func TestInspectedTargetFileOpener(t *testing.T) {
 	clerk := FileClerk{}
 	tempDir := t.TempDir()
@@ -2992,16 +3003,16 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 	}
 	defer func() { _ = unix.Close(dirHandle) }()
 
-	targetState, stateErr := clerk.targetFileStateReader(
-		dirHandle, targetFileName,
+	targetSnapshot, snapshotErr := clerk.fileSnapshotReader(
+		dirHandle, targetFileName.String(),
 	)
-	if stateErr != nil {
-		t.Fatalf("TargetFileStateReadFailed: %v", stateErr)
+	if snapshotErr != nil {
+		t.Fatalf("TargetFileSnapshotReadFailed: %v", snapshotErr)
 	}
 
 	t.Run("AcceptsTheInspectedInode", func(t *testing.T) {
 		fileHandle, openErr := clerk.inspectedTargetFileOpener(
-			dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
+			dirHandle, targetFileName, targetSnapshot, targetFileReadOpenFlags,
 		)
 		if openErr != nil {
 			t.Fatalf("UnexpectedOpenError: %v", openErr)
@@ -3023,7 +3034,7 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 		openFlagCases := []int{targetFileReadOpenFlags, targetFileAppendOpenFlags}
 		for _, openFlags := range openFlagCases {
 			_, openErr := clerk.inspectedTargetFileOpener(
-				dirHandle, targetFileName, targetState, openFlags,
+				dirHandle, targetFileName, targetSnapshot, openFlags,
 			)
 			if !errors.Is(openErr, ErrTargetFileChanged) {
 				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
@@ -3045,7 +3056,7 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 		openResultChan := make(chan error, 1)
 		go func() {
 			fileHandle, openErr := clerk.inspectedTargetFileOpener(
-				dirHandle, targetFileName, targetState, targetFileReadOpenFlags,
+				dirHandle, targetFileName, targetSnapshot, targetFileReadOpenFlags,
 			)
 			if fileHandle != 0 {
 				_ = unix.Close(fileHandle)
@@ -3060,6 +3071,98 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 			}
 		case <-time.After(2 * time.Second):
 			t.Fatalf("OpenBlockedOnFifo")
+		}
+	})
+}
+
+func TestInspectedSubDirOpener(t *testing.T) {
+	clerk := FileClerk{}
+	tempDir := t.TempDir()
+
+	inspectedDirName := "inspected"
+	inspectedDirPath := filepath.Join(tempDir, inspectedDirName)
+	mkdirErr := os.MkdirAll(inspectedDirPath, 0755)
+	if mkdirErr != nil {
+		t.Fatalf("MkdirFailed: %v", mkdirErr)
+	}
+
+	dirHandle, openErr := unix.Open(
+		tempDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0,
+	)
+	if openErr != nil {
+		t.Fatalf("OpenDirFailed: %v", openErr)
+	}
+	defer func() { _ = unix.Close(dirHandle) }()
+
+	inspectedSnapshot, snapshotErr := clerk.fileSnapshotReader(
+		dirHandle, inspectedDirName,
+	)
+	if snapshotErr != nil {
+		t.Fatalf("DirSnapshotReadFailed: %v", snapshotErr)
+	}
+
+	t.Run("AcceptsTheInspectedDirectory", func(t *testing.T) {
+		subDirHandle, openErr := clerk.inspectedSubDirOpener(
+			dirHandle, inspectedDirName, inspectedSnapshot,
+		)
+		if openErr != nil {
+			t.Fatalf("UnexpectedOpenError: %v", openErr)
+		}
+		_ = unix.Close(subDirHandle)
+	})
+
+	t.Run("RefusesSwappedDirectory", func(t *testing.T) {
+		swappedDirPath := filepath.Join(tempDir, "swapped")
+		mkdirErr := os.MkdirAll(swappedDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		renameErr := unix.Rename(swappedDirPath, inspectedDirPath)
+		if renameErr != nil {
+			t.Fatalf("RenameFailed: %v", renameErr)
+		}
+
+		_, openErr := clerk.inspectedSubDirOpener(
+			dirHandle, inspectedDirName, inspectedSnapshot,
+		)
+		if !errors.Is(openErr, ErrTargetFileChanged) {
+			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+		}
+	})
+
+	t.Run("RefusesSymlinkSwap", func(t *testing.T) {
+		removeErr := os.Remove(inspectedDirPath)
+		if removeErr != nil {
+			t.Fatalf("RemoveFailed: %v", removeErr)
+		}
+		symlinkErr := os.Symlink(tempDir, inspectedDirPath)
+		if symlinkErr != nil {
+			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+		}
+
+		_, openErr := clerk.inspectedSubDirOpener(
+			dirHandle, inspectedDirName, inspectedSnapshot,
+		)
+		if !errors.Is(openErr, ErrTargetFileChanged) {
+			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+		}
+	})
+
+	t.Run("RefusesNonDirectorySwap", func(t *testing.T) {
+		removeErr := os.Remove(inspectedDirPath)
+		if removeErr != nil {
+			t.Fatalf("RemoveFailed: %v", removeErr)
+		}
+		writeErr := os.WriteFile(inspectedDirPath, []byte("x"), 0644)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		_, openErr := clerk.inspectedSubDirOpener(
+			dirHandle, inspectedDirName, inspectedSnapshot,
+		)
+		if !errors.Is(openErr, ErrTargetFileChanged) {
+			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 		}
 	})
 }
@@ -3130,6 +3233,20 @@ func TestTempFilePathFactory(t *testing.T) {
 			t.Errorf("IdenticalTempNamesAcrossCalls: %s", first)
 		}
 	})
+}
+
+func unresolvableUnixUserIdFinder(t *testing.T) uint32 {
+	t.Helper()
+
+	for candidate := uint32(999999); candidate > 0; candidate-- {
+		_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
+		if lookupErr != nil {
+			return candidate
+		}
+	}
+
+	t.Fatal("NoUnresolvableUserIdFound")
+	return 0
 }
 
 func TestUpsertFile(t *testing.T) {
@@ -3755,20 +3872,12 @@ func TestUpsertFile(t *testing.T) {
 	})
 
 	t.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(t *testing.T) {
-		unresolvableUserIdFinder := func() uint32 {
-			for candidate := uint32(999999); candidate > 0; candidate-- {
-				_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
-				if lookupErr != nil {
-					return candidate
-				}
-			}
-
-			t.Fatal("NoUnresolvableUserIdFound")
-			return 0
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
 		}
 
 		unresolvableUserId, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUserIdFinder(),
+			unresolvableUnixUserIdFinder(t),
 		)
 		if userIdErr != nil {
 			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
@@ -3781,10 +3890,8 @@ func TestUpsertFile(t *testing.T) {
 				unresolvableUserId,
 			},
 		}, newFileContent)
-		if err != nil && !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Errorf(
-				"ExpectedOwnershipComparisonNotAccountLookup, got: %v", err,
-			)
+		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
+			t.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
 		}
 	})
 
@@ -4376,12 +4483,12 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 	statedOwnerUserId := tkValueObject.UnixUserId(3456)
 	statedGroupId := tkValueObject.UnixGroupId(3457)
 
-	targetStateExisting := targetFileState{
+	targetSnapshotExisting := fileStatSnapshot{
 		Exists:       true,
 		OwnerUserId:  existingFileOwnerUserId,
 		OwnerGroupId: existingFileOwnerGroupId,
 	}
-	targetStateMissing := targetFileState{}
+	targetSnapshotMissing := fileStatSnapshot{}
 	containingDirStat := unix.Stat_t{
 		Uid: uint32(containingDirOwnerUserId),
 		Gid: uint32(containingDirOwnerGroupId),
@@ -4393,7 +4500,7 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 		ownerUsername   *tkValueObject.UnixUsername
 		ownerUserId     *tkValueObject.UnixUserId
 		ownerGroupId    *tkValueObject.UnixGroupId
-		targetState     targetFileState
+		targetSnapshot  fileStatSnapshot
 		expectedUserId  tkValueObject.UnixUserId
 		expectedGroupId tkValueObject.UnixGroupId
 		expectedError   error
@@ -4402,7 +4509,7 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 			name:            "StatedAccountUsesPrimaryGroup",
 			ownerSource:     FileClerkOwnerSourceExistingFile,
 			ownerUsername:   &currentUsername,
-			targetState:     targetStateMissing,
+			targetSnapshot:  targetSnapshotMissing,
 			expectedUserId:  currentUserId,
 			expectedGroupId: currentPrimaryGroupId,
 		},
@@ -4411,35 +4518,35 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 			ownerSource:     FileClerkOwnerSourceExistingFile,
 			ownerUserId:     &statedOwnerUserId,
 			ownerGroupId:    &statedGroupId,
-			targetState:     targetStateExisting,
+			targetSnapshot:  targetSnapshotExisting,
 			expectedUserId:  statedOwnerUserId,
 			expectedGroupId: statedGroupId,
 		},
 		{
 			name:            "ExistingFileSourceInheritsTargetOwnership",
 			ownerSource:     FileClerkOwnerSourceExistingFile,
-			targetState:     targetStateExisting,
+			targetSnapshot:  targetSnapshotExisting,
 			expectedUserId:  existingFileOwnerUserId,
 			expectedGroupId: existingFileOwnerGroupId,
 		},
 		{
 			name:            "ExistingFileSourceFallsBackToRunningProcess",
 			ownerSource:     FileClerkOwnerSourceExistingFile,
-			targetState:     targetStateMissing,
+			targetSnapshot:  targetSnapshotMissing,
 			expectedUserId:  runningProcessUserId,
 			expectedGroupId: runningProcessGroupId,
 		},
 		{
 			name:            "ContainingDirectorySourceUsesDirectoryOwnership",
 			ownerSource:     FileClerkOwnerSourceContainingDirectory,
-			targetState:     targetStateMissing,
+			targetSnapshot:  targetSnapshotMissing,
 			expectedUserId:  containingDirOwnerUserId,
 			expectedGroupId: containingDirOwnerGroupId,
 		},
 		{
 			name:            "RunningProcessSourceUsesProcessOwnership",
 			ownerSource:     FileClerkOwnerSourceRunningProcess,
-			targetState:     targetStateMissing,
+			targetSnapshot:  targetSnapshotMissing,
 			expectedUserId:  runningProcessUserId,
 			expectedGroupId: runningProcessGroupId,
 		},
@@ -4447,23 +4554,23 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 			name:            "StatedGroupOverridesInheritedGroup",
 			ownerSource:     FileClerkOwnerSourceExistingFile,
 			ownerGroupId:    &statedGroupId,
-			targetState:     targetStateExisting,
+			targetSnapshot:  targetSnapshotExisting,
 			expectedUserId:  existingFileOwnerUserId,
 			expectedGroupId: statedGroupId,
 		},
 		{
-			name:          "StatedAccountConflictsWithContainingDirectory",
-			ownerSource:   FileClerkOwnerSourceContainingDirectory,
-			ownerUsername: &currentUsername,
-			targetState:   targetStateMissing,
-			expectedError: ErrOwnerSourceConflict,
+			name:           "StatedAccountConflictsWithContainingDirectory",
+			ownerSource:    FileClerkOwnerSourceContainingDirectory,
+			ownerUsername:  &currentUsername,
+			targetSnapshot: targetSnapshotMissing,
+			expectedError:  ErrOwnerSourceConflict,
 		},
 		{
-			name:          "StatedAccountConflictsWithRunningProcess",
-			ownerSource:   FileClerkOwnerSourceRunningProcess,
-			ownerUsername: &currentUsername,
-			targetState:   targetStateMissing,
-			expectedError: ErrOwnerSourceConflict,
+			name:           "StatedAccountConflictsWithRunningProcess",
+			ownerSource:    FileClerkOwnerSourceRunningProcess,
+			ownerUsername:  &currentUsername,
+			targetSnapshot: targetSnapshotMissing,
+			expectedError:  ErrOwnerSourceConflict,
 		},
 	}
 
@@ -4471,7 +4578,7 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			ownership, err := clerk.fileUpsertOwnerResolver(
 				testCase.ownerSource, testCase.ownerUsername, testCase.ownerUserId,
-				testCase.ownerGroupId, testCase.targetState, containingDirStat,
+				testCase.ownerGroupId, testCase.targetSnapshot, containingDirStat,
 			)
 
 			if testCase.expectedError != nil {
@@ -4506,7 +4613,7 @@ func TestFileUpsertPermissionsResolver(t *testing.T) {
 	zeroPermissions := os.FileMode(0)
 	existingPermissions := os.FileMode(0604)
 
-	targetStateExisting := targetFileState{
+	targetSnapshotExisting := fileStatSnapshot{
 		Exists:      true,
 		Permissions: existingPermissions,
 	}
@@ -4514,31 +4621,31 @@ func TestFileUpsertPermissionsResolver(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		statedPermissionsPtr *os.FileMode
-		targetState          targetFileState
+		targetSnapshot       fileStatSnapshot
 		expectedPermissions  os.FileMode
 	}{
 		{
 			"StatedPermissionsWin",
-			&statedPermissions, targetStateExisting, statedPermissions,
+			&statedPermissions, targetSnapshotExisting, statedPermissions,
 		},
 		{
 			"StatedZeroPermissionsWin",
-			&zeroPermissions, targetStateExisting, zeroPermissions,
+			&zeroPermissions, targetSnapshotExisting, zeroPermissions,
 		},
 		{
 			"InheritsExistingPermissions",
-			nil, targetStateExisting, existingPermissions,
+			nil, targetSnapshotExisting, existingPermissions,
 		},
 		{
 			"DefaultsForMissingTarget",
-			nil, targetFileState{}, FileClerkDefaultNewFileMode,
+			nil, fileStatSnapshot{}, FileClerkDefaultNewFileMode,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			permissions := clerk.fileUpsertPermissionsResolver(
-				testCase.statedPermissionsPtr, testCase.targetState,
+				testCase.statedPermissionsPtr, testCase.targetSnapshot,
 			)
 			if permissions != testCase.expectedPermissions {
 				t.Errorf(
@@ -5052,6 +5159,1043 @@ func TestUpsertFileTrustedDirOwners(t *testing.T) {
 		}
 		if clerk.FileExists(target) {
 			t.Errorf("RefusedTargetWasCreated")
+		}
+	})
+}
+
+func TestListDir(t *testing.T) {
+	clerk := FileClerk{}
+
+	// Note: Setup/teardown are intentionally file-local — test independence
+	// requires each file to own its preconditions, even if it duplicates code.
+	listDirTestTreeFactory := func() string {
+		t.Helper()
+
+		tempDir := t.TempDir()
+		subDir := filepath.Join(tempDir, "sub")
+		elsewhereDir := filepath.Join(tempDir, "elsewhere")
+		mkdirErr := os.MkdirAll(subDir, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		mkdirErr = os.MkdirAll(elsewhereDir, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+
+		writeErr := os.WriteFile(
+			filepath.Join(tempDir, "a.txt"), []byte("hello"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(tempDir, "b.log"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(subDir, "inner.txt"), []byte("world"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(elsewhereDir, "hidden.txt"), []byte("!"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		symlinkTargetDir := t.TempDir()
+		writeErr = os.WriteFile(
+			filepath.Join(symlinkTargetDir, "symlinkTargetCanary.txt"),
+			[]byte("canary"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		symlinkErr := os.Symlink(
+			symlinkTargetDir, filepath.Join(subDir, "linkToOutside"),
+		)
+		if symlinkErr != nil {
+			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+		}
+
+		return tempDir
+	}
+	tempDir := listDirTestTreeFactory()
+
+	t.Run("ListsRootEntriesSortedByName", func(t *testing.T) {
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, tempDir),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+
+		expectedNames := []string{"a.txt", "b.log", "elsewhere", "sub"}
+		if len(unixFiles) != len(expectedNames) {
+			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+		for entryIndex, expectedName := range expectedNames {
+			actualName := unixFiles[entryIndex].Name.String()
+			if actualName != expectedName {
+				t.Errorf("UnexpectedEntryName: %s", actualName)
+			}
+		}
+	})
+
+	t.Run("ReadsEntryAttributes", func(t *testing.T) {
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, tempDir),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+
+		for _, unixFile := range unixFiles {
+			switch unixFile.Name.String() {
+			case "a.txt":
+				expectedPath := filepath.Join(tempDir, "a.txt")
+				if unixFile.Path.String() != expectedPath {
+					t.Errorf("UnexpectedFilePath: %s", unixFile.Path.String())
+				}
+				if unixFile.MimeType.String() != "text/plain" {
+					t.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
+				}
+				if unixFile.Extension == nil ||
+					unixFile.Extension.String() != "txt" {
+					t.Errorf("UnexpectedExtension: %v", unixFile.Extension)
+				}
+				if unixFile.Size.Uint64() != 5 {
+					t.Errorf("UnexpectedSize: %d", unixFile.Size.Uint64())
+				}
+				if unixFile.IsSymlink {
+					t.Errorf("RegularFileMarkedAsSymlink")
+				}
+			case "sub":
+				if unixFile.MimeType.String() != "directory" {
+					t.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
+				}
+				if unixFile.Extension != nil {
+					t.Errorf("DirectoryHasExtension: %s", unixFile.Extension.String())
+				}
+				if unixFile.IsSymlink {
+					t.Errorf("DirectoryMarkedAsSymlink")
+				}
+			}
+		}
+	})
+
+	t.Run("RespectsMaxDepth", func(t *testing.T) {
+		depthZeroFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, tempDir),
+			MaxDepth: 0,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(depthZeroFiles) != 4 {
+			t.Errorf("UnexpectedDepthZeroEntryCount: %d", len(depthZeroFiles))
+		}
+
+		depthOneFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, tempDir),
+			MaxDepth: 1,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(depthOneFiles) != 7 {
+			t.Errorf("UnexpectedDepthOneEntryCount: %d", len(depthOneFiles))
+		}
+	})
+
+	t.Run("CapsEntries", func(t *testing.T) {
+		maxFiles := uint64(2)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, tempDir),
+			MaxFiles: &maxFiles,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 2 {
+			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("CapsEntriesAcrossSubdirectories", func(t *testing.T) {
+		nestedCapDirPath := t.TempDir()
+		for _, subDirName := range []string{"first", "second"} {
+			subDirPath := filepath.Join(nestedCapDirPath, subDirName)
+			mkdirErr := os.MkdirAll(subDirPath, 0755)
+			if mkdirErr != nil {
+				t.Fatalf("MkdirFailed: %v", mkdirErr)
+			}
+			for _, fileName := range []string{"one.txt", "two.txt"} {
+				writeErr := os.WriteFile(
+					filepath.Join(subDirPath, fileName), []byte("x"), 0644,
+				)
+				if writeErr != nil {
+					t.Fatalf("WriteFileFailed: %v", writeErr)
+				}
+			}
+		}
+
+		maxFiles := uint64(2)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, nestedCapDirPath),
+			MaxFiles: &maxFiles,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != int(maxFiles) {
+			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	rootLinkPath := filepath.Join(tempDir, "rootLink")
+	symlinkErr := os.Symlink(tempDir, rootLinkPath)
+	if symlinkErr != nil {
+		t.Fatalf("SymlinkFailed: %v", symlinkErr)
+	}
+
+	t.Run("RefusesSymlinkedRootByDefault", func(t *testing.T) {
+		_, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, rootLinkPath),
+		})
+		if !errors.Is(err, ErrSymlinkedPathInvalid) {
+			t.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
+		}
+	})
+
+	t.Run("ResolvesSymlinkedRootWithPolicy", func(t *testing.T) {
+		resolvePolicy := FileClerkSymlinkPolicyResolve
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:       absoluteFilePathForTest(t, rootLinkPath),
+			SymlinkPolicy: &resolvePolicy,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 5 {
+			t.Errorf("UnexpectedResolvedEntryCount: %d", len(unixFiles))
+		}
+		for _, unixFile := range unixFiles {
+			if unixFile.Name.String() != "a.txt" {
+				continue
+			}
+			expectedPath := filepath.Join(tempDir, "a.txt")
+			if unixFile.Path.String() != expectedPath {
+				t.Errorf("PathStillGoesThroughSymlink: %s", unixFile.Path.String())
+			}
+		}
+	})
+
+	t.Run("FailsOnMissingDir", func(t *testing.T) {
+		missingDirPath := filepath.Join(tempDir, "missing")
+		_, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, missingDirPath),
+		})
+		if !errors.Is(err, ErrDirMissing) {
+			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+		}
+	})
+
+	t.Run("FailsOnEmptyDirPath", func(t *testing.T) {
+		_, err := clerk.ListDir(FileListDirSettings{})
+		if !errors.Is(err, ErrDirMissing) {
+			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+		}
+	})
+
+	t.Run("SkipsEntriesWithRejectedNames", func(t *testing.T) {
+		rejectedNamePath := filepath.Join(tempDir, "~")
+		writeErr := os.WriteFile(rejectedNamePath, []byte("x"), 0644)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, tempDir),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		for _, unixFile := range unixFiles {
+			if unixFile.Name.String() == "~" {
+				t.Errorf("RejectedNameWasListed")
+			}
+		}
+	})
+
+	t.Run("ListsEmptyDir", func(t *testing.T) {
+		emptyDirPath := filepath.Join(tempDir, "emptyDir")
+		mkdirErr := os.MkdirAll(emptyDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, emptyDirPath),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 0 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	capTreeDirPath := filepath.Join(tempDir, "capTree")
+	capTreeMkdirErr := os.MkdirAll(capTreeDirPath, 0755)
+	if capTreeMkdirErr != nil {
+		t.Fatalf("MkdirFailed: %v", capTreeMkdirErr)
+	}
+	expectedUncappedEntryCount := int(FileClerkDefaultMaxFiles) + 2
+	for fileIndex := range expectedUncappedEntryCount {
+		capTreeFileName := "entry-" + strconv.Itoa(fileIndex) + ".txt"
+		capTreeWriteErr := os.WriteFile(
+			filepath.Join(capTreeDirPath, capTreeFileName), []byte("x"), 0644,
+		)
+		if capTreeWriteErr != nil {
+			t.Fatalf("WriteFileFailed: %v", capTreeWriteErr)
+		}
+	}
+
+	t.Run("DefaultsToMaxFilesWhenUnset", func(t *testing.T) {
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, capTreeDirPath),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if uint64(len(unixFiles)) != FileClerkDefaultMaxFiles {
+			t.Errorf("UnexpectedDefaultCappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(t *testing.T) {
+		zeroMaxFiles := uint64(0)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, capTreeDirPath),
+			MaxFiles: &zeroMaxFiles,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != expectedUncappedEntryCount {
+			t.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+		writableDirPath := filepath.Join(tempDir, "writableListDir")
+		mkdirErr := os.MkdirAll(writableDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		chmodErr := os.Chmod(writableDirPath, 0o777)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, writableDirPath),
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 0 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		_, err = clerk.ListDir(FileListDirSettings{
+			DirPath:        absoluteFilePathForTest(t, writableDirPath),
+			DirChainPolicy: &sharedWriteRefusedPolicy,
+		})
+		if !errors.Is(err, ErrDirectoryWritableByOthers) {
+			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+		}
+	})
+
+	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
+			"no-such-user-xyz-42",
+		)
+		if usernameErr != nil {
+			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+		}
+
+		_, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, tempDir),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				unknownUsername,
+			},
+		})
+		if err == nil {
+			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+		}
+		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
+			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+		}
+	})
+
+	t.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
+		}
+
+		unresolvableUserId, userIdErr := tkValueObject.NewUnixUserId(
+			unresolvableUnixUserIdFinder(t),
+		)
+		if userIdErr != nil {
+			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
+		}
+
+		_, err := clerk.ListDir(FileListDirSettings{
+			DirPath: absoluteFilePathForTest(t, tempDir),
+			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
+				unresolvableUserId,
+			},
+		})
+		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
+			t.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
+		}
+	})
+
+	t.Run("SkipsDescentWhenSubDirOpenFails", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
+		}
+
+		lockedParentDirPath := filepath.Join(tempDir, "lockedParent")
+		lockedDirPath := filepath.Join(lockedParentDirPath, "locked")
+		mkdirErr := os.MkdirAll(lockedDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		chmodErr := os.Chmod(lockedDirPath, 0o000)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+
+		depthOne := uint16(1)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, lockedParentDirPath),
+			MaxDepth: depthOne,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 1 {
+			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+		if unixFiles[0].Path.String() != lockedDirPath {
+			t.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
+		}
+	})
+
+	t.Run("SkipsEntryWhenDirEntryStatFails", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("NonRootRequired")
+		}
+
+		unsearchableParentDirPath := filepath.Join(tempDir, "unsearchableParent")
+		unsearchableDirPath := filepath.Join(unsearchableParentDirPath, "unsearchable")
+		mkdirErr := os.MkdirAll(unsearchableDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		entryPath := filepath.Join(unsearchableDirPath, "entry.txt")
+		writeErr := os.WriteFile(entryPath, []byte("x"), 0644)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		chmodErr := os.Chmod(unsearchableDirPath, 0o444)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+		defer func() {
+			_ = os.Chmod(unsearchableDirPath, 0o755)
+		}()
+
+		depthOne := uint16(1)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, unsearchableParentDirPath),
+			MaxDepth: depthOne,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+		if len(unixFiles) != 1 {
+			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+		if unixFiles[0].Path.String() != unsearchableDirPath {
+			t.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
+		}
+	})
+
+	t.Run("SortsDuplicateNamesByPath", func(t *testing.T) {
+		dupRootDirPath := filepath.Join(tempDir, "dupRoot")
+		dupDirBPath := filepath.Join(dupRootDirPath, "dupB")
+		dupDirAPath := filepath.Join(dupRootDirPath, "dupA")
+		mkdirErr := os.MkdirAll(dupDirBPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		mkdirErr = os.MkdirAll(dupDirAPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		writeErr := os.WriteFile(
+			filepath.Join(dupDirBPath, "same.txt"), []byte("b"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(dupDirAPath, "same.txt"), []byte("a"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		depthOne := uint16(1)
+		unixFiles, err := clerk.ListDir(FileListDirSettings{
+			DirPath:  absoluteFilePathForTest(t, dupRootDirPath),
+			MaxDepth: depthOne,
+		})
+		if err != nil {
+			t.Fatalf("ListDirFailed: %v", err)
+		}
+
+		duplicatePaths := []string{}
+		for _, unixFile := range unixFiles {
+			if unixFile.Name.String() == "same.txt" {
+				duplicatePaths = append(duplicatePaths, unixFile.Path.String())
+			}
+		}
+		if len(duplicatePaths) != 2 {
+			t.Fatalf("UnexpectedDuplicateCount: %d", len(duplicatePaths))
+		}
+		expectedFirstPath := filepath.Join(dupDirAPath, "same.txt")
+		if duplicatePaths[0] != expectedFirstPath {
+			t.Errorf("DuplicateNamesNotSortedByPath: %s", duplicatePaths[0])
+		}
+	})
+}
+
+func TestFind(t *testing.T) {
+	clerk := FileClerk{}
+
+	// Note: Setup/teardown are intentionally file-local — test independence
+	// requires each file to own its preconditions, even if it duplicates code.
+	findTestTreeFactory := func() string {
+		t.Helper()
+
+		tempDir := t.TempDir()
+		subDir := filepath.Join(tempDir, "sub")
+		elsewhereDir := filepath.Join(tempDir, "elsewhere")
+		mkdirErr := os.MkdirAll(subDir, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		mkdirErr = os.MkdirAll(elsewhereDir, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+
+		writeErr := os.WriteFile(
+			filepath.Join(tempDir, "a.txt"), []byte("hello"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(tempDir, "b.log"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(subDir, "inner.txt"), []byte("world"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(elsewhereDir, "hidden.txt"), []byte("!"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		symlinkTargetDir := t.TempDir()
+		writeErr = os.WriteFile(
+			filepath.Join(symlinkTargetDir, "symlinkTargetCanary.txt"),
+			[]byte("canary"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		symlinkErr := os.Symlink(
+			symlinkTargetDir, filepath.Join(subDir, "linkToOutside"),
+		)
+		if symlinkErr != nil {
+			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+		}
+
+		return tempDir
+	}
+	tempDir := findTestTreeFactory()
+
+	t.Run("FiltersByNamePattern", func(t *testing.T) {
+		namePattern := regexp.MustCompile(`\.txt$`)
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			MaxDepth:            1,
+			NamePattern:         namePattern,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+
+		expectedPaths := []string{
+			filepath.Join(tempDir, "a.txt"),
+			filepath.Join(tempDir, "elsewhere", "hidden.txt"),
+			filepath.Join(tempDir, "sub", "inner.txt"),
+		}
+		if len(unixFiles) != len(expectedPaths) {
+			t.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
+		}
+		for matchIndex, expectedPath := range expectedPaths {
+			actualPath := unixFiles[matchIndex].Path.String()
+			if actualPath != expectedPath {
+				t.Errorf("UnexpectedMatchPath: %s", actualPath)
+			}
+		}
+	})
+
+	t.Run("MatchesEveryEntryWithoutPattern", func(t *testing.T) {
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 4 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("CapsMatchedEntries", func(t *testing.T) {
+		flatDir := t.TempDir()
+		for fileIndex := range 5 {
+			fileName := "file" + strconv.Itoa(fileIndex) + ".txt"
+			writeErr := os.WriteFile(
+				filepath.Join(flatDir, fileName), []byte("x"), 0644,
+			)
+			if writeErr != nil {
+				t.Fatalf("WriteFileFailed: %v", writeErr)
+			}
+		}
+
+		maxFiles := uint64(2)
+		namePattern := regexp.MustCompile(`\.txt$`)
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, flatDir),
+			MaxFiles:            &maxFiles,
+			NamePattern:         namePattern,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 2 {
+			t.Errorf("UnexpectedCappedMatchCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("NeverDescendsIntoSymlinkedDir", func(t *testing.T) {
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			MaxDepth:            2,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+
+		symlinkReported := false
+		for _, unixFile := range unixFiles {
+			if unixFile.Name.String() == "symlinkTargetCanary.txt" {
+				t.Errorf("SymlinkedDirWasDescended: %s", unixFile.Path.String())
+			}
+			if unixFile.Name.String() == "linkToOutside" {
+				symlinkReported = true
+				if !unixFile.IsSymlink {
+					t.Errorf("SymlinkNotMarkedAsSymlink")
+				}
+			}
+		}
+		if !symlinkReported {
+			t.Errorf("SymlinkNotReported")
+		}
+	})
+
+	t.Run("FailsOnMissingRoot", func(t *testing.T) {
+		missingRootPath := filepath.Join(tempDir, "missing")
+		_, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, missingRootPath),
+		})
+		if !errors.Is(err, ErrDirMissing) {
+			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+		}
+	})
+
+	t.Run("WalksPlainStartingPath", func(t *testing.T) {
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPath: absoluteFilePathForTest(t, tempDir),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 4 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("FailsOnMissingStartingPath", func(t *testing.T) {
+		missingPath := filepath.Join(tempDir, "missingStartingPath")
+		_, err := clerk.Find(FileFindSettings{
+			StartingPath: absoluteFilePathForTest(t, missingPath),
+		})
+		if !errors.Is(err, ErrDirMissing) {
+			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+		}
+	})
+
+	t.Run("FailsWhenBothStartingPathsSet", func(t *testing.T) {
+		_, err := clerk.Find(FileFindSettings{
+			StartingPath:        absoluteFilePathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+		})
+		if !errors.Is(err, ErrStartingPathConflict) {
+			t.Fatalf("ExpectedErrStartingPathConflict, got: %v", err)
+		}
+	})
+
+	t.Run("FailsWhenNoStartingPathSet", func(t *testing.T) {
+		_, err := clerk.Find(FileFindSettings{})
+		if !errors.Is(err, ErrStartingPathMissing) {
+			t.Fatalf("ExpectedErrStartingPathMissing, got: %v", err)
+		}
+	})
+
+	t.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(t *testing.T) {
+		zeroMaxFiles := uint64(0)
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			MaxFiles:            &zeroMaxFiles,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 4 {
+			t.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+		writableDirPath := filepath.Join(tempDir, "writableFindDir")
+		mkdirErr := os.MkdirAll(writableDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		chmodErr := os.Chmod(writableDirPath, 0o777)
+		if chmodErr != nil {
+			t.Fatalf("ChmodFailed: %v", chmodErr)
+		}
+
+		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
+		_, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, writableDirPath),
+			DirChainPolicy:      &sharedWriteRefusedPolicy,
+		})
+		if !errors.Is(err, ErrDirectoryWritableByOthers) {
+			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+		}
+	})
+
+	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
+			"no-such-user-xyz-42",
+		)
+		if usernameErr != nil {
+			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+		}
+
+		_, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
+				unknownUsername,
+			},
+		})
+		if err == nil {
+			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+		}
+		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
+			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+		}
+	})
+
+	t.Run("ExpandsWildcardRootPattern", func(t *testing.T) {
+		patternRootDirPath := t.TempDir()
+		for _, accountName := range []string{"alpha", "beta"} {
+			docsDirPath := filepath.Join(patternRootDirPath, accountName, "docs")
+			mkdirErr := os.MkdirAll(docsDirPath, 0755)
+			if mkdirErr != nil {
+				t.Fatalf("MkdirFailed: %v", mkdirErr)
+			}
+			for _, fileName := range []string{"one.txt", "two.txt"} {
+				writeErr := os.WriteFile(
+					filepath.Join(docsDirPath, fileName), []byte("x"), 0644,
+				)
+				if writeErr != nil {
+					t.Fatalf("WriteFileFailed: %v", writeErr)
+				}
+			}
+		}
+
+		startingPathPattern := filepath.Join(patternRootDirPath, "*", "docs")
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, startingPathPattern),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+
+		expectedPaths := []string{
+			filepath.Join(patternRootDirPath, "alpha", "docs", "one.txt"),
+			filepath.Join(patternRootDirPath, "alpha", "docs", "two.txt"),
+			filepath.Join(patternRootDirPath, "beta", "docs", "one.txt"),
+			filepath.Join(patternRootDirPath, "beta", "docs", "two.txt"),
+		}
+		if len(unixFiles) != len(expectedPaths) {
+			t.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
+		}
+		for matchIndex, expectedPath := range expectedPaths {
+			actualPath := unixFiles[matchIndex].Path.String()
+			if actualPath != expectedPath {
+				t.Errorf("UnexpectedMatchPath: %s", actualPath)
+			}
+		}
+	})
+
+	t.Run("ReturnsEmptyWhenWildcardMatchesNothing", func(t *testing.T) {
+		startingPathPattern := filepath.Join(tempDir, "*", "noSuchDir")
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, startingPathPattern),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 0 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("CapsEntriesAcrossWildcardRoots", func(t *testing.T) {
+		patternRootDirPath := t.TempDir()
+		for _, accountName := range []string{"alpha", "beta"} {
+			docsDirPath := filepath.Join(patternRootDirPath, accountName, "docs")
+			mkdirErr := os.MkdirAll(docsDirPath, 0755)
+			if mkdirErr != nil {
+				t.Fatalf("MkdirFailed: %v", mkdirErr)
+			}
+			for _, fileName := range []string{"one.txt", "two.txt"} {
+				writeErr := os.WriteFile(
+					filepath.Join(docsDirPath, fileName), []byte("x"), 0644,
+				)
+				if writeErr != nil {
+					t.Fatalf("WriteFileFailed: %v", writeErr)
+				}
+			}
+		}
+
+		maxFiles := uint64(3)
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(
+				t, filepath.Join(patternRootDirPath, "*", "docs"),
+			),
+			MaxFiles: &maxFiles,
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != int(maxFiles) {
+			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("SkipsNonDirectoryMatches", func(t *testing.T) {
+		patternRootDirPath := t.TempDir()
+		accountDirPath := filepath.Join(patternRootDirPath, "alpha")
+		mkdirErr := os.MkdirAll(accountDirPath, 0755)
+		if mkdirErr != nil {
+			t.Fatalf("MkdirFailed: %v", mkdirErr)
+		}
+		writeErr := os.WriteFile(
+			filepath.Join(accountDirPath, "one.txt"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+		writeErr = os.WriteFile(
+			filepath.Join(patternRootDirPath, "stray.txt"), []byte("x"), 0644,
+		)
+		if writeErr != nil {
+			t.Fatalf("WriteFileFailed: %v", writeErr)
+		}
+
+		unixFiles, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(
+				t, filepath.Join(patternRootDirPath, "*"),
+			),
+		})
+		if err != nil {
+			t.Fatalf("FindFailed: %v", err)
+		}
+		if len(unixFiles) != 1 {
+			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+		}
+	})
+
+	t.Run("FailsOnMalformedWildcardPattern", func(t *testing.T) {
+		_, err := clerk.Find(FileFindSettings{
+			StartingPathPattern: absoluteGlobPathForTest(t, filepath.Join(tempDir, "[")),
+		})
+		if !errors.Is(err, ErrGlobPatternInvalid) {
+			t.Fatalf("ExpectedErrGlobPatternInvalid, got: %v", err)
+		}
+	})
+}
+
+func TestCachedOwnerNameResolvers(t *testing.T) {
+	clerk := FileClerk{}
+
+	t.Run("ReturnsCachedUsernameWithoutLookup", func(t *testing.T) {
+		missingUserId, userIdErr := tkValueObject.NewUnixUserId(
+			unresolvableUnixUserIdFinder(t),
+		)
+		if userIdErr != nil {
+			t.Fatalf("UserIdInvalid: %v", userIdErr)
+		}
+		cachedUsername, usernameErr := tkValueObject.NewUnixUsername("ghost")
+		if usernameErr != nil {
+			t.Fatalf("UsernameInvalid: %v", usernameErr)
+		}
+		ownerNames := &ownerNameCache{
+			usernames: map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{
+				missingUserId: cachedUsername,
+			},
+			groupNames: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+		}
+
+		username, err := clerk.cachedUsernameResolver(ownerNames, missingUserId)
+		if err != nil {
+			t.Fatalf("CachedUsernameLookupFailed: %v", err)
+		}
+		if username != cachedUsername {
+			t.Errorf("UnexpectedCachedUsername: %s", username)
+		}
+	})
+
+	t.Run("StoresLookupResultForLaterHits", func(t *testing.T) {
+		processUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
+		if userIdErr != nil {
+			t.Fatalf("UserIdInvalid: %v", userIdErr)
+		}
+		ownerNames := &ownerNameCache{
+			usernames:  map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
+			groupNames: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+		}
+
+		_, err := clerk.cachedUsernameResolver(ownerNames, processUserId)
+		if err != nil {
+			t.Fatalf("UsernameLookupFailed: %v", err)
+		}
+		if _, isCached := ownerNames.usernames[processUserId]; !isCached {
+			t.Errorf("UsernameNotCached")
+		}
+	})
+}
+
+func TestUnixFilePermissionsFormatter(t *testing.T) {
+	clerk := FileClerk{}
+
+	testCases := []struct {
+		name                string
+		fileMode            os.FileMode
+		expectedPermissions string
+	}{
+		{"ZeroMode", 0, "000"},
+		{"PlainMode", 0o644, "644"},
+		{"SetuidMode", os.ModeSetuid | 0o755, "4755"},
+		{"SetgidMode", os.ModeSetgid | 0o775, "2775"},
+		{"StickyMode", os.ModeSticky | 0o777, "1777"},
+		{"AllSpecialBits", os.ModeSetuid | os.ModeSetgid | os.ModeSticky | 0o770, "7770"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			permissions, permissionsErr := clerk.unixFilePermissionsFormatter(
+				testCase.fileMode,
+			)
+			if permissionsErr != nil {
+				t.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
+			}
+			if permissions.String() != testCase.expectedPermissions {
+				t.Errorf(
+					"UnexpectedPermissions: got %s, expected %s",
+					permissions.String(), testCase.expectedPermissions,
+				)
+			}
+		})
+	}
+
+	t.Run("RoundTripsThroughToFileMode", func(t *testing.T) {
+		roundTripModes := []os.FileMode{
+			0,
+			0o644,
+			0o755,
+			os.ModeSetuid | 0o755,
+			os.ModeSetgid | 0o775,
+			os.ModeSticky | 0o777,
+			os.ModeSetuid | os.ModeSetgid | os.ModeSticky | 0o770,
+		}
+
+		for _, fileMode := range roundTripModes {
+			permissions, permissionsErr := clerk.unixFilePermissionsFormatter(
+				fileMode,
+			)
+			if permissionsErr != nil {
+				t.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
+			}
+			roundTrippedMode, modeErr := permissions.ToFileMode()
+			if modeErr != nil {
+				t.Fatalf("ToFileModeFailed: %v", modeErr)
+			}
+			if roundTrippedMode != fileMode {
+				t.Errorf(
+					"RoundTripMismatch: got %v, expected %v",
+					roundTrippedMode, fileMode,
+				)
+			}
 		}
 	})
 }
