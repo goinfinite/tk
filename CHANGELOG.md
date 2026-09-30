@@ -1,6 +1,14 @@
 # Changelog
 
 ```log
+0.4.0 - 2026/09/30
+feat: add FileClerk.ListDir and FileClerk.Find. Both read a directory tree through held, chain-verified directory handles and return UnixFile entities, so a path swap cannot redirect the read. MaxDepth 0 reads only the starting directory's entries; N reads N levels of subdirectories. MaxFiles (uint64) caps the result and each directory read; nil uses FileClerkDefaultMaxFiles (1000) and 0 reads without a cap. ListDir sorts by entry name with the path breaking ties; Find sorts by path.
+feat: Find takes exactly one of StartingPath or StartingPathPattern. StartingPath is a single directory walked as-is. StartingPathPattern accepts the glob wildcards * ? and []. Every directory it matches is walked, a wildcard that matches nothing returns an empty result, and a path that does not exist fails with ErrDirMissing. Setting both fails with ErrStartingPathConflict; setting neither fails with ErrStartingPathMissing. An optional NamePattern regex matches entry names. The cap counts across all matched starting directories.
+feat: add the UnixFile entity and the UnixAbsoluteGlobPath and UnixFilePermissions value objects. UnixFile carries name, path, MIME type, permissions, size, extension, owner and group ids and names, update time, and the symlink flag. UnixAbsoluteGlobPath accepts an absolute path with the glob wildcards.
+feat: the directory walk skips an entry it cannot stat and a subdirectory it cannot open, and a warning names the skipped path. A subdirectory replaced mid-walk fails with ErrTargetFileChanged. Owner user names and group names resolve through a per-operation cache, so each distinct id is looked up once per call.
+test: move the x509 certificate test to the external test package, so the infra package can import entity without an import cycle.
+docs: document ListDir and Find in the infra README, the domain README, and the feature map.
+
 0.3.9 - 2026/09/24
 feat: add tkVoUtil.IsAnyError. It reports whether an error matches any target error through errors.Is.
 feat: ShellSettings takes ExecutionDeadline, an optional absolute UnixTime. The timeout is ExecutionTimeoutSecs, ExecutionDeadline, or the earlier of the two when both are set. It is 1800 seconds when neither is set.
