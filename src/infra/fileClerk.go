@@ -1990,8 +1990,10 @@ func (clerk FileClerk) UpsertFile(
 }
 
 type ownerNameCache struct {
-	usernames  map[tkValueObject.UnixUserId]tkValueObject.UnixUsername
-	groupNames map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName
+	usernames       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername
+	groupNames      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName
+	usernameErrors  map[tkValueObject.UnixUserId]error
+	groupNameErrors map[tkValueObject.UnixGroupId]error
 }
 
 type dirReadSettings struct {
@@ -2029,8 +2031,10 @@ func (clerk FileClerk) dirReadSettingsResolver(
 		DirChainPolicy: *dirChainPolicy,
 		MaxFiles:       FileClerkDefaultMaxFiles,
 		OwnerNameCache: &ownerNameCache{
-			usernames:  map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
-			groupNames: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+			usernames:       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
+			groupNames:      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+			usernameErrors:  map[tkValueObject.UnixUserId]error{},
+			groupNameErrors: map[tkValueObject.UnixGroupId]error{},
 		},
 
 		TrustedDirOwnerUsernames: trustedDirOwnerUsernames,
@@ -2194,9 +2198,14 @@ func (clerk FileClerk) cachedUsernameResolver(
 	if isCached {
 		return username, nil
 	}
+	cachedLookupErr, hasFailedBefore := ownerNames.usernameErrors[ownerUserId]
+	if hasFailedBefore {
+		return username, cachedLookupErr
+	}
 
 	username, err = clerk.usernameByUserIdResolver(ownerUserId)
 	if err != nil {
+		ownerNames.usernameErrors[ownerUserId] = err
 		return username, err
 	}
 	ownerNames.usernames[ownerUserId] = username
@@ -2212,9 +2221,14 @@ func (clerk FileClerk) cachedGroupNameResolver(
 	if isCached {
 		return groupName, nil
 	}
+	cachedLookupErr, hasFailedBefore := ownerNames.groupNameErrors[ownerGroupId]
+	if hasFailedBefore {
+		return groupName, cachedLookupErr
+	}
 
 	groupName, err = clerk.groupNameByGroupIdResolver(ownerGroupId)
 	if err != nil {
+		ownerNames.groupNameErrors[ownerGroupId] = err
 		return groupName, err
 	}
 	ownerNames.groupNames[ownerGroupId] = groupName

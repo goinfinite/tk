@@ -6133,6 +6133,34 @@ func TestCachedOwnerNameResolvers(t *testing.T) {
 			t.Errorf("UsernameNotCached")
 		}
 	})
+
+	t.Run("CachesLookupErrorForLaterHits", func(t *testing.T) {
+		missingUserId, userIdErr := tkValueObject.NewUnixUserId(
+			unresolvableUnixUserIdFinder(t),
+		)
+		if userIdErr != nil {
+			t.Fatalf("UserIdInvalid: %v", userIdErr)
+		}
+		ownerNames := &ownerNameCache{
+			usernames:       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
+			groupNames:      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+			usernameErrors:  map[tkValueObject.UnixUserId]error{},
+			groupNameErrors: map[tkValueObject.UnixGroupId]error{},
+		}
+
+		_, firstErr := clerk.cachedUsernameResolver(ownerNames, missingUserId)
+		if firstErr == nil {
+			t.Fatalf("ExpectedUsernameLookupError")
+		}
+		if _, isCached := ownerNames.usernameErrors[missingUserId]; !isCached {
+			t.Errorf("UsernameLookupErrorNotCached")
+		}
+
+		_, secondErr := clerk.cachedUsernameResolver(ownerNames, missingUserId)
+		if secondErr != firstErr {
+			t.Errorf("CachedUsernameLookupErrorNotReturned: %v", secondErr)
+		}
+	})
 }
 
 func TestUnixFilePermissionsFormatter(t *testing.T) {
