@@ -1,8 +1,9 @@
-package entity
+package entity_test
 
 import (
 	"testing"
 
+	tkEntity "github.com/goinfinite/tk/src/domain/entity"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
@@ -23,7 +24,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		x509CertEntity, err := NewX509CertificateFromEnvelopedCertificate(
+		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
@@ -120,7 +121,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		x509CertEntity, err := NewX509CertificateFromEnvelopedCertificate(
+		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
@@ -160,7 +161,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		x509CertEntity, err := NewX509CertificateFromEnvelopedCertificate(
+		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
@@ -207,7 +208,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		x509CertEntity, err := NewX509CertificateFromEnvelopedCertificate(
+		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
@@ -249,7 +250,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		x509CertEntity, err := NewX509CertificateFromEnvelopedCertificate(
+		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
@@ -282,7 +283,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
-		_, err = NewX509CertificateFromEnvelopedCertificate(envelopedCert)
+		_, err = tkEntity.NewX509CertificateFromEnvelopedCertificate(envelopedCert)
 		if err == nil {
 			t.Fatalf("MissingExpectedError: malformed certificate should fail")
 		}

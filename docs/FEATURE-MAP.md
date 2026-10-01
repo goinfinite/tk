@@ -101,11 +101,12 @@ Resolves DNS records with configurable resolvers, timeouts, and an optional loca
 
 ## File Operations
 
-Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search/replace.
+Provides filesystem utilities: existence checks, read/write, copy, move, compress/decompress, permission management, regex search/replace, and wildcard-aware, symlink-safe directory listing and search.
 
 **Flow:**
 
 1. `src/infra/fileClerk.go` — `FileClerk` provides filesystem operations: exclusive create, atomic move, upsert and append, copy, compress/decompress, permission management, and regex search/replace
+2. `src/infra/fileClerk.go` — `ListDir` and `Find` walk a directory tree through held, chain-verified directory handles and return `[]UnixFile` entities (`src/domain/entity/unixFile.go`); depth and file caps bound the walk, an optional regex filters `Find` by entry name, `Find` walks a plain starting path or expands a wildcard starting-path pattern into every matching directory, a symlinked root path is refused unless the policy resolves it, and entry symlinks are reported but never descended
 
 ---
 

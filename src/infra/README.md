@@ -18,7 +18,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   deserializedMap, deserializationErr := FileDeserializer("config.json")
   ```
 
-- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, collision-safe temp file naming, and symlink handling.
+- **FileClerk**: Perform file operations including existence checks, creation, copying, reading content, regex search and replace, atomic overwrite-rename, collision-safe temp file naming, symlink-safe directory listing and search, and symlink handling.
 
   ```go
   clerk := FileClerk{}
@@ -48,6 +48,24 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
     FileAppendSettings{FilePath: regexSearchFilePath}, "new content",
   )
   fileTruncationErr := clerk.TruncateFileContent(regexSearchFilePath)
+
+  // DirectoryReading
+  listDirPath, listDirPathErr := tkValueObject.NewUnixAbsoluteFilePath(
+    "/var/www", false,
+  )
+  unixFiles, listDirErr := clerk.ListDir(FileListDirSettings{
+    DirPath:  listDirPath,
+    MaxDepth: 1,
+  })
+  namePattern := regexp.MustCompile(`\.conf$`)
+  findStartingPathPattern, findStartingPathPatternErr := tkValueObject.NewUnixAbsoluteGlobPath(
+    "/var/www/*/conf",
+  )
+  foundFiles, findErr := clerk.Find(FileFindSettings{
+    StartingPathPattern: findStartingPathPattern,
+    MaxDepth:            3,
+    NamePattern:         namePattern,
+  })
 
   // FileManipulation
   fileCopyErr := clerk.CopyFile("source.txt", "destination.txt")
@@ -113,6 +131,18 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   **FileContentRegexReplace and AppendFileContent Notes**
 
   `FileContentRegexReplace` takes `FileRegexReplaceSettings` and uses the same trust model as `UpsertFile`: it walks the parent directory chain through a held handle, opens the target through that handle, verifies the opened inode, and preserves the target's owner, group, and mode (special bits included). It refuses symlinks unless `SymlinkPolicy` resolves them. Empty files and directories are rejected. `AppendFileContent` verifies the opened inode and only appends to an existing file through an `O_APPEND` write, so the target's owner, group, and mode stay untouched and concurrent writers never lose data. A missing target fails with `ErrFileMissing`; create it with `UpsertFile` first. `FileAppendSettings` takes `SymlinkPolicy`, `DirChainPolicy`, `TrustedDirOwnerUsernames`, and `TrustedDirOwnerUserIds`.
+
+  **ListDir and Find Notes**
+
+  `ListDir` and `Find` read directory trees into `[]tkEntity.UnixFile` entities. They use the same trust model as `UpsertFile`. The root directory chain is walked through held handles, so a path swap cannot redirect the read. Every opened subdirectory is checked against its inspected inode.
+
+  `MaxDepth` 0 reads only the root's entries. `MaxDepth` N reads N levels of subdirectories. `MaxFiles` caps the returned entities and each directory read. A nil `MaxFiles` uses `FileClerkDefaultMaxFiles` (1000). A `MaxFiles` of 0 reads without a cap. A small cap truncates the result silently. Raise the cap, or pass 0, when the result must be complete.
+
+  `Find` takes exactly one of two starting points. `StartingPath` (type `UnixAbsoluteFilePath`) is a single directory walked as-is. `StartingPathPattern` (type `UnixAbsoluteGlobPath`) accepts the glob wildcards `*`, `?`, and `[]`, for example `/var/home/*/Downloads`, and every directory it matches is walked. A wildcard pattern that matches nothing returns an empty result. A starting path that does not exist fails with `ErrDirMissing`. Paths that are not directories are skipped. A wildcard match that cannot be read is skipped and a warning names it; a starting path that is named directly fails with its read error. Setting both starting points fails with `ErrStartingPathConflict`; setting neither fails with `ErrStartingPathMissing`. A symlinked starting directory fails the search under the default policy; pass a resolving `SymlinkPolicy` to walk it. Find also takes an optional `NamePattern` regex. The regex matches the entry name, not the path. A nil `NamePattern` matches every entry. `ListDir` sorts by entry name and the path breaks ties. `Find` sorts by path. The `MaxFiles` cap counts across all matched starting directories.
+
+  A symlinked root path is refused unless `SymlinkPolicy` resolves it. The walk reports an entry symlink and never descends into it.
+
+  An entry that cannot become an entity is skipped and logged at debug level. This happens when the value object rejects the name, or when the owner or group has no account. An entry the walk cannot stat, or a subdirectory it cannot open, is skipped and a warning names it. A subdirectory removed during the walk is skipped and logged at debug level. A subdirectory replaced during the walk fails with `ErrTargetFileChanged`. A missing directory fails with `ErrDirMissing`.
 
 - **Shell**: Execute system commands with configurable user, timeout, environment variables, and output redirection to files.
 
