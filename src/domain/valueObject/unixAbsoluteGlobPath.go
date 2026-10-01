@@ -55,3 +55,7 @@ func NewUnixAbsoluteGlobPath(value any) (
 func (vo UnixAbsoluteGlobPath) String() string {
 	return string(vo)
 }
+
+func (vo UnixAbsoluteGlobPath) HasWildcardChars() bool {
+	return strings.ContainsAny(vo.String(), "*?[")
+}

@@ -58,8 +58,9 @@ var (
 	// FileClerkDirChainPolicySharedWriteAllowed is the default policy.
 	FileClerkDirChainPolicySharedWriteAllowed FileClerkDirChainPolicy = "shared-write-allowed"
 
-	// FileClerkDirChainPolicySharedWriteRefused rejects a component writable
-	// by group or others, unless it is sticky (ErrDirectoryWritableByOthers).
+	// FileClerkDirChainPolicySharedWriteRefused rejects a component that
+	// is writable by group or others. A sticky component is allowed. The
+	// rejection fails with ErrDirectoryWritableByOthers.
 	FileClerkDirChainPolicySharedWriteRefused FileClerkDirChainPolicy = "shared-write-refused"
 
 	FileClerkOverwritePolicyStrictRefuse FileClerkOverwritePolicy = "strict-refuse"
@@ -141,7 +142,7 @@ func (clerk FileClerk) IsDir(filePath string) bool {
 	return fileInfo.IsDir() && !clerk.IsSymlink(filePath)
 }
 
-// TouchFile behaves like touch(1), except a dangling symlink fails with
+// TouchFile behaves like touch(1). A dangling symlink fails with
 // ErrTargetIsSymlink instead of creating the file behind the link.
 func (FileClerk) TouchFile(filePath string) error {
 	timestampNow := time.Now()
@@ -266,9 +267,9 @@ func (FileClerk) isTargetSource(sourcePath, targetPath string) bool {
 	return sourceErr == nil && targetErr == nil && os.SameFile(sourceInfo, targetInfo)
 }
 
-// MoveFile never replaces an existing target. Cross-device moves fall back
-// to copy+delete: the two files briefly coexist, and an interrupted run
-// leaves a partial target next to an untouched source.
+// MoveFile never replaces an existing target. Cross-device moves
+// fall back to copy and delete. An interrupted run leaves a partial
+// target next to an untouched source.
 func (clerk FileClerk) MoveFile(sourcePath, targetPath string) error {
 	if !clerk.IsFile(sourcePath) {
 		return ErrSourceFileMissing
@@ -303,9 +304,9 @@ func (clerk FileClerk) MoveFile(sourcePath, targetPath string) error {
 	return ErrTargetFileExists
 }
 
-// OverwriteFile atomically replaces targetPath's underlying file with
-// sourcePath's content. Symlink targets are written through, not replaced:
-// the original file and every other reference to it stay in place.
+// OverwriteFile atomically replaces the underlying file of targetPath
+// with the content of sourcePath. Symlink targets are written
+// through. The original file and every other reference stay in place.
 func (clerk FileClerk) OverwriteFile(sourcePath, targetPath string) error {
 	sourceInfo, statErr := os.Stat(sourcePath)
 	if statErr != nil {
@@ -401,8 +402,9 @@ func (clerk FileClerk) ReadFileContent(
 	return clerk.readFileContentFromReader(fileHandler, maxContentSizeBytesPtr)
 }
 
-// FileContentRegexFindings holds one regex match and its capture groups.
-// LineNumRange is [start, end] inclusive; a single-line match has start == end.
+// FileContentRegexFindings holds one regex match and its capture
+// groups. LineNumRange is [start, end] inclusive. A single-line match
+// has start == end.
 type FileContentRegexFindings struct {
 	Match        string
 	Groups       []string
@@ -418,11 +420,10 @@ func (clerk FileClerk) regexSearchWholeFile(
 		return regexSearchFindings, readErr
 	}
 
-	// DO NOT REPLACE: FindAllStringSubmatchIndex would halve the regex
-	// scan, but extracting match text and capture groups from raw index
-	// pairs requires manual slice arithmetic that makes the code
-	// unreadable. The gain is negligible (~ms on 10MiB files).
-	// Readability over performance.
+	// DO NOT REPLACE with FindAllStringSubmatchIndex. Extracting match
+	// text and capture groups from raw index pairs needs manual slice
+	// arithmetic and makes the code unreadable. The gain is about a
+	// millisecond on a 10 MiB file.
 	matchesWithGroups := regexPattern.FindAllStringSubmatch(fileContent, -1)
 	matchByteRanges := regexPattern.FindAllStringIndex(fileContent, -1)
 	if len(matchesWithGroups) != len(matchByteRanges) {
@@ -510,12 +511,11 @@ func (clerk FileClerk) regexTargetFileInspector(
 	return fileInfo, nil
 }
 
-// FileContentRegexSearch finds every regex match in a file with its 1-based
-// inclusive line range and capture groups. Files under
-// RegexLargeFileThresholdBytes are matched in one pass, so per-line anchors
-// need the (?m) flag and multi-line matches span every line they touch.
-// Larger files stream line-by-line, so multi-line patterns match within a
-// single line only.
+// FileContentRegexSearch finds every regex match in a file. Each
+// result has capture groups and a 1-based inclusive line range. Use
+// the (?m) flag for per-line anchors. Files at or above
+// RegexLargeFileThresholdBytes stream line by line, so a multi-line
+// pattern matches within one line only.
 func (clerk FileClerk) FileContentRegexSearch(
 	filePath tkValueObject.UnixAbsoluteFilePath,
 	regexPattern *regexp.Regexp,
@@ -616,7 +616,7 @@ func (clerk FileClerk) writeFileAtomically(
 			chownErr = fmt.Errorf("%w: %w", ErrFileOwnerChangeFailed, chownErr)
 		}
 	}
-	// Chmod last: chown clears the setuid and setgid bits a mode may carry.
+	// Chmod last. chown clears the setuid and setgid bits.
 	chmodErr := tempFile.Chmod(settings.Permissions)
 	closeErr := tempFile.Close()
 
@@ -730,8 +730,9 @@ func (clerk FileClerk) UpdateFileOwnership(
 	return os.Lchown(filePath, userId, groupId)
 }
 
-// UpdateFilePermissions never chmods through a symlink. Unlike chmod(2), it
-// requires read permission on the target; root is exempt.
+// UpdateFilePermissions never chmods through a symlink. Unlike
+// chmod(2), it requires read permission on the target. Root is
+// exempt.
 func (FileClerk) UpdateFilePermissions(
 	filePath string,
 	permissionsPtr *os.FileMode,
@@ -839,8 +840,8 @@ func (clerk FileClerk) CompressFile(
 }
 
 // DecompressFile expands sourcePath and removes the archive unless
-// shouldKeepSourceFilePtr requests otherwise. Zip extraction overwrites
-// existing files at the destination without warning: only decompress archives
+// shouldKeepSourceFilePtr requests otherwise. Zip extraction
+// overwrites existing files without warning. Only decompress archives
 // you trust.
 func (clerk FileClerk) DecompressFile(
 	sourcePath string,
@@ -1481,7 +1482,8 @@ type FileRegexReplaceSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When empty, the running process account is trusted; root is always trusted.
+	// When empty, the running process account is trusted. Root is
+	// always trusted.
 	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
 	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
@@ -1589,13 +1591,14 @@ func (clerk FileClerk) regexReplaceStreaming(
 	return replacementCount, nil
 }
 
-// FileContentRegexReplace atomically substitutes regex matches in a file. It
-// preserves the target's owner, group, and mode, including special bits. The
-// parent chain is held and the opened inode is verified against the inspected
-// target, so a swap between the two fails with ErrTargetFileChanged. Symlinks
-// are refused unless the policy resolves them. A zero-byte result fails; use
-// TruncateFileContent to empty a file. Files at or above the large-file
-// threshold stream line-by-line, so multi-line patterns need smaller files.
+// FileContentRegexReplace atomically substitutes regex matches. The
+// target keeps its owner, group, and mode, including special bits. A
+// swap during the operation fails with ErrTargetFileChanged. Symlinks
+// are refused unless the policy resolves them. A zero-byte result
+// fails with ErrReplacementWouldTruncateFile. Use
+// TruncateFileContent to empty a file. Files at or above the
+// large-file threshold stream line by line, so a multi-line pattern
+// needs a smaller file.
 func (clerk FileClerk) FileContentRegexReplace(
 	settings FileRegexReplaceSettings,
 	regexPattern *regexp.Regexp,
@@ -1668,16 +1671,17 @@ type FileAppendSettings struct {
 	DirChainPolicy *FileClerkDirChainPolicy
 	SymlinkPolicy  *FileClerkSymlinkPolicy
 
-	// When empty, the running process account is trusted; root is always trusted.
+	// When empty, the running process account is trusted. Root is
+	// always trusted.
 	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
 	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 }
 
-// AppendFileContent verifies the opened inode against the inspected target and
-// appends through an O_APPEND write, so concurrent writers never lose data and
-// the target's owner, group, and mode stay untouched. A missing target fails
-// with ErrFileMissing; create it with UpsertFile. Symlinks are refused unless
-// the policy resolves them.
+// AppendFileContent appends through an O_APPEND write, so concurrent
+// writers never lose data. The target keeps its owner, group, and
+// mode. A swap during the append fails with ErrTargetFileChanged. A
+// missing target fails with ErrFileMissing. Create it with
+// UpsertFile. Symlinks are refused unless the policy resolves them.
 func (clerk FileClerk) AppendFileContent(
 	settings FileAppendSettings,
 	content string,
@@ -1730,7 +1734,8 @@ type FileUpsertSettings struct {
 	OverwritePolicy *FileClerkOverwritePolicy
 	SymlinkPolicy   *FileClerkSymlinkPolicy
 
-	// When empty, the running process account is trusted; root is always trusted.
+	// When empty, the running process account is trusted. Root is
+	// always trusted.
 	TrustedDirOwnerUsernames []tkValueObject.UnixUsername
 	TrustedDirOwnerUserIds   []tkValueObject.UnixUserId
 
@@ -2433,14 +2438,12 @@ type FileListDirSettings struct {
 	MaxFiles *uint64
 }
 
-// ListDir reads a directory tree into UnixFile entities, sorted by entry
-// name with the path breaking ties. MaxDepth 0 reads only the root's
-// entries; N reads N levels of subdirectories. MaxFiles 0 reads without
-// a cap. A small MaxFiles truncates the result silently. A symlinked
-// root path is refused unless the policy resolves it. The walk reports
-// entry symlinks and never descends into them. An entry it cannot read
-// is skipped and a warning names it. A subdirectory replaced mid-walk
-// fails with ErrTargetFileChanged.
+// ListDir reads a directory tree into UnixFile entities sorted by
+// entry name. The path breaks ties. MaxDepth 0 reads only the root's
+// entries. MaxDepth N reads N levels of subdirectories. MaxFiles 0
+// reads without a cap. A small MaxFiles truncates silently. An
+// unreadable entry is skipped with a warning. A subdirectory replaced
+// mid-walk fails with ErrTargetFileChanged.
 func (clerk FileClerk) ListDir(
 	settings FileListDirSettings,
 ) (unixFiles []tkEntity.UnixFile, err error) {
@@ -2487,12 +2490,6 @@ type FileFindSettings struct {
 	NamePattern *regexp.Regexp
 }
 
-func patternHasWildcardChars(
-	startingPathPattern tkValueObject.UnixAbsoluteGlobPath,
-) bool {
-	return strings.ContainsAny(startingPathPattern.String(), "*?[")
-}
-
 func (FileClerk) startingDirPathsResolver(
 	startingPath tkValueObject.UnixAbsoluteFilePath,
 	startingPathPattern tkValueObject.UnixAbsoluteGlobPath,
@@ -2506,7 +2503,7 @@ func (FileClerk) startingDirPathsResolver(
 		return nil, ErrStartingPathMissing
 	}
 
-	patternHasWildcard := patternHasWildcardChars(startingPathPattern)
+	patternHasWildcard := startingPathPattern.HasWildcardChars()
 	var candidatePaths []string
 	if patternIsSet {
 		patternStr := startingPathPattern.String()
@@ -2581,23 +2578,18 @@ func (FileClerk) startingDirPathsResolver(
 	return startingDirPaths, nil
 }
 
-// Find walks a directory tree and returns UnixFile entities sorted by
-// path; the starting directory itself is not part of the results.
-// Exactly one of StartingPath and StartingPathPattern must be set.
-// StartingPath is used as-is; StartingPathPattern accepts the glob
-// wildcards * ? and [] and every directory it matches is walked. A
-// starting path that does not exist fails with ErrDirMissing, a
-// wildcard pattern that matches nothing returns an empty result, and
-// non-directories are skipped. A wildcard match that cannot be read is
-// skipped and a warning names it; a starting path that is named
-// directly fails with its read error. NamePattern matches the entry name; nil
-// matches every entry. MaxFiles 0 reads without a cap; a small MaxFiles
-// can stop the walk before later matches, and the cap counts across all
-// matched starting directories. A symlinked starting path is refused
-// unless the policy resolves it. The walk reports entry symlinks and
-// never descends into them. An entry it cannot read is skipped and a
-// warning names it. A subdirectory replaced mid-walk fails with
-// ErrTargetFileChanged.
+// Find walks every directory that StartingPath or
+// StartingPathPattern matches. It returns UnixFile entities sorted by
+// path. The starting directory is not in the results. Exactly one of
+// the two starting points must be set. A missing starting path fails
+// with ErrDirMissing. A wildcard that matches nothing returns an
+// empty result. Non-directories are skipped. A wildcard match that
+// cannot be read is skipped with a warning. A directly named path
+// fails with its read error. NamePattern matches the entry name. A
+// nil NamePattern matches every entry. MaxFiles 0 reads without a
+// cap. The cap counts across all matched starting directories. An
+// unreadable entry is skipped with a warning. A subdirectory replaced
+// mid-walk fails with ErrTargetFileChanged.
 func (clerk FileClerk) Find(
 	settings FileFindSettings,
 ) (unixFiles []tkEntity.UnixFile, err error) {
@@ -2616,7 +2608,7 @@ func (clerk FileClerk) Find(
 		return nil, startingDirPathsErr
 	}
 
-	patternHasWildcard := patternHasWildcardChars(settings.StartingPathPattern)
+	patternHasWildcard := settings.StartingPathPattern.HasWildcardChars()
 	unixFiles = []tkEntity.UnixFile{}
 	remainingMaxFiles := readSettings.MaxFiles
 	for _, startingDirPath := range startingDirPaths {

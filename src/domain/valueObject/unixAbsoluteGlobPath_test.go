@@ -59,4 +59,24 @@ func TestNewUnixAbsoluteGlobPath(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("HasWildcardCharsMethod", func(t *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     UnixAbsoluteGlobPath
+			expectedOutput bool
+		}{
+			{UnixAbsoluteGlobPath("/var/www"), false},
+			{UnixAbsoluteGlobPath("/var/home/*/Downloads"), true},
+			{UnixAbsoluteGlobPath("/var/log/?.log"), true},
+			{UnixAbsoluteGlobPath("/etc/[a-z]onf"), true},
+			{UnixAbsoluteGlobPath("/tmp/file[0-9]"), true},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.HasWildcardChars()
+			if actualOutput != testCase.expectedOutput {
+				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			}
+		}
+	})
 }
