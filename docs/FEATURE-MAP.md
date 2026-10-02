@@ -166,7 +166,7 @@ Reads and merges HTTP request input from path parameters, query strings, and req
 
 **Flow:**
 
-1. `src/presentation/requestInputReader.go` — `ApiRequestInputReader.Reader` merges request body, query params, route params, operator context, and multipart file uploads; supports dot-notation keys for hierarchical maps
+1. `src/presentation/requestInputReader.go` — `ApiRequestInputReader.Reader` merges request body, query params, route params, operator context, and multipart file uploads; supports dot-notation keys for hierarchical maps; uploads are grouped under the `files` key by form field as `map[string][]*multipart.FileHeader`
 
 ---
 
@@ -186,7 +186,8 @@ Parses pagination parameters from untrusted input into a typed Pagination DTO.
 
 **Flow:**
 
-1. `src/presentation/paginationParser.go` — `PaginationParser` extracts page number, items per page, sort by, sort direction, and last-seen-id from an input map
+1. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the pagination query params and caller-listed optional params into the untrusted input map; a value that fails its tk conversion stays out, and no defaults are written
+2. `src/presentation/paginationParser.go` — `PaginationParser` extracts page number, items per page, sort by, sort direction, and last-seen-id from an input map
 
 ---
 

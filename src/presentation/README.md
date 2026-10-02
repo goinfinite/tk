@@ -26,7 +26,7 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   requiredParamsValidationErr := RequiredParamsInspector(paramsReceived, paramsRequired)
   ```
 
-- **ApiRequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data.
+- **ApiRequestInputReader**: Read and parse JSON, form data, or multipart files from Echo HTTP requests into structured data. Uploaded files are grouped under the `files` key by form field: `requestBody["files"]` is a `map[string][]*multipart.FileHeader`, one key per field, each slice in upload order. A request with no files carries no `files` key.
 
   ```go
   inputReader := ApiRequestInputReader{}
@@ -64,6 +64,15 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   untrustedInput := map[string]any{"pageNumber": 1, "itemsPerPage": 20}
   parsedPagination, paginationParsingErr := PaginationParser(
     defaultPagination, untrustedInput,
+  )
+  ```
+
+- **PaginationQueryParamsReader**: Read pagination query params and caller-listed optional params from an Echo context into the untrusted input map that `PaginationParser` consumes. It reads `pageNumber`, `itemsPerPage`, `sortBy`, `sortDirection`, and `lastSeenId`. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and `PaginationParser` returns the default. A zero `itemsPerPage` is dropped. Optional params enter the map when present and non-empty, with no conversion. The reader writes no defaults; the liaison owns them through `PaginationParser`.
+
+  ```go
+  optionalParamNames := []string{"nature", "name", "type", "status"}
+  untrustedInput := tkPresentation.PaginationQueryParamsReader(
+    echoContext, optionalParamNames,
   )
   ```
 

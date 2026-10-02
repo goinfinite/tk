@@ -1,6 +1,12 @@
 # Changelog
 
 ```log
+0.4.1 - 2026/10/02
+feat: add PaginationQueryParamsReader. It reads pageNumber, itemsPerPage, sortBy, sortDirection, and lastSeenId from an Echo context into the untrusted input map that PaginationParser consumes. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and PaginationParser returns the default. A zero itemsPerPage is dropped. The optionalParamNames argument lists extra query params to copy when present and non-empty, with no conversion. The reader writes no defaults.
+feat: ApiRequestInputReader.Reader groups uploaded files by form field. requestBody["files"] is now map[string][]*multipart.FileHeader, one key per field, each slice in upload order. A request with no files carries no files key. Breaking change: the flat map[string]*multipart.FileHeader shape and the field_N keys are gone.
+refactor: remove ApiRequestInputReader.MultipartFilesProcessor. The reader assigns echo's MultipartForm.File directly. Breaking change.
+docs: document PaginationQueryParamsReader and the grouped upload shape in the presentation README, the presentation context, and the feature map.
+
 0.4.0 - 2026/09/30
 feat: add FileClerk.ListDir and FileClerk.Find. Both read a directory tree through held, chain-verified directory handles and return UnixFile entities, so a path swap cannot redirect the read. MaxDepth 0 reads only the starting directory's entries; N reads N levels of subdirectories. MaxFiles (uint64) caps the result and each directory read; nil uses FileClerkDefaultMaxFiles (1000) and 0 reads without a cap. ListDir sorts by entry name with the path breaking ties; Find sorts by path.
 feat: Find takes exactly one of StartingPath or StartingPathPattern. StartingPath is a single directory walked as-is. StartingPathPattern accepts the glob wildcards * ? and []. Every directory it matches is walked, a wildcard that matches nothing returns an empty result, and a path that does not exist fails with ErrDirMissing. A wildcard match that cannot be read is skipped with a warning; a starting path that is named directly fails with its read error. Setting both fails with ErrStartingPathConflict; setting neither fails with ErrStartingPathMissing. An optional NamePattern regex matches entry names. The cap counts across all matched starting directories.
