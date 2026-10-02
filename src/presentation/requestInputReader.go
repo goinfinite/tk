@@ -1,9 +1,7 @@
 package tkPresentation
 
 import (
-	"mime/multipart"
 	"net/http"
-	"strconv"
 	"strings"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -68,26 +66,6 @@ func (reader ApiRequestInputReader) FormUrlEncodedDataProcessor(
 	return requestBody
 }
 
-func (ApiRequestInputReader) MultipartFilesProcessor(
-	filesByKey map[string][]*multipart.FileHeader,
-) map[string]*multipart.FileHeader {
-	fileHeaders := map[string]*multipart.FileHeader{}
-
-	for fileKey, fileHandlers := range filesByKey {
-		if len(fileHandlers) == 1 {
-			fileHeaders[fileKey] = fileHandlers[0]
-			continue
-		}
-
-		for fileIndex, fileHandler := range fileHandlers {
-			indexedKey := fileKey + "_" + strconv.Itoa(fileIndex)
-			fileHeaders[indexedKey] = fileHandler
-		}
-	}
-
-	return fileHeaders
-}
-
 // ApiRequestInputReader.Reader extracts and normalizes input data from an HTTP request
 // into a flat map[string]any.
 //
@@ -101,8 +79,9 @@ func (ApiRequestInputReader) MultipartFilesProcessor(
 //     as string slices when a key appears more than once. Supports dot notation for nested
 //     structures (e.g., "user.name" becomes map["user"]["name"]).
 //   - multipart/form-data: Processes form fields similar to URL-encoded data. File uploads
-//     are normalized under the "files" key, with multiple files indexed as "key_0", "key_1", etc.
-//     Returns "InvalidMultipartFormData" error if the multipart form cannot be parsed.
+//     are grouped under the "files" key by form field, each field holding its files in
+//     upload order. Returns "InvalidMultipartFormData" error if the multipart form cannot
+//     be parsed.
 //   - Other/missing Content-Type: Returns "InvalidContentType" error.
 //
 // Query parameters:
@@ -152,8 +131,7 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 		requestBody = reader.FormUrlEncodedDataProcessor(requestBody, multipartForm.Value)
 
 		if len(multipartForm.File) > 0 {
-			fileHeaders := reader.MultipartFilesProcessor(multipartForm.File)
-			requestBody["files"] = fileHeaders
+			requestBody["files"] = multipartForm.File
 		}
 
 	default:

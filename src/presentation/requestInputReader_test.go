@@ -218,91 +218,6 @@ func TestFormUrlEncodedDataProcessor(t *testing.T) {
 	}
 }
 
-func TestMultipartFilesProcessor(t *testing.T) {
-	requestInputReader := ApiRequestInputReader{}
-
-	t.Run("SingleFilePerKey", func(t *testing.T) {
-		uploadedFilesByKey := map[string][]*multipart.FileHeader{
-			"file1": {
-				{Filename: "test1.txt"},
-			},
-			"file2": {
-				{Filename: "test2.txt"},
-			},
-		}
-
-		processedFiles := requestInputReader.MultipartFilesProcessor(uploadedFilesByKey)
-		if len(processedFiles) != 2 {
-			t.Errorf("ExpectedTwoFilesButGot: %d", len(processedFiles))
-		}
-
-		if processedFiles["file1"].Filename != "test1.txt" {
-			t.Errorf("File1NameMismatch: %s", processedFiles["file1"].Filename)
-		}
-
-		if processedFiles["file2"].Filename != "test2.txt" {
-			t.Errorf("File2NameMismatch: %s", processedFiles["file2"].Filename)
-		}
-	})
-
-	t.Run("MultipleFilesPerKey", func(t *testing.T) {
-		uploadedFilesByKey := map[string][]*multipart.FileHeader{
-			"files": {
-				{Filename: "test1.txt"},
-				{Filename: "test2.txt"},
-				{Filename: "test3.txt"},
-			},
-		}
-
-		processedFiles := requestInputReader.MultipartFilesProcessor(uploadedFilesByKey)
-
-		if len(processedFiles) != 3 {
-			t.Errorf("ExpectedThreeFilesButGot: %d", len(processedFiles))
-		}
-
-		if processedFiles["files_0"].Filename != "test1.txt" {
-			t.Errorf("Files0NameMismatch: %s", processedFiles["files_0"].Filename)
-		}
-
-		if processedFiles["files_1"].Filename != "test2.txt" {
-			t.Errorf("Files1NameMismatch: %s", processedFiles["files_1"].Filename)
-		}
-
-		if processedFiles["files_2"].Filename != "test3.txt" {
-			t.Errorf("Files2NameMismatch: %s", processedFiles["files_2"].Filename)
-		}
-	})
-
-	t.Run("MixedSingleAndMultipleFiles", func(t *testing.T) {
-		uploadedFilesByKey := map[string][]*multipart.FileHeader{
-			"single": {
-				{Filename: "single.txt"},
-			},
-			"multiple": {
-				{Filename: "multi1.txt"},
-				{Filename: "multi2.txt"},
-			},
-		}
-
-		processedFiles := requestInputReader.MultipartFilesProcessor(uploadedFilesByKey)
-		if len(processedFiles) != 3 {
-			t.Errorf("ExpectedThreeFilesButGot: %d", len(processedFiles))
-		}
-
-		if processedFiles["single"].Filename != "single.txt" {
-			t.Errorf("SingleFileNameMismatch: %s", processedFiles["single"].Filename)
-		}
-
-		if processedFiles["multiple_0"].Filename != "multi1.txt" {
-			t.Errorf("Multiple0NameMismatch: %s", processedFiles["multiple_0"].Filename)
-		}
-
-		if processedFiles["multiple_1"].Filename != "multi2.txt" {
-			t.Errorf("Multiple1NameMismatch: %s", processedFiles["multiple_1"].Filename)
-		}
-	})
-}
-
 func TestApiRequestInputReader(t *testing.T) {
 	requestInputReader := ApiRequestInputReader{}
 
@@ -431,7 +346,7 @@ func TestApiRequestInputReader(t *testing.T) {
 			t.Fatalf("WriteFileContentFailed: %v", err)
 		}
 
-		multipartWriter.Close()
+		_ = multipartWriter.Close()
 
 		httpRequest := httptest.NewRequest(http.MethodPost, "/", multipartBody)
 		httpRequest.Header.Set("Content-Type", multipartWriter.FormDataContentType())
@@ -454,15 +369,20 @@ func TestApiRequestInputReader(t *testing.T) {
 			)
 		}
 
-		uploadedFiles, hasFiles := parsedRequestBody["files"].(map[string]*multipart.FileHeader)
+		uploadedFiles, hasFiles := parsedRequestBody["files"].(map[string][]*multipart.FileHeader)
 		if !hasFiles {
 			t.Errorf("FilesNotFound")
 		}
 
-		if uploadedFiles["avatar"].Filename != "avatar.jpg" {
+		avatarFiles := uploadedFiles["avatar"]
+		if len(avatarFiles) != 1 {
+			t.Fatalf("ExpectedOneAvatarFileButGot: %d", len(avatarFiles))
+		}
+
+		if avatarFiles[0].Filename != "avatar.jpg" {
 			t.Errorf(
 				"AvatarFilenameMismatch: expected avatar.jpg, got %s",
-				uploadedFiles["avatar"].Filename,
+				avatarFiles[0].Filename,
 			)
 		}
 	})
@@ -486,7 +406,7 @@ func TestApiRequestInputReader(t *testing.T) {
 			}
 		}
 
-		multipartWriter.Close()
+		_ = multipartWriter.Close()
 
 		httpRequest := httptest.NewRequest(http.MethodPost, "/", multipartBody)
 		httpRequest.Header.Set("Content-Type", multipartWriter.FormDataContentType())
@@ -498,20 +418,97 @@ func TestApiRequestInputReader(t *testing.T) {
 			t.Fatalf("UnexpectedError: %v", err)
 		}
 
-		uploadedFiles, hasFiles := parsedRequestBody["files"].(map[string]*multipart.FileHeader)
+		uploadedFiles, hasFiles := parsedRequestBody["files"].(map[string][]*multipart.FileHeader)
 		if !hasFiles {
 			t.Errorf("FilesNotFound")
 		}
 
-		if len(uploadedFiles) != 3 {
-			t.Errorf("ExpectedThreeFilesButGot: %d", len(uploadedFiles))
+		documentFiles := uploadedFiles["documents"]
+		if len(documentFiles) != 3 {
+			t.Fatalf("ExpectedThreeDocumentsButGot: %d", len(documentFiles))
 		}
 
-		if uploadedFiles["documents_0"].Filename != "doc0.pdf" {
+		for fileIndex, documentFile := range documentFiles {
+			expectedFileName := "doc" + strconv.Itoa(fileIndex) + ".pdf"
+			if documentFile.Filename != expectedFileName {
+				t.Errorf(
+					"DocumentFilenameMismatchAtIndex %d: expected %s, got %s",
+					fileIndex, expectedFileName, documentFile.Filename,
+				)
+			}
+		}
+	})
+
+	t.Run("MultipartFormDataWithLiteralIndexedFieldName", func(t *testing.T) {
+		echoInstance := echo.New()
+
+		multipartBody := &bytes.Buffer{}
+		multipartWriter := multipart.NewWriter(multipartBody)
+
+		fileWriter, err := multipartWriter.CreateFormFile("archiveFiles_0", "literal.txt")
+		if err != nil {
+			t.Fatalf("CreateFormFileFailed: %v", err)
+		}
+
+		_, err = io.WriteString(fileWriter, "fake content")
+		if err != nil {
+			t.Fatalf("WriteFileContentFailed: %v", err)
+		}
+
+		_ = multipartWriter.Close()
+
+		httpRequest := httptest.NewRequest(http.MethodPost, "/", multipartBody)
+		httpRequest.Header.Set("Content-Type", multipartWriter.FormDataContentType())
+		httpRecorder := httptest.NewRecorder()
+		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
+
+		parsedRequestBody, err := requestInputReader.Reader(echoContext)
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		uploadedFiles, hasFiles := parsedRequestBody["files"].(map[string][]*multipart.FileHeader)
+		if !hasFiles {
+			t.Fatalf("FilesNotFound")
+		}
+
+		literalFiles := uploadedFiles["archiveFiles_0"]
+		if len(literalFiles) != 1 {
+			t.Fatalf("ExpectedOneLiteralFileButGot: %d", len(literalFiles))
+		}
+
+		if literalFiles[0].Filename != "literal.txt" {
 			t.Errorf(
-				"Documents0FilenameMismatch: expected doc0.pdf, got %s",
-				uploadedFiles["documents_0"].Filename,
+				"LiteralFilenameMismatch: expected literal.txt, got %s",
+				literalFiles[0].Filename,
 			)
+		}
+	})
+
+	t.Run("MultipartFormDataWithoutFiles", func(t *testing.T) {
+		echoInstance := echo.New()
+
+		multipartBody := &bytes.Buffer{}
+		multipartWriter := multipart.NewWriter(multipartBody)
+		err := multipartWriter.WriteField("name", "john")
+		if err != nil {
+			t.Fatalf("WriteFieldNameFailed: %v", err)
+		}
+
+		_ = multipartWriter.Close()
+
+		httpRequest := httptest.NewRequest(http.MethodPost, "/", multipartBody)
+		httpRequest.Header.Set("Content-Type", multipartWriter.FormDataContentType())
+		httpRecorder := httptest.NewRecorder()
+		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
+
+		parsedRequestBody, err := requestInputReader.Reader(echoContext)
+		if err != nil {
+			t.Fatalf("UnexpectedError: %v", err)
+		}
+
+		if _, hasFiles := parsedRequestBody["files"]; hasFiles {
+			t.Errorf("UnexpectedFilesKey")
 		}
 	})
 
