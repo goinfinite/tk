@@ -2,7 +2,7 @@
 
 ```log
 0.4.1 - 2026/10/02
-feat: add PaginationQueryParamsReader. It reads pageNumber, itemsPerPage, sortBy, sortDirection, and lastSeenId from an Echo context into the untrusted input map that PaginationParser consumes. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and PaginationParser returns the default. A zero itemsPerPage is dropped. The optionalParamNames argument lists extra query params to copy when present and non-empty, with no conversion. The reader writes no defaults.
+feat: add PaginationQueryParamsReader. It reads pageNumber, itemsPerPage, sortBy, sortDirection, and lastSeenId from an Echo context into the untrusted input map that PaginationParser consumes. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and PaginationParser returns the default. A zero itemsPerPage is dropped. The optionalParamNames argument lists extra query params to copy when present and non-empty, with no conversion; a pagination key listed among them is ignored, so the converted value stands. The reader writes no defaults.
 feat: ApiRequestInputReader.Reader groups uploaded files by form field. requestBody["files"] is now map[string][]*multipart.FileHeader, one key per field, each slice in upload order. A request with no files carries no files key. Breaking change: the flat map[string]*multipart.FileHeader shape and the field_N keys are gone.
 refactor: remove ApiRequestInputReader.MultipartFilesProcessor. The reader assigns echo's MultipartForm.File directly. Breaking change.
 docs: document PaginationQueryParamsReader and the grouped upload shape in the presentation README, the presentation context, and the feature map.

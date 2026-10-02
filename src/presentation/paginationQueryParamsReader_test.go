@@ -123,6 +123,33 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		}
 	})
 
+	t.Run("IgnoresPaginationKeysListedAsOptional", func(t *testing.T) {
+		echoInstance := echo.New()
+		httpRequest := httptest.NewRequest(
+			http.MethodGet, "/?pageNumber=2&sortBy=bad@sort&nature=app", nil,
+		)
+		httpRecorder := httptest.NewRecorder()
+		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
+
+		optionalParamNames := []string{"pageNumber", "sortBy", "nature"}
+		requestParams := PaginationQueryParamsReader(echoContext, optionalParamNames)
+
+		if requestParams["pageNumber"] != uint32(2) {
+			t.Errorf(
+				"PageNumberMismatch: expected converted 2, got %v",
+				requestParams["pageNumber"],
+			)
+		}
+
+		if _, hasSortBy := requestParams["sortBy"]; hasSortBy {
+			t.Errorf("UnexpectedMalformedSortBy: %v", requestParams["sortBy"])
+		}
+
+		if requestParams["nature"] != "app" {
+			t.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
+		}
+	})
+
 	t.Run("ReadsOnlyPaginationKeysWithoutOptionalNames", func(t *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(

@@ -71,6 +71,11 @@ func PaginationQueryParamsReader(
 	}
 
 	for _, optionalParamName := range optionalParamNames {
+		switch optionalParamName {
+		case "pageNumber", "itemsPerPage", "sortBy", "sortDirection", "lastSeenId":
+			continue
+		}
+
 		optionalParamValue := echoContext.QueryParam(optionalParamName)
 		if optionalParamValue == "" {
 			continue

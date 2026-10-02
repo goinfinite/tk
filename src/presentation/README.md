@@ -67,7 +67,7 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   )
   ```
 
-- **PaginationQueryParamsReader**: Read pagination query params and caller-listed optional params from an Echo context into the untrusted input map that `PaginationParser` consumes. It reads `pageNumber`, `itemsPerPage`, `sortBy`, `sortDirection`, and `lastSeenId`. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and `PaginationParser` returns the default. A zero `itemsPerPage` is dropped. Optional params enter the map when present and non-empty, with no conversion. The reader writes no defaults; the liaison owns them through `PaginationParser`.
+- **PaginationQueryParamsReader**: Read pagination query params and caller-listed optional params from an Echo context into the untrusted input map that `PaginationParser` consumes. It reads `pageNumber`, `itemsPerPage`, `sortBy`, `sortDirection`, and `lastSeenId`. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and `PaginationParser` returns the default. A zero `itemsPerPage` is dropped. Optional params enter the map when present and non-empty, with no conversion; a pagination key listed among them is ignored, so the converted value stands. The reader writes no defaults; the liaison owns them through `PaginationParser`.
 
   ```go
   optionalParamNames := []string{"nature", "name", "type", "status"}
