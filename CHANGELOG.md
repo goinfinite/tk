@@ -5,6 +5,7 @@
 feat: InterfaceToBool accepts yes, y, s, and sim as true and no and n as false, ignoring case and surrounding whitespace. on, off, and every strconv.ParseBool value keep their current behavior.
 feat: add ActivityRecordQueryRepo.Count. It returns the number of activity records that match the same filters as Read and ignores pagination. Breaking change: the exported interface gains a method, so downstream implementations must add it.
 docs: document the boolean words and Count in the domain README, the feature map, and the repository context files.
+chore: update Go to 1.27.3.
 
 0.4.1 - 2026/10/02
 feat: add PaginationQueryParamsReader. It reads pageNumber, itemsPerPage, sortBy, sortDirection, and lastSeenId from an Echo context into the untrusted input map that PaginationParser consumes. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and PaginationParser returns the default. A zero itemsPerPage is dropped. The optionalParamNames argument lists extra query params to copy when present and non-empty, with no conversion; a pagination key listed among them is ignored, so the converted value stands. The reader writes no defaults.

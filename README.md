@@ -14,7 +14,7 @@ If you're looking for UI components, please refer to the [Infinite UI](https://g
 
 ## Installation
 
-TK requires Go 1.27.1 or later. Install it with:
+TK requires Go 1.27.3 or later. Install it with:
 
 ```bash
 go get github.com/goinfinite/tk
