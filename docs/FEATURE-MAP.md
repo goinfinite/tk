@@ -26,8 +26,8 @@ Queries activity records with filtering and pagination support. Returns a pagina
 
 1. `src/domain/dto/readActivityRecords.go` — request DTO with optional filters (record code, level, time range, operator, affected resource) and response DTO wrapping pagination + entity slice
 2. `src/domain/useCase/readActivityRecords.go` — orchestrates the read; defines default pagination; delegates to the query repo
-3. `src/domain/repository/activityRecordQueryRepo.go` — interface declaring `Read` (paginated list) and `ReadFirst`
-4. `src/infra/activityRecord/activityRecordQueryRepo.go` — GORM implementation: builds filtered query, applies pagination, loads associated resources, transforms models to entities
+3. `src/domain/repository/activityRecordQueryRepo.go` — interface declaring `Read` (paginated list), `Count` (filtered total), and `ReadFirst`
+4. `src/infra/activityRecord/activityRecordQueryRepo.go` — GORM implementation: builds one filtered query shared by `Read`, `Count`, and `ReadFirst`; `Read` applies pagination, loads associated resources, and transforms models to entities; `Count` returns the matching total and ignores pagination
 5. `src/infra/db/paginationQueryBuilder.go` — builds paginated GORM queries (page-number or last-seen-id mode); callers MUST set `.Model(...)` because sort fields and the cursor default resolve through the parsed schema
 6. `src/infra/db/model/activityRecord.go` — GORM model with `ToEntity()` conversion to domain entity
 7. `src/domain/entity/activityRecord.go` — domain entity returned in the response

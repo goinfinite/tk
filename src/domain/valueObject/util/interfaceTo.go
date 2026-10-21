@@ -15,11 +15,10 @@ func InterfaceToBool(input any) (output bool, conversionErr error) {
 	case string:
 		stringValue := strings.TrimSpace(inputValue)
 		stringValue = strings.ToLower(stringValue)
-		if stringValue == "on" {
+		switch stringValue {
+		case "on", "yes", "y", "s", "sim":
 			return true, nil
-		}
-
-		if stringValue == "off" {
+		case "off", "no", "n":
 			return false, nil
 		}
 

@@ -9,6 +9,7 @@ import (
 	tkUseCase "github.com/goinfinite/tk/src/domain/useCase"
 	tkInfraDb "github.com/goinfinite/tk/src/infra/db"
 	tkInfraDbModel "github.com/goinfinite/tk/src/infra/db/model"
+	"gorm.io/gorm"
 )
 
 type ActivityRecordQueryRepo struct {
@@ -21,9 +22,9 @@ func NewActivityRecordQueryRepo(
 	return &ActivityRecordQueryRepo{trailDbSvc: trailDbSvc}
 }
 
-func (repo *ActivityRecordQueryRepo) Read(
+func (repo *ActivityRecordQueryRepo) filteredQueryBuilder(
 	requestDto tkDto.ReadActivityRecordsRequest,
-) (responseDto tkDto.ReadActivityRecordsResponse, err error) {
+) *gorm.DB {
 	recordModel := tkInfraDbModel.ActivityRecord{}
 	if requestDto.RecordId != nil {
 		recordId := requestDto.RecordId.Uint64()
@@ -73,8 +74,14 @@ func (repo *ActivityRecordQueryRepo) Read(
 		dbQuery = dbQuery.Where("created_at > ?", requestDto.CreatedAfterAt.ReadAsGoTime())
 	}
 
+	return dbQuery
+}
+
+func (repo *ActivityRecordQueryRepo) Read(
+	requestDto tkDto.ReadActivityRecordsRequest,
+) (responseDto tkDto.ReadActivityRecordsResponse, err error) {
 	paginatedDbQuery, responsePagination, err := tkInfraDb.PaginationQueryBuilder(
-		dbQuery, requestDto.Pagination, "",
+		repo.filteredQueryBuilder(requestDto), requestDto.Pagination, "",
 	)
 	if err != nil {
 		return responseDto, errors.New("PaginationQueryBuilderError: " + err.Error())
@@ -96,13 +103,27 @@ func (repo *ActivityRecordQueryRepo) Read(
 			)
 			continue
 		}
-		responseDto.ActivityRecords = append(responseDto.ActivityRecords, activityRecordEntity)
+		responseDto.ActivityRecords = append(
+			responseDto.ActivityRecords, activityRecordEntity,
+		)
 	}
 
 	return tkDto.ReadActivityRecordsResponse{
 		ActivityRecords: responseDto.ActivityRecords,
 		Pagination:      responsePagination,
 	}, nil
+}
+
+func (repo *ActivityRecordQueryRepo) Count(
+	requestDto tkDto.ReadActivityRecordsRequest,
+) (count uint64, err error) {
+	var itemsTotal int64
+	err = repo.filteredQueryBuilder(requestDto).Count(&itemsTotal).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(itemsTotal), nil
 }
 
 func (repo *ActivityRecordQueryRepo) ReadFirst(
