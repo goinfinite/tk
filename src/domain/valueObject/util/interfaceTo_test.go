@@ -38,6 +38,19 @@ func TestInterfaceToBool(t *testing.T) {
 			{"False", false},
 			{"on", true},
 			{"off", false},
+			{"yes", true},
+			{"YES", true},
+			{"y", true},
+			{"Y", true},
+			{"no", false},
+			{"NO", false},
+			{"n", false},
+			{"N", false},
+			{"s", true},
+			{"S", true},
+			{"sim", true},
+			{"SIM", true},
+			{"  sim  ", true},
 			{"1", true},
 			{"0", false},
 			{"  true  ", true},
@@ -53,7 +66,7 @@ func TestInterfaceToBool(t *testing.T) {
 			}
 		}
 
-		invalidInputStrings := []string{"yes", "no", "invalid", "2", "-1"}
+		invalidInputStrings := []string{"invalid", "2", "-1"}
 		for _, invalidString := range invalidInputStrings {
 			_, conversionErr := InterfaceToBool(invalidString)
 			if conversionErr == nil {

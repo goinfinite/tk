@@ -379,6 +379,209 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 	})
 }
 
+func TestActivityRecordQueryRepoCount(t *testing.T) {
+	t.Run("EmptyDatabase", func(t *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(t)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+
+		count, err := queryRepo.Count(tkDto.ReadActivityRecordsRequest{})
+		if err != nil {
+			t.Errorf("CountFailedOnEmptyDatabase: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("ExpectedZeroCount: got %d", count)
+		}
+	})
+
+	t.Run("CountWithFilters", func(t *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(t)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+
+		codeAVo, err := tkValueObject.NewActivityRecordCode("COUNT_CODE_A")
+		if err != nil {
+			t.Fatalf("CreateCodeAVoFailed: %v", err)
+		}
+		codeBVo, err := tkValueObject.NewActivityRecordCode("COUNT_CODE_B")
+		if err != nil {
+			t.Fatalf("CreateCodeBVoFailed: %v", err)
+		}
+
+		sri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/count1")
+		if err != nil {
+			t.Fatalf("CreateRes1VoFailed: %v", err)
+		}
+		sri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/count2")
+		if err != nil {
+			t.Fatalf("CreateRes2VoFailed: %v", err)
+		}
+
+		accountId1Vo, err := tkValueObject.NewAccountId(1)
+		if err != nil {
+			t.Fatalf("CreateAccountId1VoFailed: %v", err)
+		}
+		operatorSri1 := tkValueObject.NewSriAccount(accountId1Vo)
+		accountId2Vo, err := tkValueObject.NewAccountId(2)
+		if err != nil {
+			t.Fatalf("CreateAccountId2VoFailed: %v", err)
+		}
+		operatorSri2 := tkValueObject.NewSriAccount(accountId2Vo)
+
+		ip1, err := tkValueObject.NewIpAddress("192.168.1.1")
+		if err != nil {
+			t.Fatalf("CreateIp1VoFailed: %v", err)
+		}
+		ip2, err := tkValueObject.NewIpAddress("192.168.1.2")
+		if err != nil {
+			t.Fatalf("CreateIp2VoFailed: %v", err)
+		}
+
+		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+			RecordCode:        codeAVo,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{sri1},
+			OperatorSri:       &operatorSri1,
+			OperatorIpAddress: &ip1,
+		})
+		if err != nil {
+			t.Fatalf("CreateRecordAFailed: %v", err)
+		}
+
+		recordB, err := createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
+			RecordLevel:       tkValueObject.ActivityRecordLevelError,
+			RecordCode:        codeBVo,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{sri2},
+			OperatorSri:       &operatorSri2,
+			OperatorIpAddress: &ip2,
+		})
+		if err != nil {
+			t.Fatalf("CreateRecordBFailed: %v", err)
+		}
+
+		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
+			RecordLevel:       tkValueObject.ActivityRecordLevelInfo,
+			RecordCode:        codeAVo,
+			AffectedResources: []tkValueObject.SystemResourceIdentifier{},
+		})
+		if err != nil {
+			t.Fatalf("CreateRecordCFailed: %v", err)
+		}
+
+		recordIdVo, err := tkValueObject.NewActivityRecordId(recordB.RecordId.Uint64())
+		if err != nil {
+			t.Fatalf("CreateRecordIdVoFailed: %v", err)
+		}
+
+		futureTimeVo := tkValueObject.NewUnixTimeAfterNow(1 * time.Hour)
+		pastTimeVo := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
+		infoLevel := tkValueObject.ActivityRecordLevelInfo
+		errorLevel := tkValueObject.ActivityRecordLevelError
+
+		testCases := []struct {
+			name          string
+			requestDto    tkDto.ReadActivityRecordsRequest
+			expectedCount uint64
+		}{
+			{
+				name:          "NoFilters",
+				requestDto:    tkDto.ReadActivityRecordsRequest{},
+				expectedCount: 3,
+			},
+			{
+				name:          "RecordIdFilter",
+				requestDto:    tkDto.ReadActivityRecordsRequest{RecordId: &recordIdVo},
+				expectedCount: 1,
+			},
+			{
+				name:          "RecordCodeFilter",
+				requestDto:    tkDto.ReadActivityRecordsRequest{RecordCode: &codeAVo},
+				expectedCount: 2,
+			},
+			{
+				name:          "RecordLevelFilter",
+				requestDto:    tkDto.ReadActivityRecordsRequest{RecordLevel: &infoLevel},
+				expectedCount: 2,
+			},
+			{
+				name: "AffectedResourcesFilter",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					AffectedResources: []tkValueObject.SystemResourceIdentifier{sri1},
+				},
+				expectedCount: 1,
+			},
+			{
+				name:          "OperatorSriFilter",
+				requestDto:    tkDto.ReadActivityRecordsRequest{OperatorSri: &operatorSri1},
+				expectedCount: 1,
+			},
+			{
+				name: "OperatorIpAddressFilter",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					OperatorIpAddress: &ip2,
+				},
+				expectedCount: 1,
+			},
+			{
+				name: "CreatedBeforeAtFuture",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					CreatedBeforeAt: &futureTimeVo,
+				},
+				expectedCount: 3,
+			},
+			{
+				name: "CreatedBeforeAtPast",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					CreatedBeforeAt: &pastTimeVo,
+				},
+				expectedCount: 0,
+			},
+			{
+				name: "CreatedAfterAtPast",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					CreatedAfterAt: &pastTimeVo,
+				},
+				expectedCount: 3,
+			},
+			{
+				name: "CreatedAfterAtFuture",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					CreatedAfterAt: &futureTimeVo,
+				},
+				expectedCount: 0,
+			},
+			{
+				name: "CombinedFilters",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					RecordCode:  &codeAVo,
+					RecordLevel: &errorLevel,
+				},
+				expectedCount: 0,
+			},
+			{
+				name: "PaginationIgnored",
+				requestDto: tkDto.ReadActivityRecordsRequest{
+					Pagination: tkDto.Pagination{PageNumber: 1, ItemsPerPage: 1},
+				},
+				expectedCount: 3,
+			},
+		}
+
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				count, err := queryRepo.Count(testCase.requestDto)
+				if err != nil {
+					t.Errorf("CountWith%sFilterFailed: %v", testCase.name, err)
+				}
+				if count != testCase.expectedCount {
+					t.Errorf(
+						"UnexpectedCountWith%sFilter: expected %d, got %d",
+						testCase.name, testCase.expectedCount, count,
+					)
+				}
+			})
+		}
+	})
+}
+
 func TestActivityRecordQueryRepoReadFirst(t *testing.T) {
 	dbSvc := SetupTestTrailDatabaseService(t)
 	queryRepo := NewActivityRecordQueryRepo(dbSvc)

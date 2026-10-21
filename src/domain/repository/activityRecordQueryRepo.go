@@ -7,5 +7,6 @@ import (
 
 type ActivityRecordQueryRepo interface {
 	Read(tkDto.ReadActivityRecordsRequest) (tkDto.ReadActivityRecordsResponse, error)
+	Count(tkDto.ReadActivityRecordsRequest) (uint64, error)
 	ReadFirst(tkDto.ReadActivityRecordsRequest) (tkEntity.ActivityRecord, error)
 }

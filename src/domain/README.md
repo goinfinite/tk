@@ -14,7 +14,7 @@ The library offers a diverse range of value objects (VO) to represent domain ent
 
 ## Value Object Utilities
 
-- **InterfaceTo**: Safely convert any value to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking.
+- **InterfaceTo**: Safely convert any value to primitive types (bool, string, int, float, etc.) using reflection, handling various input formats with error checking. Boolean strings accept `true`/`false`, `on`/`off`, `yes`/`y`/`s`/`sim`, `no`/`n`, and `1`/`0`, case-insensitively and around surrounding whitespace.
 
   ```go
   boolValue, boolConversionErr := tkVoUtil.InterfaceToBool("true")
@@ -144,17 +144,17 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
 ### Repositories
 
 - **ActivityRecordCmdRepo**: Interface for command operations (create, delete) on activity records.
-- **ActivityRecordQueryRepo**: Interface for query operations (read) on activity records.
+- **ActivityRecordQueryRepo**: Interface for query operations (read, count) on activity records.
 
 ### Usage Examples
 
 - **Counting Failed Login Attempts**: Query activity records to count failed login attempts for security monitoring.
 
   ```go
-  func readFailedLoginAttemptsCount(
+  func countFailedLoginAttempts(
       activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
       operatorIpAddress tkValueObject.IpAddress,
-  ) (attemptsCount uint, err error) {
+  ) (attemptsCount uint64, err error) {
       recordLevel := tkValueObject.ActivityRecordLevelSecurity
       recordCode, _ := tkValueObject.NewActivityRecordCode(
           "CreateSessionTokenFailed",
@@ -163,18 +163,11 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
           24 * time.Hour,
       )
 
-      readResponseDto, err := tkUseCase.ReadActivityRecords(
-          activityRecordQueryRepo, tkDto.ReadActivityRecordsRequest{
-              Pagination:        tkUseCase.ActivityRecordsDefaultPagination,
-              RecordLevel:       &recordLevel,
-              RecordCode:        &recordCode,
-              OperatorIpAddress: &operatorIpAddress,
-              CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
-          })
-      if err != nil {
-          return attemptsCount, err
-      }
-
-      return uint(len(readResponseDto.ActivityRecords)), nil
+      return activityRecordQueryRepo.Count(tkDto.ReadActivityRecordsRequest{
+          RecordLevel:       &recordLevel,
+          RecordCode:        &recordCode,
+          OperatorIpAddress: &operatorIpAddress,
+          CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
+      })
   }
   ```
