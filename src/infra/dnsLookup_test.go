@@ -18,15 +18,15 @@ var nonRoutableTestNetOneIpAddress = tkValueObject.IpAddress("192.0.2.1")
 
 const localhostLoopbackIpAddress = "127.0.0.1"
 
-func TestNewDnsLookup(t *testing.T) {
+func TestNewDnsLookup(test *testing.T) {
 	customPrimaryIpAddress, primaryIpErr := tkValueObject.NewIpAddress("1.1.1.1")
 	if primaryIpErr != nil {
-		t.Fatalf("CreateCustomPrimaryIpAddressFailed: %v", primaryIpErr)
+		test.Fatalf("CreateCustomPrimaryIpAddressFailed: %v", primaryIpErr)
 	}
 
 	customSecondaryIpAddress, secondaryIpErr := tkValueObject.NewIpAddress("9.9.9.9")
 	if secondaryIpErr != nil {
-		t.Fatalf("CreateCustomSecondaryIpAddressFailed: %v", secondaryIpErr)
+		test.Fatalf("CreateCustomSecondaryIpAddressFailed: %v", secondaryIpErr)
 	}
 
 	testCaseStructs := []struct {
@@ -79,35 +79,35 @@ func TestNewDnsLookup(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			lookup := NewDnsLookup(testCase.settings)
 
 			if lookup.primaryResolver != testCase.expectedPrimary {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongPrimaryResolver: expected '%s', got '%s'",
 					testCase.expectedPrimary, lookup.primaryResolver,
 				)
 			}
 			if lookup.secondaryResolver != testCase.expectedSecondary {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongSecondaryResolver: expected '%s', got '%s'",
 					testCase.expectedSecondary, lookup.secondaryResolver,
 				)
 			}
 			if lookup.queryTimeoutSecs != testCase.expectedQueryTimeout {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongQueryTimeoutSecs: expected %d, got %d",
 					testCase.expectedQueryTimeout, lookup.queryTimeoutSecs,
 				)
 			}
 			if lookup.dialTimeoutMs != testCase.expectedDialTimeout {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongDialTimeoutMs: expected %d, got %d",
 					testCase.expectedDialTimeout, lookup.dialTimeoutMs,
 				)
 			}
 			if lookup.shouldBypassLocalResolver != testCase.expectedBypass {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongShouldBypassLocalResolver: expected %t, got %t",
 					testCase.expectedBypass, lookup.shouldBypassLocalResolver,
 				)
@@ -116,15 +116,15 @@ func TestNewDnsLookup(t *testing.T) {
 	}
 }
 
-func TestDnsLookupExecute(t *testing.T) {
+func TestDnsLookupExecute(test *testing.T) {
 	validHostname, err := tkValueObject.NewUnixHostname("example.com")
 	if err != nil {
-		t.Fatalf("CreateValidHostnameFailed: %v", err)
+		test.Fatalf("CreateValidHostnameFailed: %v", err)
 	}
 
 	ptrIpAddress, err := tkValueObject.NewIpAddress("8.8.8.8")
 	if err != nil {
-		t.Fatalf("CreatePtrIpAddressFailed: %v", err)
+		test.Fatalf("CreatePtrIpAddressFailed: %v", err)
 	}
 	ptrHostname := tkValueObject.UnixHostname(ptrIpAddress.String())
 
@@ -146,28 +146,28 @@ func TestDnsLookupExecute(t *testing.T) {
 	}
 
 	for _, testCase := range recordTypeTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			results, lookupErr := dnsLookup.Execute(
 				testCase.hostname, testCase.recordType,
 			)
 			if lookupErr != nil {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedError: '%s' [%s]",
 					lookupErr.Error(), testCase.name,
 				)
 			}
 			if len(results) == 0 {
-				t.Errorf("NoResultsReturned: %s", testCase.name)
+				subtest.Errorf("NoResultsReturned: %s", testCase.name)
 			}
 		})
 	}
 
-	t.Run("UnreachableResolversFailLookup", func(t *testing.T) {
+	test.Run("UnreachableResolversFailLookup", func(subtest *testing.T) {
 		uniqueHostname, err := tkValueObject.NewUnixHostname(fmt.Sprintf(
 			"resolver-isolation-%d.invalid", time.Now().UnixNano(),
 		))
 		if err != nil {
-			t.Fatalf("CreateUniqueHostnameFailed: %v", err)
+			subtest.Fatalf("CreateUniqueHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
@@ -179,17 +179,17 @@ func TestDnsLookupExecute(t *testing.T) {
 
 		results, lookupErr := lookup.Execute(uniqueHostname, nil)
 		if lookupErr == nil {
-			t.Errorf(
+			subtest.Errorf(
 				"NonRoutableResolversShouldHaveFailed: got %v",
 				results,
 			)
 		}
 	})
 
-	t.Run("LocalhostReturnsLoopbackWithoutDnsServer", func(t *testing.T) {
+	test.Run("LocalhostReturnsLoopbackWithoutDnsServer", func(subtest *testing.T) {
 		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
 		if err != nil {
-			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
+			subtest.Fatalf("CreateLocalhostHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
@@ -203,42 +203,42 @@ func TestDnsLookupExecute(t *testing.T) {
 			localhostHostname, &tkValueObject.DnsRecordTypeA,
 		)
 		if lookupErr != nil {
-			t.Fatalf("LocalhostLookupFailed: %v", lookupErr)
+			subtest.Fatalf("LocalhostLookupFailed: %v", lookupErr)
 		}
 
 		if !slices.Contains(results, localhostLoopbackIpAddress) {
-			t.Errorf(
+			subtest.Errorf(
 				"LocalResolverShouldReturnLoopback: got %v, expected to contain '%s'",
 				results, localhostLoopbackIpAddress,
 			)
 		}
 	})
 
-	t.Run("ZoneScopedIpv6LiteralReturnsItself", func(t *testing.T) {
+	test.Run("ZoneScopedIpv6LiteralReturnsItself", func(subtest *testing.T) {
 		zoneScopedHostname, err := tkValueObject.NewUnixHostname("fe80::1%eth0")
 		if err != nil {
-			t.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
+			subtest.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
 		}
 
 		results, lookupErr := dnsLookup.Execute(
 			zoneScopedHostname, &tkValueObject.DnsRecordTypeAAAA,
 		)
 		if lookupErr != nil {
-			t.Fatalf("ZoneScopedLookupFailed: %v", lookupErr)
+			subtest.Fatalf("ZoneScopedLookupFailed: %v", lookupErr)
 		}
 
 		if !slices.Contains(results, "fe80::1%eth0") {
-			t.Errorf(
+			subtest.Errorf(
 				"ZoneScopedLiteralMissing: got %v, expected to contain 'fe80::1%%eth0'",
 				results,
 			)
 		}
 	})
 
-	t.Run("ZoneScopedIpv6LiteralReturnsItselfWithBypass", func(t *testing.T) {
+	test.Run("ZoneScopedIpv6LiteralReturnsItselfWithBypass", func(subtest *testing.T) {
 		zoneScopedHostname, err := tkValueObject.NewUnixHostname("fe80::1%eth0")
 		if err != nil {
-			t.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
+			subtest.Fatalf("CreateZoneScopedHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
@@ -253,21 +253,21 @@ func TestDnsLookupExecute(t *testing.T) {
 			zoneScopedHostname, &tkValueObject.DnsRecordTypeAAAA,
 		)
 		if lookupErr != nil {
-			t.Fatalf("ZoneScopedBypassLookupFailed: %v", lookupErr)
+			subtest.Fatalf("ZoneScopedBypassLookupFailed: %v", lookupErr)
 		}
 
 		if !slices.Contains(results, "fe80::1%eth0") {
-			t.Errorf(
+			subtest.Errorf(
 				"ZoneScopedLiteralMissing: got %v, expected to contain 'fe80::1%%eth0'",
 				results,
 			)
 		}
 	})
 
-	t.Run("LocalhostBypassedSkipsHostsFile", func(t *testing.T) {
+	test.Run("LocalhostBypassedSkipsHostsFile", func(subtest *testing.T) {
 		localhostHostname, err := tkValueObject.NewUnixHostname("localhost")
 		if err != nil {
-			t.Fatalf("CreateLocalhostHostnameFailed: %v", err)
+			subtest.Fatalf("CreateLocalhostHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
@@ -282,24 +282,24 @@ func TestDnsLookupExecute(t *testing.T) {
 			localhostHostname, &tkValueObject.DnsRecordTypeA,
 		)
 		if lookupErr == nil {
-			t.Errorf(
+			subtest.Errorf(
 				"BypassedLocalhostShouldNotResolveWithoutDnsServer: got %v",
 				results,
 			)
 		}
 
 		if slices.Contains(results, localhostLoopbackIpAddress) {
-			t.Errorf(
+			subtest.Errorf(
 				"BypassedLocalhostNotContainLoopback: %v contains '%s'",
 				results, localhostLoopbackIpAddress,
 			)
 		}
 	})
 
-	t.Run("BypassIgnoredForNonIpRecordType", func(t *testing.T) {
+	test.Run("BypassIgnoredForNonIpRecordType", func(subtest *testing.T) {
 		nonIpHostname, err := tkValueObject.NewUnixHostname("example.com")
 		if err != nil {
-			t.Fatalf("CreateNonIpHostnameFailed: %v", err)
+			subtest.Fatalf("CreateNonIpHostnameFailed: %v", err)
 		}
 
 		lookup := NewDnsLookup(DnsLookupSettings{
@@ -310,23 +310,23 @@ func TestDnsLookupExecute(t *testing.T) {
 			nonIpHostname, &tkValueObject.DnsRecordTypeTXT,
 		)
 		if lookupErr != nil {
-			t.Fatalf("TxtLookupFailed: %v", lookupErr)
+			subtest.Fatalf("TxtLookupFailed: %v", lookupErr)
 		}
 		if len(results) == 0 {
-			t.Fatalf("TxtLookupReturnedEmpty")
+			subtest.Fatalf("TxtLookupReturnedEmpty")
 		}
 	})
 }
 
-func TestDnsLookupDirectResolver(t *testing.T) {
+func TestDnsLookupDirectResolver(test *testing.T) {
 	publicResolver, err := tkValueObject.NewIpAddress("8.8.8.8")
 	if err != nil {
-		t.Fatalf("CreatePublicResolverIpAddressFailed: %v", err)
+		test.Fatalf("CreatePublicResolverIpAddressFailed: %v", err)
 	}
 
 	dnsGoogleHostname, err := tkValueObject.NewUnixHostname("dns.google")
 	if err != nil {
-		t.Fatalf("CreateDnsGoogleHostnameFailed: %v", err)
+		test.Fatalf("CreateDnsGoogleHostnameFailed: %v", err)
 	}
 
 	lookup := NewDnsLookup(DnsLookupSettings{
@@ -347,7 +347,7 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			results, lookupErr := lookup.directIpAddressResolver(
 				context.Background(), publicResolver,
 				dnsGoogleHostname, testCase.recordType,
@@ -355,16 +355,16 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 
 			if testCase.expectError {
 				if lookupErr == nil {
-					t.Errorf("ExpectedErrorButGotNone")
+					subtest.Errorf("ExpectedErrorButGotNone")
 				}
 				return
 			}
 
 			if lookupErr != nil {
-				t.Fatalf("DirectLookupFailed: %v", lookupErr)
+				subtest.Fatalf("DirectLookupFailed: %v", lookupErr)
 			}
 			if len(results) == 0 {
-				t.Fatalf("DirectLookupReturnedEmpty")
+				subtest.Fatalf("DirectLookupReturnedEmpty")
 			}
 
 			if testCase.expectKnownIp == "" {
@@ -372,7 +372,7 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 			}
 
 			if !slices.Contains(results, testCase.expectKnownIp) {
-				t.Errorf(
+				subtest.Errorf(
 					"ExpectedIpMissing: got %v, expected to contain '%s'",
 					results, testCase.expectKnownIp,
 				)
@@ -382,7 +382,7 @@ func TestDnsLookupDirectResolver(t *testing.T) {
 }
 
 func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId(
-	t *testing.T,
+	test *testing.T,
 ) {
 	lookup := NewDnsLookup(DnsLookupSettings{})
 
@@ -390,7 +390,7 @@ func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId
 
 	expectedDnsName, nameParseError := dnsmessage.NewName("example.com.")
 	if nameParseError != nil {
-		t.Fatalf("CreateExpectedNameFailed: %v", nameParseError)
+		test.Fatalf("CreateExpectedNameFailed: %v", nameParseError)
 	}
 	expectedQuestion := dnsmessage.Question{
 		Name:  expectedDnsName,
@@ -398,7 +398,7 @@ func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId
 		Class: dnsmessage.ClassINET,
 	}
 
-	t.Run("RejectsNonResponsePacket", func(t *testing.T) {
+	test.Run("RejectsNonResponsePacket", func(subtest *testing.T) {
 		queryShapedPacket := dnsmessage.Message{
 			Header: dnsmessage.Header{
 				ID:               transactionId,
@@ -409,24 +409,24 @@ func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId
 		}
 		packedBytes, packError := queryShapedPacket.Pack()
 		if packError != nil {
-			t.Fatalf("PackQueryShapedPacketFailed: %v", packError)
+			subtest.Fatalf("PackQueryShapedPacketFailed: %v", packError)
 		}
 
 		_, validateError := lookup.dnsMessageValidator(
 			packedBytes, transactionId, expectedQuestion,
 		)
 		if validateError != ErrDnsLookupResponseNotResponse {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedErrDnsLookupResponseNotResponse: got '%v'",
 				validateError,
 			)
 		}
 	})
 
-	t.Run("RejectsMismatchedQuestion", func(t *testing.T) {
+	test.Run("RejectsMismatchedQuestion", func(subtest *testing.T) {
 		attackerDnsName, nameParseError := dnsmessage.NewName("attacker.com.")
 		if nameParseError != nil {
-			t.Fatalf("CreateAttackerNameFailed: %v", nameParseError)
+			subtest.Fatalf("CreateAttackerNameFailed: %v", nameParseError)
 		}
 		mismatchedPacket := dnsmessage.Message{
 			Header: dnsmessage.Header{
@@ -442,14 +442,14 @@ func TestDnsMessageValidatorRejectsNonResponseOrMismatchedQuestionWithMatchingId
 		}
 		packedBytes, packError := mismatchedPacket.Pack()
 		if packError != nil {
-			t.Fatalf("PackMismatchedPacketFailed: %v", packError)
+			subtest.Fatalf("PackMismatchedPacketFailed: %v", packError)
 		}
 
 		_, validateError := lookup.dnsMessageValidator(
 			packedBytes, transactionId, expectedQuestion,
 		)
 		if validateError != ErrDnsLookupResponseQuestionMismatch {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedErrDnsLookupResponseQuestionMismatch: got '%v'",
 				validateError,
 			)

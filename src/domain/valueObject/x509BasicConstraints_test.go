@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewX509BasicConstraints(t *testing.T) {
-	t.Run("ValidBasicConstraints", func(t *testing.T) {
+func TestNewX509BasicConstraints(test *testing.T) {
+	test.Run("ValidBasicConstraints", func(subtest *testing.T) {
 		maxPathZero := 0
 		maxPathOne := 1
 		maxPathFive := 5
@@ -30,14 +30,14 @@ func TestNewX509BasicConstraints(t *testing.T) {
 			)
 
 			if testCase.expectError && err == nil {
-				t.Errorf(
+				subtest.Errorf(
 					"MissingExpectedError: [isAuthority=%v, maxPath=%v]",
 					testCase.isAuthority, testCase.maxPathLength,
 				)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedError: '%s' [isAuthority=%v, maxPath=%v]",
 					err.Error(), testCase.isAuthority, testCase.maxPathLength,
 				)
@@ -45,7 +45,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 
 			if !testCase.expectError {
 				if actualOutput.IsAuthority != testCase.isAuthority {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedIsAuthority: '%v' vs '%v'",
 						actualOutput.IsAuthority, testCase.isAuthority,
 					)
@@ -53,7 +53,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 
 				if testCase.maxPathLength == nil &&
 					actualOutput.MaxPathLength != nil {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedMaxPathLength: expected nil, got %v",
 						*actualOutput.MaxPathLength,
 					)
@@ -61,7 +61,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 
 				if testCase.maxPathLength != nil &&
 					actualOutput.MaxPathLength == nil {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedMaxPathLength: expected %v, got nil",
 						*testCase.maxPathLength,
 					)
@@ -70,7 +70,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 				if testCase.maxPathLength != nil &&
 					actualOutput.MaxPathLength != nil &&
 					*actualOutput.MaxPathLength != *testCase.maxPathLength {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedMaxPathLength: '%v' vs '%v'",
 						*actualOutput.MaxPathLength, *testCase.maxPathLength,
 					)
@@ -79,7 +79,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		maxPathZero := 0
 		maxPathFive := 5
 
@@ -102,7 +102,7 @@ func TestNewX509BasicConstraints(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)

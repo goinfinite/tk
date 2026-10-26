@@ -8,91 +8,74 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestReadThrough_CertPairFilePathsReader(t *testing.T) {
+func TestReadThrough_CertPairFilePathsReader(test *testing.T) {
 	readThrough := &ReadThrough{}
 	fileClerk := FileClerk{}
 
-	t.Run("BothEnvVarsSetAndValid", func(t *testing.T) {
-		tempDir := t.TempDir()
+	test.Run("BothEnvVarsSetAndValid", func(subtest *testing.T) {
+		tempDir := subtest.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
 
-		os.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
-		os.Setenv("CERTIFICATE_PAIR_KEY_PATH", keyPath)
-		defer func() {
-			os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-			os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
-		}()
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", keyPath)
 
 		actualCertPath, actualKeyPath, err := readThrough.CertPairFilePathsReader()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		expectedCertPath, _ := tkValueObject.NewUnixAbsoluteFilePath(certPath, false)
 		expectedKeyPath, _ := tkValueObject.NewUnixAbsoluteFilePath(keyPath, false)
 
 		if actualCertPath.String() != expectedCertPath.String() {
-			t.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
+			subtest.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
 		}
 		if actualKeyPath.String() != expectedKeyPath.String() {
-			t.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
+			subtest.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
 		}
 	})
 
-	t.Run("CertEnvVarInvalid", func(t *testing.T) {
-		os.Setenv("CERTIFICATE_PAIR_CERT_PATH", "relative<path")
-		os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
-		defer func() {
-			os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-		}()
+	test.Run("CertEnvVarInvalid", func(subtest *testing.T) {
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", "relative<path")
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", "")
 
 		_, _, err := readThrough.CertPairFilePathsReader()
 		if err == nil {
-			t.Errorf("MissingExpectedError: InvalidCertificatePairCertPath")
+			subtest.Errorf("MissingExpectedError: InvalidCertificatePairCertPath")
 		}
 		if err.Error() != "InvalidCertificatePairCertPath" {
-			t.Errorf("ErrorMismatch: Expected 'InvalidCertificatePairCertPath', Got '%s'", err.Error())
+			subtest.Errorf("ErrorMismatch: Expected 'InvalidCertificatePairCertPath', Got '%s'", err.Error())
 		}
 	})
 
-	t.Run("KeyEnvVarInvalid", func(t *testing.T) {
-		tempDir := t.TempDir()
+	test.Run("KeyEnvVarInvalid", func(subtest *testing.T) {
+		tempDir := subtest.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 
-		os.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
-		os.Setenv("CERTIFICATE_PAIR_KEY_PATH", "relative<key")
-		defer func() {
-			os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-			os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
-		}()
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", "relative<key")
 
 		_, _, err := readThrough.CertPairFilePathsReader()
 		if err == nil {
-			t.Errorf("MissingExpectedError: InvalidCertificatePairKeyPath")
+			subtest.Errorf("MissingExpectedError: InvalidCertificatePairKeyPath")
 		}
 		if err.Error() != "InvalidCertificatePairKeyPath" {
-			t.Errorf("ErrorMismatch: Expected 'InvalidCertificatePairKeyPath', Got '%s'", err.Error())
+			subtest.Errorf("ErrorMismatch: Expected 'InvalidCertificatePairKeyPath', Got '%s'", err.Error())
 		}
 	})
 
-	t.Run("CertEnvVarSetKeyNotSet", func(t *testing.T) {
-		tempDir := t.TempDir()
+	test.Run("CertEnvVarSetKeyNotSet", func(subtest *testing.T) {
+		tempDir := subtest.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 
-		os.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
-		os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
-		defer func() {
-			os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-		}()
-
-		originalDir, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", certPath)
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", "")
+		subtest.Chdir(tempDir)
 
 		actualCertPath, actualKeyPath, err := readThrough.CertPairFilePathsReader()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		expectedCertPathStr := filepath.Join(tempDir, "pki", "cert.pem")
@@ -101,37 +84,31 @@ func TestReadThrough_CertPairFilePathsReader(t *testing.T) {
 		expectedKeyPath, _ := tkValueObject.NewUnixAbsoluteFilePath(expectedKeyPathStr, false)
 
 		if actualCertPath.String() != expectedCertPath.String() {
-			t.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
+			subtest.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
 		}
 		if actualKeyPath.String() != expectedKeyPath.String() {
-			t.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
+			subtest.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
 		}
 
 		if !fileClerk.FileExists(expectedCertPathStr) {
-			t.Errorf("CertFileNotCreated")
+			subtest.Errorf("CertFileNotCreated")
 		}
 		if !fileClerk.FileExists(expectedKeyPathStr) {
-			t.Errorf("KeyFileNotCreated")
+			subtest.Errorf("KeyFileNotCreated")
 		}
 	})
 
-	t.Run("KeyEnvVarSetCertNotSet", func(t *testing.T) {
-		tempDir := t.TempDir()
+	test.Run("KeyEnvVarSetCertNotSet", func(subtest *testing.T) {
+		tempDir := subtest.TempDir()
 		keyPath := filepath.Join(tempDir, "key.pem")
 
-		os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-		os.Setenv("CERTIFICATE_PAIR_KEY_PATH", keyPath)
-		defer func() {
-			os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
-		}()
-
-		originalDir, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", "")
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", keyPath)
+		subtest.Chdir(tempDir)
 
 		actualCertPath, actualKeyPath, err := readThrough.CertPairFilePathsReader()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		expectedCertPathStr := filepath.Join(tempDir, "pki", "cert.pem")
@@ -140,33 +117,30 @@ func TestReadThrough_CertPairFilePathsReader(t *testing.T) {
 		expectedKeyPath, _ := tkValueObject.NewUnixAbsoluteFilePath(expectedKeyPathStr, false)
 
 		if actualCertPath.String() != expectedCertPath.String() {
-			t.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
+			subtest.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
 		}
 		if actualKeyPath.String() != expectedKeyPath.String() {
-			t.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
+			subtest.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
 		}
 
 		if !fileClerk.FileExists(expectedCertPathStr) {
-			t.Errorf("CertFileNotCreated")
+			subtest.Errorf("CertFileNotCreated")
 		}
 		if !fileClerk.FileExists(expectedKeyPathStr) {
-			t.Errorf("KeyFileNotCreated")
+			subtest.Errorf("KeyFileNotCreated")
 		}
 	})
 
-	t.Run("NeitherEnvVarSet", func(t *testing.T) {
-		os.Unsetenv("CERTIFICATE_PAIR_CERT_PATH")
-		os.Unsetenv("CERTIFICATE_PAIR_KEY_PATH")
+	test.Run("NeitherEnvVarSet", func(subtest *testing.T) {
+		subtest.Setenv("CERTIFICATE_PAIR_CERT_PATH", "")
+		subtest.Setenv("CERTIFICATE_PAIR_KEY_PATH", "")
 
-		tempDir := t.TempDir()
-
-		originalDir, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		tempDir := subtest.TempDir()
+		subtest.Chdir(tempDir)
 
 		actualCertPath, actualKeyPath, err := readThrough.CertPairFilePathsReader()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		expectedCertPathStr := filepath.Join(tempDir, "pki", "cert.pem")
@@ -175,33 +149,33 @@ func TestReadThrough_CertPairFilePathsReader(t *testing.T) {
 		expectedKeyPath, _ := tkValueObject.NewUnixAbsoluteFilePath(expectedKeyPathStr, false)
 
 		if actualCertPath.String() != expectedCertPath.String() {
-			t.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
+			subtest.Errorf("CertPathMismatch: Expected '%s', Got '%s'", expectedCertPath.String(), actualCertPath.String())
 		}
 		if actualKeyPath.String() != expectedKeyPath.String() {
-			t.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
+			subtest.Errorf("KeyPathMismatch: Expected '%s', Got '%s'", expectedKeyPath.String(), actualKeyPath.String())
 		}
 
 		if !fileClerk.FileExists(expectedCertPathStr) {
-			t.Errorf("CertFileNotCreated")
+			subtest.Errorf("CertFileNotCreated")
 		}
 		if !fileClerk.FileExists(expectedKeyPathStr) {
-			t.Errorf("KeyFileNotCreated")
+			subtest.Errorf("KeyFileNotCreated")
 		}
 
 		certFileInfo, certStatErr := os.Stat(expectedCertPathStr)
 		if certStatErr != nil {
-			t.Fatalf("CertStatFailed: %v", certStatErr)
+			subtest.Fatalf("CertStatFailed: %v", certStatErr)
 		}
 		if certFileInfo.Mode().Perm() != 0644 {
-			t.Errorf("CertPermissionsMismatch: %v", certFileInfo.Mode().Perm())
+			subtest.Errorf("CertPermissionsMismatch: %v", certFileInfo.Mode().Perm())
 		}
 
 		keyFileInfo, keyStatErr := os.Stat(expectedKeyPathStr)
 		if keyStatErr != nil {
-			t.Fatalf("KeyStatFailed: %v", keyStatErr)
+			subtest.Fatalf("KeyStatFailed: %v", keyStatErr)
 		}
 		if keyFileInfo.Mode().Perm() != 0600 {
-			t.Errorf("KeyPermissionsMismatch: %v", keyFileInfo.Mode().Perm())
+			subtest.Errorf("KeyPermissionsMismatch: %v", keyFileInfo.Mode().Perm())
 		}
 	})
 }

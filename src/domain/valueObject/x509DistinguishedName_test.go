@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewX509DistinguishedName(t *testing.T) {
-	t.Run("ValidDistinguishedName", func(t *testing.T) {
+func TestNewX509DistinguishedName(test *testing.T) {
+	test.Run("ValidDistinguishedName", func(subtest *testing.T) {
 		org, _ := NewX509Organization("Example Corp")
 		ou1, _ := NewX509OrganizationalUnit("Engineering")
 		ou2, _ := NewX509OrganizationalUnit("Security")
@@ -34,30 +34,30 @@ func TestNewX509DistinguishedName(t *testing.T) {
 
 			if testCase.organization != nil &&
 				result.Organization != testCase.organization {
-				t.Errorf("UnexpectedOrganization")
+				subtest.Errorf("UnexpectedOrganization")
 			}
 
 			if testCase.organizationalUnit != nil &&
 				len(result.OrganizationalUnit) != len(testCase.organizationalUnit) {
-				t.Errorf("UnexpectedOrganizationalUnitLength")
+				subtest.Errorf("UnexpectedOrganizationalUnitLength")
 			}
 
 			if testCase.locality != nil && result.Locality != testCase.locality {
-				t.Errorf("UnexpectedLocality")
+				subtest.Errorf("UnexpectedLocality")
 			}
 
 			if testCase.stateOrProvince != nil &&
 				result.StateOrProvince != testCase.stateOrProvince {
-				t.Errorf("UnexpectedStateOrProvince")
+				subtest.Errorf("UnexpectedStateOrProvince")
 			}
 
 			if testCase.country != nil && result.Country != testCase.country {
-				t.Errorf("UnexpectedCountry")
+				subtest.Errorf("UnexpectedCountry")
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		org, _ := NewX509Organization("Example Corp")
 		ou1, _ := NewX509OrganizationalUnit("Engineering")
 		ou2, _ := NewX509OrganizationalUnit("Security")
@@ -97,7 +97,7 @@ func TestNewX509DistinguishedName(t *testing.T) {
 			actualOutput := testCase.dn.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
 			}
 		}
 	})

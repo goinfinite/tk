@@ -7,16 +7,16 @@ import (
 )
 
 func privateKeyPemGenerator(
-	t *testing.T, algorithm PrivateKeyAlgorithm,
+	test *testing.T, algorithm PrivateKeyAlgorithm,
 ) string {
-	t.Helper()
+	test.Helper()
 
 	switch algorithm {
 	case PrivateKeyAlgorithmRSA:
 		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
 		rsaKeyOutput, err := rsaKeyCmd.Output()
 		if err != nil {
-			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+			test.Skipf("OpenSslNotAvailable: %s", err.Error())
 		}
 		return strings.TrimSpace(string(rsaKeyOutput))
 
@@ -24,7 +24,7 @@ func privateKeyPemGenerator(
 		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
 		rsaKeyOutput, err := rsaKeyCmd.Output()
 		if err != nil {
-			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+			test.Skipf("OpenSslNotAvailable: %s", err.Error())
 		}
 
 		pkcs8Cmd := exec.Command(
@@ -34,7 +34,7 @@ func privateKeyPemGenerator(
 		pkcs8Cmd.Stdin = strings.NewReader(string(rsaKeyOutput))
 		pkcs8Output, err := pkcs8Cmd.Output()
 		if err != nil {
-			t.Skipf("PKCS8ConversionFailed: %s", err.Error())
+			test.Skipf("PKCS8ConversionFailed: %s", err.Error())
 		}
 		return strings.TrimSpace(string(pkcs8Output))
 
@@ -42,13 +42,13 @@ func privateKeyPemGenerator(
 		ecKeyCmd := exec.Command("openssl", "ecparam", "-genkey", "-name", "prime256v1")
 		ecKeyOutput, err := ecKeyCmd.Output()
 		if err != nil {
-			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+			test.Skipf("OpenSslNotAvailable: %s", err.Error())
 		}
 
 		ecKeyOutputStr := string(ecKeyOutput)
 		keyStart := strings.Index(ecKeyOutputStr, "-----BEGIN EC PRIVATE KEY-----")
 		if keyStart == -1 {
-			t.Fatalf("ECPrivateKeyNotFoundInOutput")
+			test.Fatalf("ECPrivateKeyNotFoundInOutput")
 		}
 		return strings.TrimSpace(ecKeyOutputStr[keyStart:])
 
@@ -56,7 +56,7 @@ func privateKeyPemGenerator(
 		rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
 		rsaKeyOutput, err := rsaKeyCmd.Output()
 		if err != nil {
-			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+			test.Skipf("OpenSslNotAvailable: %s", err.Error())
 		}
 
 		encryptCmd := exec.Command(
@@ -66,7 +66,7 @@ func privateKeyPemGenerator(
 		encryptCmd.Stdin = strings.NewReader(string(rsaKeyOutput))
 		encryptOutput, err := encryptCmd.Output()
 		if err != nil {
-			t.Skipf("PrivateKeyEncryptionFailed: %s", err.Error())
+			test.Skipf("PrivateKeyEncryptionFailed: %s", err.Error())
 		}
 		return strings.TrimSpace(string(encryptOutput))
 
@@ -74,7 +74,7 @@ func privateKeyPemGenerator(
 		dsaCmd := exec.Command("openssl", "dsaparam", "-genkey", "2048")
 		dsaOutput, err := dsaCmd.Output()
 		if err != nil {
-			t.Skipf("OpenSslNotAvailable: %s", err.Error())
+			test.Skipf("OpenSslNotAvailable: %s", err.Error())
 		}
 
 		dsaOutputStr := string(dsaOutput)
@@ -83,24 +83,24 @@ func privateKeyPemGenerator(
 			keyStart = strings.Index(dsaOutputStr, "-----BEGIN DSA PRIVATE KEY-----")
 		}
 		if keyStart == -1 {
-			t.Fatalf("DSAPrivateKeyNotFoundInOutput")
+			test.Fatalf("DSAPrivateKeyNotFoundInOutput")
 		}
 		return strings.TrimSpace(dsaOutputStr[keyStart:])
 
 	default:
-		t.Fatalf("UnsupportedPrivateKeyAlgorithm: %s", algorithm)
+		test.Fatalf("UnsupportedPrivateKeyAlgorithm: %s", algorithm)
 		return ""
 	}
 }
 
-func TestNewEnvelopedPrivateKey(t *testing.T) {
-	validPrivateKey := privateKeyPemGenerator(t, "PKCS8")
-	validRsaPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmRSA)
-	validEcPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmECDSA)
-	validEncryptedPrivateKey := privateKeyPemGenerator(t, "Encrypted")
-	validDsaPrivateKey := privateKeyPemGenerator(t, PrivateKeyAlgorithmDSA)
+func TestNewEnvelopedPrivateKey(test *testing.T) {
+	validPrivateKey := privateKeyPemGenerator(test, "PKCS8")
+	validRsaPrivateKey := privateKeyPemGenerator(test, PrivateKeyAlgorithmRSA)
+	validEcPrivateKey := privateKeyPemGenerator(test, PrivateKeyAlgorithmECDSA)
+	validEncryptedPrivateKey := privateKeyPemGenerator(test, "Encrypted")
+	validDsaPrivateKey := privateKeyPemGenerator(test, PrivateKeyAlgorithmDSA)
 
-	t.Run("ValidEnvelopedPrivateKey", func(t *testing.T) {
+	test.Run("ValidEnvelopedPrivateKey", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput EnvelopedPrivateKey
@@ -229,16 +229,16 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 			)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -246,7 +246,7 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     EnvelopedPrivateKey
 			expectedOutput string
@@ -262,7 +262,7 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)
@@ -270,87 +270,87 @@ func TestNewEnvelopedPrivateKey(t *testing.T) {
 		}
 	})
 
-	t.Run("ShortInputErrorMessage", func(t *testing.T) {
+	test.Run("ShortInputErrorMessage", func(subtest *testing.T) {
 		shortInput := "-----BEGIN PRIVATE KEY-----\nshort\n-----END PRIVATE KEY-----"
 		_, err := NewEnvelopedPrivateKey(shortInput)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: short input should fail")
+			subtest.Fatalf("MissingExpectedError: short input should fail")
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyTooShort"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)
 		}
 	})
 
-	t.Run("MultipleBeginTagsErrorMessage", func(t *testing.T) {
+	test.Run("MultipleBeginTagsErrorMessage", func(subtest *testing.T) {
 		multipleBeginInput := "-----BEGIN PRIVATE KEY-----\n" +
 			string(make([]byte, 50)) +
 			"\n-----END PRIVATE KEY-----\n-----BEGIN PRIVATE KEY-----\n" +
 			string(make([]byte, 50)) + "\n-----END PRIVATE KEY-----"
 		_, err := NewEnvelopedPrivateKey(multipleBeginInput)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: multiple begin tags should fail")
+			subtest.Fatalf("MissingExpectedError: multiple begin tags should fail")
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyMultipleBeginTags"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)
 		}
 	})
 
-	t.Run("MultipleEndTagsErrorMessage", func(t *testing.T) {
+	test.Run("MultipleEndTagsErrorMessage", func(subtest *testing.T) {
 		multipleEndInput := "-----BEGIN PRIVATE KEY-----\n" +
 			string(make([]byte, 100)) +
 			"\n-----END PRIVATE KEY-----\n-----END PRIVATE KEY-----"
 		_, err := NewEnvelopedPrivateKey(multipleEndInput)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: multiple end tags should fail")
+			subtest.Fatalf("MissingExpectedError: multiple end tags should fail")
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyMultipleEndTags"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)
 		}
 	})
 
-	t.Run("MissingBeginTagErrorMessage", func(t *testing.T) {
+	test.Run("MissingBeginTagErrorMessage", func(subtest *testing.T) {
 		missingBeginInput := string(make([]byte, 100)) +
 			"\n-----END PRIVATE KEY-----"
 		_, err := NewEnvelopedPrivateKey(missingBeginInput)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: missing begin tag should fail")
+			subtest.Fatalf("MissingExpectedError: missing begin tag should fail")
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyMissingBeginTag"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)
 		}
 	})
 
-	t.Run("MissingEndTagErrorMessage", func(t *testing.T) {
+	test.Run("MissingEndTagErrorMessage", func(subtest *testing.T) {
 		missingEndInput := "-----BEGIN PRIVATE KEY-----\n" +
 			string(make([]byte, 100))
 		_, err := NewEnvelopedPrivateKey(missingEndInput)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: missing end tag should fail")
+			subtest.Fatalf("MissingExpectedError: missing end tag should fail")
 		}
 
 		expectedError := "InvalidEnvelopedPrivateKeyMissingEndTag"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedErrorMessage: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)

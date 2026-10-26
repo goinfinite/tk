@@ -6,7 +6,7 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestTrustedCidrsReader(t *testing.T) {
+func TestTrustedCidrsReader(test *testing.T) {
 	testCaseStructs := []struct {
 		description    string
 		cidrsEnvValue  string
@@ -148,18 +148,18 @@ func TestTrustedCidrsReader(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.description, func(t *testing.T) {
-			t.Setenv(TrustedCidrsEnvVarName, testCase.cidrsEnvValue)
-			t.Setenv(TrustedIpsEnvVarName, testCase.ipsEnvValue)
+		test.Run(testCase.description, func(subtest *testing.T) {
+			subtest.Setenv(TrustedCidrsEnvVarName, testCase.cidrsEnvValue)
+			subtest.Setenv(TrustedIpsEnvVarName, testCase.ipsEnvValue)
 
 			actualCidrBlocks, err := TrustedCidrsReader()
 			if err != nil {
-				t.Errorf("UnexpectedError: '%s'", err.Error())
+				subtest.Errorf("UnexpectedError: '%s'", err.Error())
 				return
 			}
 
 			if len(actualCidrBlocks) != len(testCase.expectedOutput) {
-				t.Errorf(
+				subtest.Errorf(
 					"OutputLengthMismatch: expected=%d, actual=%d",
 					len(testCase.expectedOutput), len(actualCidrBlocks),
 				)
@@ -168,7 +168,7 @@ func TestTrustedCidrsReader(t *testing.T) {
 
 			for expectedCidrIndex, expectedCidr := range testCase.expectedOutput {
 				if actualCidrBlocks[expectedCidrIndex] != expectedCidr {
-					t.Errorf(
+					subtest.Errorf(
 						"CidrMismatchAtIndex%d: expected='%s', actual='%s'",
 						expectedCidrIndex,
 						expectedCidr.String(),

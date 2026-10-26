@@ -17,261 +17,261 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestFileExists(t *testing.T) {
+func TestFileExists(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("ExistingFile", func(t *testing.T) {
+	test.Run("ExistingFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "existing.txt")
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.FileExists(testFile) {
-			t.Errorf("FileExistsShouldReturnTrue: %s", testFile)
+			subtest.Errorf("FileExistsShouldReturnTrue: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("NonExistentFile", func(t *testing.T) {
+	test.Run("NonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 		if clerk.FileExists(nonExistentFile) {
-			t.Errorf("FileExistsShouldReturnFalse: %s", nonExistentFile)
+			subtest.Errorf("FileExistsShouldReturnFalse: %s", nonExistentFile)
 		}
 	})
 
-	t.Run("ExistingDirectory", func(t *testing.T) {
+	test.Run("ExistingDirectory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "testdir")
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		if !clerk.FileExists(testDir) {
-			t.Errorf("FileExistsShouldReturnTrueForDir: %s", testDir)
+			subtest.Errorf("FileExistsShouldReturnTrueForDir: %s", testDir)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 }
 
-func TestIsFile(t *testing.T) {
+func TestIsFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("RegularFile", func(t *testing.T) {
+	test.Run("RegularFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
-			t.Errorf("IsFileShouldReturnTrue: %s", testFile)
+			subtest.Errorf("IsFileShouldReturnTrue: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("Directory", func(t *testing.T) {
+	test.Run("Directory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "testdir")
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		if clerk.IsFile(testDir) {
-			t.Errorf("IsFileShouldReturnFalseForDir: %s", testDir)
+			subtest.Errorf("IsFileShouldReturnFalseForDir: %s", testDir)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 
-	t.Run("NonExistentPath", func(t *testing.T) {
+	test.Run("NonExistentPath", func(subtest *testing.T) {
 		nonExistentPath := filepath.Join(tempDir, "nonexistent.txt")
 		if clerk.IsFile(nonExistentPath) {
-			t.Errorf("IsFileShouldReturnFalseForNonExistent: %s", nonExistentPath)
+			subtest.Errorf("IsFileShouldReturnFalseForNonExistent: %s", nonExistentPath)
 		}
 	})
 }
 
-func TestIsDir(t *testing.T) {
+func TestIsDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("RegularDirectory", func(t *testing.T) {
+	test.Run("RegularDirectory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "testdir")
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		if !clerk.IsDir(testDir) {
-			t.Errorf("IsDirShouldReturnTrue: %s", testDir)
+			subtest.Errorf("IsDirShouldReturnTrue: %s", testDir)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 
-	t.Run("RegularFile", func(t *testing.T) {
+	test.Run("RegularFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if clerk.IsDir(testFile) {
-			t.Errorf("IsDirShouldReturnFalseForFile: %s", testFile)
+			subtest.Errorf("IsDirShouldReturnFalseForFile: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("NonExistentPath", func(t *testing.T) {
+	test.Run("NonExistentPath", func(subtest *testing.T) {
 		nonExistentPath := filepath.Join(tempDir, "nonexistent")
 		if clerk.IsDir(nonExistentPath) {
-			t.Errorf("IsDirShouldReturnFalseForNonExistent: %s", nonExistentPath)
+			subtest.Errorf("IsDirShouldReturnFalseForNonExistent: %s", nonExistentPath)
 		}
 	})
 }
 
-func TestTouchFile(t *testing.T) {
+func TestTouchFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CreateNewFile", func(t *testing.T) {
+	test.Run("CreateNewFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "newfile.txt")
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Errorf("TouchFileFailed: %v", err)
+			subtest.Errorf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
-			t.Errorf("FileShouldExistAfterCreation: %s", testFile)
+			subtest.Errorf("FileShouldExistAfterCreation: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("TouchFileInNonExistentDir", func(t *testing.T) {
+	test.Run("TouchFileInNonExistentDir", func(subtest *testing.T) {
 		nonExistentDir := filepath.Join(tempDir, "nonexistent", "subdir")
 		testFile := filepath.Join(nonExistentDir, "file.txt")
 		err := clerk.TouchFile(testFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TouchFileInNonExistentDir")
+			subtest.Errorf("MissingExpectedError: TouchFileInNonExistentDir")
 		}
 	})
 
-	t.Run("TouchExistingFileRefreshesTimestamps", func(t *testing.T) {
+	test.Run("TouchExistingFileRefreshesTimestamps", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "existing_touch.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		pastTimestamp := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 		err = os.Chtimes(testFile, pastTimestamp, pastTimestamp)
 		if err != nil {
-			t.Fatalf("ChtimesFailed: %v", err)
+			subtest.Fatalf("ChtimesFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Errorf("TouchFileFailed: %v", err)
+			subtest.Errorf("TouchFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(testFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if !fileInfo.ModTime().After(pastTimestamp) {
-			t.Errorf("TimestampsNotRefreshed: mtime %v", fileInfo.ModTime())
+			subtest.Errorf("TimestampsNotRefreshed: mtime %v", fileInfo.ModTime())
 		}
 	})
 
-	t.Run("TouchExistingFileKeepsContent", func(t *testing.T) {
+	test.Run("TouchExistingFileKeepsContent", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "kept_content.txt")
 
 		err := clerk.WriteNewFile(testFile, "do not truncate me", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Errorf("TouchFileFailed: %v", err)
+			subtest.Errorf("TouchFileFailed: %v", err)
 		}
 
 		content, readErr := clerk.ReadFileContent(testFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if content != "do not truncate me" {
-			t.Errorf("ContentWasTruncated: '%s'", content)
+			subtest.Errorf("ContentWasTruncated: '%s'", content)
 		}
 	})
 
-	t.Run("TouchDanglingSymlinkFails", func(t *testing.T) {
+	test.Run("TouchDanglingSymlinkFails", func(subtest *testing.T) {
 		targetPath := filepath.Join(tempDir, "dangling_touch_target")
 		symlinkPath := filepath.Join(tempDir, "dangling_touch.txt")
 
 		err := os.Symlink(targetPath, symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(symlinkPath)
 		if err == nil || err.Error() != "TargetIsSymlink" {
-			t.Errorf("MissingExpectedError: TargetIsSymlink, got %v", err)
+			subtest.Errorf("MissingExpectedError: TargetIsSymlink, got %v", err)
 		}
 		if clerk.FileExists(targetPath) {
-			t.Errorf("TouchFollowedDanglingSymlink")
+			subtest.Errorf("TouchFollowedDanglingSymlink")
 		}
 	})
 }
 
-func TestWriteNewFile(t *testing.T) {
+func TestWriteNewFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("WritesContentWithExactPermissions", func(t *testing.T) {
+	test.Run("WritesContentWithExactPermissions", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "written.txt")
 
 		err := clerk.WriteNewFile(testFile, "hello clerk", 0666)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(testFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != 0666 {
-			t.Errorf(
+			subtest.Errorf(
 				"PermissionsMismatch: umask must not shrink granted mode, got %04o",
 				fileInfo.Mode().Perm(),
 			)
@@ -279,362 +279,362 @@ func TestWriteNewFile(t *testing.T) {
 
 		content, readErr := clerk.ReadFileContent(testFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if content != "hello clerk" {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", content, "hello clerk")
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", content, "hello clerk")
 		}
 	})
 
-	t.Run("EmptyContentWritesEmptyFile", func(t *testing.T) {
+	test.Run("EmptyContentWritesEmptyFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "empty.txt")
 
 		err := clerk.WriteNewFile(testFile, "", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(testFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Size() != 0 {
-			t.Errorf("FileShouldBeEmpty: size %d", fileInfo.Size())
+			subtest.Errorf("FileShouldBeEmpty: size %d", fileInfo.Size())
 		}
 	})
 
-	t.Run("ExistingPathFails", func(t *testing.T) {
+	test.Run("ExistingPathFails", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "occupied.txt")
 
 		err := clerk.WriteNewFile(testFile, "first", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		err = clerk.WriteNewFile(testFile, "second", 0644)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 		if err != nil && err.Error() != "TargetFileAlreadyExists" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
 		}
 
 		content, readErr := clerk.ReadFileContent(testFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if content != "first" {
-			t.Errorf("ExistingContentWasOverwritten: '%s'", content)
+			subtest.Errorf("ExistingContentWasOverwritten: '%s'", content)
 		}
 	})
 
-	t.Run("DanglingSymlinkPathFails", func(t *testing.T) {
+	test.Run("DanglingSymlinkPathFails", func(subtest *testing.T) {
 		symlinkPath := filepath.Join(tempDir, "dangling_link.txt")
 
 		err := os.Symlink(filepath.Join(tempDir, "nowhere"), symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.WriteNewFile(symlinkPath, "payload", 0644)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 		if clerk.FileExists(filepath.Join(tempDir, "nowhere")) {
-			t.Errorf("WriteFollowedDanglingSymlink")
+			subtest.Errorf("WriteFollowedDanglingSymlink")
 		}
 	})
 }
 
-func TestCopyFile(t *testing.T) {
+func TestCopyFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CopyExistingFile", func(t *testing.T) {
+	test.Run("CopyExistingFile", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 		testContent := "test content for copy"
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(sourceFile, []byte(testContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.CopyFile(sourceFile, targetFile)
 		if err != nil {
-			t.Errorf("CopyFileFailed: %v", err)
+			subtest.Errorf("CopyFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("TargetFileShouldExist: %s", targetFile)
+			subtest.Errorf("TargetFileShouldExist: %s", targetFile)
 		}
 
 		targetContent, err := clerk.ReadFileContent(targetFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if targetContent != testContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", targetContent, testContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", targetContent, testContent)
 		}
 
 		err = clerk.DeleteFile(sourceFile)
 		if err != nil {
-			t.Errorf("DeleteSourceFileFailed: %v", err)
+			subtest.Errorf("DeleteSourceFileFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("CopyNonExistentFile", func(t *testing.T) {
+	test.Run("CopyNonExistentFile", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "nonexistent.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
 		err := clerk.CopyFile(sourceFile, targetFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceFileNotFound")
+			subtest.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
 
-	t.Run("CopyToExistingTarget", func(t *testing.T) {
+	test.Run("CopyToExistingTarget", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source.txt")
 		targetFile := filepath.Join(tempDir, "existing_target.txt")
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateSourceFileFailed: %v", err)
+			subtest.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = clerk.CopyFile(sourceFile, targetFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 
 		if err != nil && err.Error() != "TargetFileAlreadyExists" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
 		}
 
 		err = clerk.DeleteFile(sourceFile)
 		if err != nil {
-			t.Errorf("DeleteSourceFileFailed: %v", err)
+			subtest.Errorf("DeleteSourceFileFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("CopyPreservesSourceModeIncludingExecBit", func(t *testing.T) {
+	test.Run("CopyPreservesSourceModeIncludingExecBit", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "executable.sh")
 		targetFile := filepath.Join(tempDir, "executable_copy.sh")
 
 		err := clerk.WriteNewFile(sourceFile, "#!/bin/sh\necho hi\n", 0755)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		err = clerk.CopyFile(sourceFile, targetFile)
 		if err != nil {
-			t.Fatalf("CopyFileFailed: %v", err)
+			subtest.Fatalf("CopyFileFailed: %v", err)
 		}
 
 		targetInfo, statErr := os.Stat(targetFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if targetInfo.Mode().Perm() != 0755 {
-			t.Errorf(
+			subtest.Errorf(
 				"ModeMismatch: exec bit must survive copy, got %04o",
 				targetInfo.Mode().Perm(),
 			)
 		}
 	})
 
-	t.Run("CopyToDanglingSymlinkFails", func(t *testing.T) {
+	test.Run("CopyToDanglingSymlinkFails", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "copy_source.txt")
 		symlinkPath := filepath.Join(tempDir, "dangling_target.txt")
 
 		err := clerk.WriteNewFile(sourceFile, "payload", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		err = os.Symlink(filepath.Join(tempDir, "nowhere_copy"), symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.CopyFile(sourceFile, symlinkPath)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 		if err != nil && err.Error() != "TargetFileAlreadyExists" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
 		}
 		if clerk.FileExists(filepath.Join(tempDir, "nowhere_copy")) {
-			t.Errorf("CopyFollowedDanglingSymlink")
+			subtest.Errorf("CopyFollowedDanglingSymlink")
 		}
 	})
 }
 
-func TestMoveFile(t *testing.T) {
+func TestMoveFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("MoveExistingFile", func(t *testing.T) {
+	test.Run("MoveExistingFile", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 		testContent := "test content for move"
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(sourceFile, []byte(testContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.MoveFile(sourceFile, targetFile)
 		if err != nil {
-			t.Errorf("MoveFileFailed: %v", err)
+			subtest.Errorf("MoveFileFailed: %v", err)
 		}
 
 		if clerk.IsFile(sourceFile) {
-			t.Errorf("SourceFileShouldNotExist: %s", sourceFile)
+			subtest.Errorf("SourceFileShouldNotExist: %s", sourceFile)
 		}
 
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("TargetFileShouldExist: %s", targetFile)
+			subtest.Errorf("TargetFileShouldExist: %s", targetFile)
 		}
 
 		targetContent, err := clerk.ReadFileContent(targetFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if targetContent != testContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", targetContent, testContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", targetContent, testContent)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("MoveNonExistentFile", func(t *testing.T) {
+	test.Run("MoveNonExistentFile", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "nonexistent.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
 		err := clerk.MoveFile(sourceFile, targetFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceFileNotFound")
+			subtest.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
 
-	t.Run("MoveToExistingTargetFails", func(t *testing.T) {
+	test.Run("MoveToExistingTargetFails", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "move_source.txt")
 		targetFile := filepath.Join(tempDir, "move_existing_target.txt")
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateSourceFileFailed: %v", err)
+			subtest.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = clerk.MoveFile(sourceFile, targetFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 		if err != nil && err.Error() != "TargetFileAlreadyExists" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetFileAlreadyExists", err.Error())
 		}
 
 		if !clerk.IsFile(sourceFile) || !clerk.IsFile(targetFile) {
-			t.Errorf("FailedMoveMustLeaveBothFilesIntact")
+			subtest.Errorf("FailedMoveMustLeaveBothFilesIntact")
 		}
 	})
 
-	t.Run("MoveToDanglingSymlinkFails", func(t *testing.T) {
+	test.Run("MoveToDanglingSymlinkFails", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "move_dangling_source.txt")
 		symlinkPath := filepath.Join(tempDir, "move_dangling_target.txt")
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateSourceFileFailed: %v", err)
+			subtest.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
 		err = os.Symlink(filepath.Join(tempDir, "move_dangling_nowhere"), symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.MoveFile(sourceFile, symlinkPath)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetFileAlreadyExists")
+			subtest.Errorf("MissingExpectedError: TargetFileAlreadyExists")
 		}
 		if !clerk.IsFile(sourceFile) {
-			t.Errorf("SourceFileMustSurviveFailedMove: %s", sourceFile)
+			subtest.Errorf("SourceFileMustSurviveFailedMove: %s", sourceFile)
 		}
 	})
 
-	t.Run("MoveFileOntoItselfSucceeds", func(t *testing.T) {
+	test.Run("MoveFileOntoItselfSucceeds", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "move_onto_itself.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.MoveFile(testFile, testFile)
 		if err != nil {
-			t.Errorf("MoveFileOntoItselfFailed: %v", err)
+			subtest.Errorf("MoveFileOntoItselfFailed: %v", err)
 		}
 		if !clerk.IsFile(testFile) {
-			t.Errorf("FileShouldStillExist: %s", testFile)
+			subtest.Errorf("FileShouldStillExist: %s", testFile)
 		}
 	})
 
-	t.Run("MoveFileCrossDeviceFallsBackToCopyAndDelete", func(t *testing.T) {
+	test.Run("MoveFileCrossDeviceFallsBackToCopyAndDelete", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "xdev_source.txt")
 
 		err := clerk.WriteNewFile(sourceFile, "cross device payload", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
-		otherDeviceBase := directoryOnDifferentDevice(t, tempDir)
+		otherDeviceBase := directoryOnDifferentDevice(subtest, tempDir)
 		otherDeviceDir, mkErr := os.MkdirTemp(otherDeviceBase, "tk-xdev-")
 		if mkErr != nil {
-			t.Fatalf("MkdirTempFailed: %v", mkErr)
+			subtest.Fatalf("MkdirTempFailed: %v", mkErr)
 		}
 		defer func() { _ = os.RemoveAll(otherDeviceDir) }()
 
@@ -642,30 +642,30 @@ func TestMoveFile(t *testing.T) {
 
 		err = clerk.MoveFile(sourceFile, targetFile)
 		if err != nil {
-			t.Fatalf("MoveFileCrossDeviceFailed: %v", err)
+			subtest.Fatalf("MoveFileCrossDeviceFailed: %v", err)
 		}
 		if clerk.FileExists(sourceFile) {
-			t.Errorf("SourceShouldBeRemovedAfterCrossDeviceMove: %s", sourceFile)
+			subtest.Errorf("SourceShouldBeRemovedAfterCrossDeviceMove: %s", sourceFile)
 		}
 
 		content, readErr := clerk.ReadFileContent(targetFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if content != "cross device payload" {
-			t.Errorf("ContentMismatch: '%s'", content)
+			subtest.Errorf("ContentMismatch: '%s'", content)
 		}
 	})
 }
 
 // directoryOnDifferentDevice finds a world-writable directory living on
 // another device than referenceDir, so MoveFile must take its EXDEV path.
-func directoryOnDifferentDevice(t *testing.T, referenceDir string) string {
-	t.Helper()
+func directoryOnDifferentDevice(test *testing.T, referenceDir string) string {
+	test.Helper()
 
 	referenceInfo, statErr := os.Stat(referenceDir)
 	if statErr != nil {
-		t.Fatalf("StatFailed: %v", statErr)
+		test.Fatalf("StatFailed: %v", statErr)
 	}
 	referenceDevice := referenceInfo.Sys().(*syscall.Stat_t).Dev
 
@@ -679,526 +679,526 @@ func directoryOnDifferentDevice(t *testing.T, referenceDir string) string {
 		}
 	}
 
-	t.Skip("NoDirectoryOnDifferentDevice")
+	test.Skip("NoDirectoryOnDifferentDevice")
 	return ""
 }
 
-func TestDeleteFile(t *testing.T) {
+func TestDeleteFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("DeleteExistingFile", func(t *testing.T) {
+	test.Run("DeleteExistingFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "todelete.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsFile(testFile) {
-			t.Fatalf("FileShouldExistBeforeDeletion: %s", testFile)
+			subtest.Fatalf("FileShouldExistBeforeDeletion: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 
 		if clerk.IsFile(testFile) {
-			t.Errorf("FileShouldNotExistAfterDeletion: %s", testFile)
+			subtest.Errorf("FileShouldNotExistAfterDeletion: %s", testFile)
 		}
 	})
 
-	t.Run("DeleteNonExistentFile", func(t *testing.T) {
+	test.Run("DeleteNonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 
 		err := clerk.DeleteFile(nonExistentFile)
 		if err != nil {
-			t.Errorf("DeleteNonExistentFileFailed: %v", err)
+			subtest.Errorf("DeleteNonExistentFileFailed: %v", err)
 		}
 	})
 
-	t.Run("DeleteDirectoryFails", func(t *testing.T) {
+	test.Run("DeleteDirectoryFails", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "undeletable_dir")
 
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(testDir)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetIsDirectory")
+			subtest.Errorf("MissingExpectedError: TargetIsDirectory")
 		}
 		if err != nil && err.Error() != "TargetIsDirectory" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsDirectory", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsDirectory", err.Error())
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 
-	t.Run("DeleteSymlinkRemovesLinkOnly", func(t *testing.T) {
+	test.Run("DeleteSymlinkRemovesLinkOnly", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "symlink_target_delete.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink_delete.txt")
 
 		err := clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.Symlink(targetFile, symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(symlinkPath)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 
 		if clerk.IsSymlink(symlinkPath) {
-			t.Errorf("SymlinkShouldBeGone: %s", symlinkPath)
+			subtest.Errorf("SymlinkShouldBeGone: %s", symlinkPath)
 		}
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("SymlinkTargetMustSurvive: %s", targetFile)
+			subtest.Errorf("SymlinkTargetMustSurvive: %s", targetFile)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 }
 
-func TestReadFileContent(t *testing.T) {
+func TestReadFileContent(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("ReadExistingFile", func(t *testing.T) {
+	test.Run("ReadExistingFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "content.txt")
 		expectedContent := "Hello, World!\nThis is test content."
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(testFile, []byte(expectedContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		actualContent, err := clerk.ReadFileContent(testFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if actualContent != expectedContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadNonExistentFile", func(t *testing.T) {
+	test.Run("ReadNonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 
 		_, err := clerk.ReadFileContent(nonExistentFile, nil)
 		if err == nil {
-			t.Errorf("MissingExpectedError: FileNotFound")
+			subtest.Errorf("MissingExpectedError: FileNotFound")
 		}
 
 		if err != nil && err.Error() != "FileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
 		}
 	})
 
-	t.Run("ReadExceedingMaxContentSizeFails", func(t *testing.T) {
+	test.Run("ReadExceedingMaxContentSizeFails", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "limited.txt")
 		fullContent := "This is a longer content that should be truncated when reading with size limit."
 		maxSize := int64(20)
 
 		err := os.WriteFile(testFile, []byte(fullContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		_, err = clerk.ReadFileContent(testFile, &maxSize)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: FileTooLarge")
+			subtest.Fatalf("MissingExpectedError: FileTooLarge")
 		}
 		if err.Error() != "FileTooLarge" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileTooLarge", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileTooLarge", err.Error())
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadExactlyAtMaxContentSize", func(t *testing.T) {
+	test.Run("ReadExactlyAtMaxContentSize", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "exact_limit.txt")
 		fullContent := "exactly-twenty-chars"
 		maxSize := int64(len(fullContent))
 
 		err := os.WriteFile(testFile, []byte(fullContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		actualContent, err := clerk.ReadFileContent(testFile, &maxSize)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 		if actualContent != fullContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, fullContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, fullContent)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadWithNegativeMaxSizeFails", func(t *testing.T) {
+	test.Run("ReadWithNegativeMaxSizeFails", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "negative_limit.txt")
 		negativeSize := int64(-1)
 
 		err := os.WriteFile(testFile, []byte("content"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		_, err = clerk.ReadFileContent(testFile, &negativeSize)
 		if err == nil || err.Error() != "FileTooLarge" {
-			t.Errorf("WrongErrorForNegativeCap: %v", err)
+			subtest.Errorf("WrongErrorForNegativeCap: %v", err)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadWithDefaultMaxSize", func(t *testing.T) {
+	test.Run("ReadWithDefaultMaxSize", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "default_size.txt")
 		testContent := "Content with default size limit"
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(testFile, []byte(testContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		actualContent, err := clerk.ReadFileContent(testFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if actualContent != testContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, testContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, testContent)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadSymlinkToFile", func(t *testing.T) {
+	test.Run("ReadSymlinkToFile", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "symlink_target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 		expectedContent := "content behind the symlink"
 
 		err := clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(targetFile, []byte(expectedContent), 0644)
 		if err != nil {
-			t.Fatalf("UpdateTargetFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateTargetFileContentFailed: %v", err)
 		}
 
 		err = os.Symlink(targetFile, symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		actualContent, err := clerk.ReadFileContent(symlinkPath, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if actualContent != expectedContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
 		}
 
 		err = clerk.RemoveSymlink(symlinkPath)
 		if err != nil {
-			t.Errorf("RemoveSymlinkFailed: %v", err)
+			subtest.Errorf("RemoveSymlinkFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("ReadDanglingSymlink", func(t *testing.T) {
+	test.Run("ReadDanglingSymlink", func(subtest *testing.T) {
 		deletedTarget := filepath.Join(tempDir, "deleted_target.txt")
 		symlinkPath := filepath.Join(tempDir, "dangling.txt")
 
 		err := clerk.TouchFile(deletedTarget)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.Symlink(deletedTarget, symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(deletedTarget)
 		if err != nil {
-			t.Fatalf("DeleteTargetFileFailed: %v", err)
+			subtest.Fatalf("DeleteTargetFileFailed: %v", err)
 		}
 
 		_, err = clerk.ReadFileContent(symlinkPath, nil)
 		if err == nil {
-			t.Errorf("MissingExpectedError: FileNotFound")
+			subtest.Errorf("MissingExpectedError: FileNotFound")
 		}
 
 		if err != nil && err.Error() != "FileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "FileNotFound", err.Error())
 		}
 
 		err = clerk.RemoveSymlink(symlinkPath)
 		if err != nil {
-			t.Errorf("RemoveSymlinkFailed: %v", err)
+			subtest.Errorf("RemoveSymlinkFailed: %v", err)
 		}
 	})
 }
 
-func TestAppendFileContent(t *testing.T) {
+func TestAppendFileContent(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("AppendsToExistingFile", func(t *testing.T) {
+	test.Run("AppendsToExistingFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "append.txt")
 		initialContent := "Initial"
 		appendContent := " Appended"
 
 		err := os.WriteFile(testFile, []byte(initialContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testFile),
+			FilePath: absoluteFilePathForTest(subtest, testFile),
 		}, appendContent)
 		if err != nil {
-			t.Fatalf("AppendFileContentFailed: %v", err)
+			subtest.Fatalf("AppendFileContentFailed: %v", err)
 		}
 
 		actualContent, readErr := clerk.ReadFileContent(testFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		expectedContent := initialContent + appendContent
 		if actualContent != expectedContent {
-			t.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
+			subtest.Errorf("ContentMismatch: '%s' vs '%s'", actualContent, expectedContent)
 		}
 	})
 
-	t.Run("MissingFileReturnsFileNotFound", func(t *testing.T) {
+	test.Run("MissingFileReturnsFileNotFound", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "missing.txt")
 
 		err := clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testFile),
+			FilePath: absoluteFilePathForTest(subtest, testFile),
 		}, "content")
 		if !errors.Is(err, ErrFileMissing) {
-			t.Errorf("ExpectedErrFileMissing, got: %v", err)
+			subtest.Errorf("ExpectedErrFileMissing, got: %v", err)
 		}
 		if clerk.FileExists(testFile) {
-			t.Errorf("MissingTargetWasCreated")
+			subtest.Errorf("MissingTargetWasCreated")
 		}
 	})
 
-	t.Run("KeepsTargetMode", func(t *testing.T) {
+	test.Run("KeepsTargetMode", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "mode.txt")
 		err := os.WriteFile(testFile, []byte("Initial"), 0640)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testFile),
+			FilePath: absoluteFilePathForTest(subtest, testFile),
 		}, " Appended")
 		if err != nil {
-			t.Fatalf("AppendFileContentFailed: %v", err)
+			subtest.Fatalf("AppendFileContentFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(testFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != 0640 {
-			t.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
+			subtest.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
 		}
 	})
 
-	t.Run("KeepsTargetOwner", func(t *testing.T) {
+	test.Run("KeepsTargetOwner", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 
 		testFile := filepath.Join(tempDir, "owned.txt")
 		err := os.WriteFile(testFile, []byte("Initial"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		err = os.Chown(testFile, nobodyUid, nobodyGid)
 		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
+			subtest.Fatalf("ChownFailed: %v", err)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testFile),
+			FilePath: absoluteFilePathForTest(subtest, testFile),
 		}, " Appended")
 		if err != nil {
-			t.Fatalf("AppendFileContentFailed: %v", err)
+			subtest.Fatalf("AppendFileContentFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(testFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnerChanged: expected %d:%d, got %d:%d",
 				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("RefusesSymlinkTargetByDefault", func(t *testing.T) {
+	test.Run("RefusesSymlinkTargetByDefault", func(subtest *testing.T) {
 		realFile := filepath.Join(tempDir, "symlinkReal.txt")
 		err := os.WriteFile(realFile, []byte("real"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		linkFile := filepath.Join(tempDir, "symlinkLink.txt")
 		err = os.Symlink(realFile, linkFile)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, linkFile),
+			FilePath: absoluteFilePathForTest(subtest, linkFile),
 		}, " appended")
 		if !errors.Is(err, ErrTargetIsSymlink) {
-			t.Errorf("ExpectedErrTargetIsSymlink, got: %v", err)
+			subtest.Errorf("ExpectedErrTargetIsSymlink, got: %v", err)
 		}
 	})
 
-	t.Run("ResolvesSymlinkTargetWhenRequested", func(t *testing.T) {
+	test.Run("ResolvesSymlinkTargetWhenRequested", func(subtest *testing.T) {
 		realFile := filepath.Join(tempDir, "resolveReal.txt")
 		err := os.WriteFile(realFile, []byte("real"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		linkFile := filepath.Join(tempDir, "resolveLink.txt")
 		err = os.Symlink(realFile, linkFile)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		symlinkPolicy := FileClerkSymlinkPolicyResolve
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath:      absoluteFilePathForTest(t, linkFile),
+			FilePath:      absoluteFilePathForTest(subtest, linkFile),
 			SymlinkPolicy: &symlinkPolicy,
 		}, " appended")
 		if err != nil {
-			t.Fatalf("AppendFileContentFailed: %v", err)
+			subtest.Fatalf("AppendFileContentFailed: %v", err)
 		}
 
 		actualContent, readErr := clerk.ReadFileContent(realFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if actualContent != "real appended" {
-			t.Errorf("ContentMismatch: '%s'", actualContent)
+			subtest.Errorf("ContentMismatch: '%s'", actualContent)
 		}
 	})
 
-	t.Run("DanglingSymlinkWithResolveReturnsFileNotFound", func(t *testing.T) {
+	test.Run("DanglingSymlinkWithResolveReturnsFileNotFound", func(subtest *testing.T) {
 		linkFile := filepath.Join(tempDir, "danglingLink.txt")
 		err := os.Symlink(filepath.Join(tempDir, "missingTarget.txt"), linkFile)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		symlinkPolicy := FileClerkSymlinkPolicyResolve
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath:      absoluteFilePathForTest(t, linkFile),
+			FilePath:      absoluteFilePathForTest(subtest, linkFile),
 			SymlinkPolicy: &symlinkPolicy,
 		}, "content")
 		if !errors.Is(err, ErrFileMissing) {
-			t.Errorf("ExpectedErrFileMissing, got: %v", err)
+			subtest.Errorf("ExpectedErrFileMissing, got: %v", err)
 		}
 	})
 
-	t.Run("RefusesDirectoryTarget", func(t *testing.T) {
+	test.Run("RefusesDirectoryTarget", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "appendDir")
 		err := os.MkdirAll(testDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testDir),
+			FilePath: absoluteFilePathForTest(subtest, testDir),
 		}, "content")
 		if !errors.Is(err, ErrTargetIsDirectory) {
-			t.Errorf("ExpectedErrTargetIsDirectory, got: %v", err)
+			subtest.Errorf("ExpectedErrTargetIsDirectory, got: %v", err)
 		}
 	})
 
-	t.Run("RefusesFifoWithoutReader", func(t *testing.T) {
+	test.Run("RefusesFifoWithoutReader", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "append.fifo")
 		fifoErr := unix.Mkfifo(testFile, 0o600)
 		if fifoErr != nil {
-			t.Fatalf("MkfifoFailed: %v", fifoErr)
+			subtest.Fatalf("MkfifoFailed: %v", fifoErr)
 		}
-		targetPath := absoluteFilePathForTest(t, testFile)
+		targetPath := absoluteFilePathForTest(subtest, testFile)
 
 		appendResultChan := make(chan error, 1)
 		go func() {
@@ -1210,172 +1210,172 @@ func TestAppendFileContent(t *testing.T) {
 		select {
 		case appendErr := <-appendResultChan:
 			if !errors.Is(appendErr, ErrTargetNotRegularFile) {
-				t.Fatalf("ExpectedErrTargetNotRegularFile, got: %v", appendErr)
+				subtest.Fatalf("ExpectedErrTargetNotRegularFile, got: %v", appendErr)
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatalf("AppendBlockedOnFifo")
+			subtest.Fatalf("AppendBlockedOnFifo")
 		}
 	})
 
-	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableDirChainWhenRequired", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "writableAppendDir")
 		err := os.MkdirAll(testDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chmod(testDir, 0o777)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 		testFile := filepath.Join(testDir, "append.txt")
 		err = os.WriteFile(testFile, []byte("Initial"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath:       absoluteFilePathForTest(t, testFile),
+			FilePath:       absoluteFilePathForTest(subtest, testFile),
 			DirChainPolicy: &sharedWriteRefusedPolicy,
 		}, " Appended")
 		if !errors.Is(err, ErrDirectoryWritableByOthers) {
-			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
 		}
 	})
 
-	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+	test.Run("ReportsUnknownTrustedDirOwner", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "unknownOwner.txt")
 		err := os.WriteFile(testFile, []byte("Initial"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
 			"no-such-user-xyz-42",
 		)
 		if usernameErr != nil {
-			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+			subtest.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
 		}
 
 		err = clerk.AppendFileContent(FileAppendSettings{
-			FilePath: absoluteFilePathForTest(t, testFile),
+			FilePath: absoluteFilePathForTest(subtest, testFile),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				unknownUsername,
 			},
 		}, " Appended")
 		if err == nil {
-			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+			subtest.Fatalf("MissingErrorForUnknownTrustedDirOwner")
 		}
 		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
-			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+			subtest.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 }
 
-func TestTruncateFileContent(t *testing.T) {
+func TestTruncateFileContent(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("TruncateContentFromFile", func(t *testing.T) {
+	test.Run("TruncateContentFromFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "clear.txt")
 		initialContent := "Content to be cleared"
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(testFile, []byte(initialContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
-		err = clerk.TruncateFileContent(absoluteFilePathForTest(t, testFile))
+		err = clerk.TruncateFileContent(absoluteFilePathForTest(subtest, testFile))
 		if err != nil {
-			t.Errorf("TruncateFileContentFailed: %v", err)
+			subtest.Errorf("TruncateFileContentFailed: %v", err)
 		}
 
 		actualContent, err := clerk.ReadFileContent(testFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if actualContent != "" {
-			t.Errorf("ContentShouldBeEmpty: '%s'", actualContent)
+			subtest.Errorf("ContentShouldBeEmpty: '%s'", actualContent)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 }
 
-func TestCreateDir(t *testing.T) {
+func TestCreateDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CreateNewDirectory", func(t *testing.T) {
+	test.Run("CreateNewDirectory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "newdir")
 
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		if !clerk.IsDir(testDir) {
-			t.Errorf("DirectoryShouldExist: %s", testDir)
+			subtest.Errorf("DirectoryShouldExist: %s", testDir)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 
-	t.Run("CreateNestedDirectory", func(t *testing.T) {
+	test.Run("CreateNestedDirectory", func(subtest *testing.T) {
 		nestedDir := filepath.Join(tempDir, "parent", "child", "grandchild")
 
 		err := clerk.CreateDir(nestedDir)
 		if err != nil {
-			t.Errorf("CreateDirFailed: %v", err)
+			subtest.Errorf("CreateDirFailed: %v", err)
 		}
 
 		if !clerk.IsDir(nestedDir) {
-			t.Errorf("NestedDirectoryShouldExist: %s", nestedDir)
+			subtest.Errorf("NestedDirectoryShouldExist: %s", nestedDir)
 		}
 
 		parentDir := filepath.Join(tempDir, "parent")
 		err = clerk.DeleteDir(parentDir)
 		if err != nil {
-			t.Errorf("DeleteParentDirFailed: %v", err)
+			subtest.Errorf("DeleteParentDirFailed: %v", err)
 		}
 	})
 
-	t.Run("CreateExistingDirectory", func(t *testing.T) {
+	test.Run("CreateExistingDirectory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "existing")
 
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.CreateDir(testDir)
 		if err != nil {
-			t.Errorf("CreateDirFailed: %v", err)
+			subtest.Errorf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 }
 
-func TestCopyDir(t *testing.T) {
+func TestCopyDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CopyDirectoryWithFiles", func(t *testing.T) {
+	test.Run("CopyDirectoryWithFiles", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "sourcedir")
 		targetDir := filepath.Join(tempDir, "targetdir")
 		testFile := filepath.Join(sourceDir, "testfile.txt")
@@ -1383,73 +1383,73 @@ func TestCopyDir(t *testing.T) {
 
 		err := clerk.CreateDir(sourceDir)
 		if err != nil {
-			t.Fatalf("CreateSourceDirFailed: %v", err)
+			subtest.Fatalf("CreateSourceDirFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateTestFileFailed: %v", err)
+			subtest.Fatalf("CreateTestFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(testFile, []byte(testContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.CopyDir(sourceDir, targetDir)
 		if err != nil {
-			t.Errorf("CopyDirFailed: %v", err)
+			subtest.Errorf("CopyDirFailed: %v", err)
 		}
 
 		if !clerk.IsDir(targetDir) {
-			t.Errorf("TargetDirectoryShouldExist: %s", targetDir)
+			subtest.Errorf("TargetDirectoryShouldExist: %s", targetDir)
 		}
 
 		copiedFile := filepath.Join(targetDir, "testfile.txt")
 		if !clerk.IsFile(copiedFile) {
-			t.Errorf("CopiedFileShouldExist: %s", copiedFile)
+			subtest.Errorf("CopiedFileShouldExist: %s", copiedFile)
 		}
 
 		copiedContent, err := clerk.ReadFileContent(copiedFile, nil)
 		if err != nil {
-			t.Errorf("ReadCopiedFileContentFailed: %v", err)
+			subtest.Errorf("ReadCopiedFileContentFailed: %v", err)
 		}
 
 		if copiedContent != testContent {
-			t.Errorf("CopiedContentMismatch: '%s' vs '%s'", copiedContent, testContent)
+			subtest.Errorf("CopiedContentMismatch: '%s' vs '%s'", copiedContent, testContent)
 		}
 
 		err = clerk.DeleteDir(sourceDir)
 		if err != nil {
-			t.Errorf("DeleteSourceDirFailed: %v", err)
+			subtest.Errorf("DeleteSourceDirFailed: %v", err)
 		}
 
 		err = clerk.DeleteDir(targetDir)
 		if err != nil {
-			t.Errorf("DeleteTargetDirFailed: %v", err)
+			subtest.Errorf("DeleteTargetDirFailed: %v", err)
 		}
 	})
 
-	t.Run("CopyNonExistentDirectory", func(t *testing.T) {
+	test.Run("CopyNonExistentDirectory", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "nonexistent")
 		targetDir := filepath.Join(tempDir, "target")
 
 		err := clerk.CopyDir(sourceDir, targetDir)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceDirNotFound")
+			subtest.Errorf("MissingExpectedError: SourceDirNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceDirNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceDirNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceDirNotFound", err.Error())
 		}
 	})
 }
 
-func TestMoveDir(t *testing.T) {
+func TestMoveDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("MoveDirectoryWithFiles", func(t *testing.T) {
+	test.Run("MoveDirectoryWithFiles", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "movesource")
 		targetDir := filepath.Join(tempDir, "movetarget")
 		testFile := filepath.Join(sourceDir, "movefile.txt")
@@ -1457,415 +1457,415 @@ func TestMoveDir(t *testing.T) {
 
 		err := clerk.CreateDir(sourceDir)
 		if err != nil {
-			t.Fatalf("CreateSourceDirFailed: %v", err)
+			subtest.Fatalf("CreateSourceDirFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("CreateTestFileFailed: %v", err)
+			subtest.Fatalf("CreateTestFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(testFile, []byte(testContent), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.MoveDir(sourceDir, targetDir)
 		if err != nil {
-			t.Errorf("MoveDirFailed: %v", err)
+			subtest.Errorf("MoveDirFailed: %v", err)
 		}
 
 		if clerk.IsDir(sourceDir) {
-			t.Errorf("SourceDirectoryShouldNotExist: %s", sourceDir)
+			subtest.Errorf("SourceDirectoryShouldNotExist: %s", sourceDir)
 		}
 
 		if !clerk.IsDir(targetDir) {
-			t.Errorf("TargetDirectoryShouldExist: %s", targetDir)
+			subtest.Errorf("TargetDirectoryShouldExist: %s", targetDir)
 		}
 
 		movedFile := filepath.Join(targetDir, "movefile.txt")
 		if !clerk.IsFile(movedFile) {
-			t.Errorf("MovedFileShouldExist: %s", movedFile)
+			subtest.Errorf("MovedFileShouldExist: %s", movedFile)
 		}
 
 		movedContent, err := clerk.ReadFileContent(movedFile, nil)
 		if err != nil {
-			t.Errorf("ReadMovedFileContentFailed: %v", err)
+			subtest.Errorf("ReadMovedFileContentFailed: %v", err)
 		}
 
 		if movedContent != testContent {
-			t.Errorf("MovedContentMismatch: '%s' vs '%s'", movedContent, testContent)
+			subtest.Errorf("MovedContentMismatch: '%s' vs '%s'", movedContent, testContent)
 		}
 
 		err = clerk.DeleteDir(targetDir)
 		if err != nil {
-			t.Errorf("DeleteTargetDirFailed: %v", err)
+			subtest.Errorf("DeleteTargetDirFailed: %v", err)
 		}
 	})
 
-	t.Run("MoveNonExistentDirectory", func(t *testing.T) {
+	test.Run("MoveNonExistentDirectory", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "nonexistent")
 		targetDir := filepath.Join(tempDir, "target")
 
 		err := clerk.MoveDir(sourceDir, targetDir)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceDirNotFound")
+			subtest.Errorf("MissingExpectedError: SourceDirNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceDirNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceDirNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceDirNotFound", err.Error())
 		}
 	})
 }
 
-func TestDeleteDir(t *testing.T) {
+func TestDeleteDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("DeleteExistingDirectory", func(t *testing.T) {
+	test.Run("DeleteExistingDirectory", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "deleteme")
 		testFile := filepath.Join(testDir, "file.txt")
 
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if !clerk.IsDir(testDir) {
-			t.Fatalf("DirectoryShouldExistBeforeDeletion: %s", testDir)
+			subtest.Fatalf("DirectoryShouldExistBeforeDeletion: %s", testDir)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 
 		if clerk.IsDir(testDir) {
-			t.Errorf("DirectoryShouldNotExistAfterDeletion: %s", testDir)
+			subtest.Errorf("DirectoryShouldNotExistAfterDeletion: %s", testDir)
 		}
 	})
 
-	t.Run("DeleteNonExistentDirectory", func(t *testing.T) {
+	test.Run("DeleteNonExistentDirectory", func(subtest *testing.T) {
 		nonExistentDir := filepath.Join(tempDir, "nonexistent")
 
 		err := clerk.DeleteDir(nonExistentDir)
 		if err != nil {
-			t.Errorf("DeleteNonExistentDirFailed: %v", err)
+			subtest.Errorf("DeleteNonExistentDirFailed: %v", err)
 		}
 	})
 
-	t.Run("DeleteFileThroughDeleteDirFails", func(t *testing.T) {
+	test.Run("DeleteFileThroughDeleteDirFails", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "not_a_dir.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.DeleteDir(testFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetNotDirectory")
+			subtest.Errorf("MissingExpectedError: TargetNotDirectory")
 		}
 		if err != nil && err.Error() != "TargetNotDirectory" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetNotDirectory", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetNotDirectory", err.Error())
 		}
 
 		if !clerk.IsFile(testFile) {
-			t.Errorf("FileMustSurviveRejectedDelete: %s", testFile)
+			subtest.Errorf("FileMustSurviveRejectedDelete: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 }
 
-func TestIsSymlink(t *testing.T) {
+func TestIsSymlink(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("RegularFile", func(t *testing.T) {
+	test.Run("RegularFile", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "regular.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		if clerk.IsSymlink(testFile) {
-			t.Errorf("IsSymlinkShouldReturnFalseForRegularFile: %s", testFile)
+			subtest.Errorf("IsSymlinkShouldReturnFalseForRegularFile: %s", testFile)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("NonExistentPath", func(t *testing.T) {
+	test.Run("NonExistentPath", func(subtest *testing.T) {
 		nonExistentPath := filepath.Join(tempDir, "nonexistent")
 
 		if clerk.IsSymlink(nonExistentPath) {
-			t.Errorf("IsSymlinkShouldReturnFalseForNonExistent: %s", nonExistentPath)
+			subtest.Errorf("IsSymlinkShouldReturnFalseForNonExistent: %s", nonExistentPath)
 		}
 	})
 }
 
-func TestCreateSymlink(t *testing.T) {
+func TestCreateSymlink(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CreateSymlinkToFile", func(t *testing.T) {
+	test.Run("CreateSymlinkToFile", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
 		err := clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = clerk.CreateSymlink(targetFile, symlinkPath, false)
 		if err != nil {
-			t.Errorf("CreateSymlinkFailed: %v", err)
+			subtest.Errorf("CreateSymlinkFailed: %v", err)
 		}
 
 		if !clerk.IsSymlink(symlinkPath) {
-			t.Errorf("SymlinkShouldExist: %s", symlinkPath)
+			subtest.Errorf("SymlinkShouldExist: %s", symlinkPath)
 		}
 
 		err = clerk.RemoveSymlink(symlinkPath)
 		if err != nil {
-			t.Errorf("RemoveSymlinkFailed: %v", err)
+			subtest.Errorf("RemoveSymlinkFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("CreateSymlinkToNonExistentFile", func(t *testing.T) {
+	test.Run("CreateSymlinkToNonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
 		err := clerk.CreateSymlink(nonExistentFile, symlinkPath, false)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourcePathNotFound")
+			subtest.Errorf("MissingExpectedError: SourcePathNotFound")
 		}
 
 		if err != nil && err.Error() != "SourcePathNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourcePathNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourcePathNotFound", err.Error())
 		}
 	})
 }
 
-func TestIsSymlinkTo(t *testing.T) {
+func TestIsSymlinkTo(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("ValidSymlinkTarget", func(t *testing.T) {
+	test.Run("ValidSymlinkTarget", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
 		err := clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = clerk.CreateSymlink(targetFile, symlinkPath, false)
 		if err != nil {
-			t.Fatalf("CreateSymlinkFailed: %v", err)
+			subtest.Fatalf("CreateSymlinkFailed: %v", err)
 		}
 
 		if !clerk.IsSymlinkTo(symlinkPath, targetFile) {
-			t.Errorf("IsSymlinkToShouldReturnTrue: %s -> %s", symlinkPath, targetFile)
+			subtest.Errorf("IsSymlinkToShouldReturnTrue: %s -> %s", symlinkPath, targetFile)
 		}
 
 		err = clerk.RemoveSymlink(symlinkPath)
 		if err != nil {
-			t.Errorf("RemoveSymlinkFailed: %v", err)
+			subtest.Errorf("RemoveSymlinkFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 
-	t.Run("RegularFileNotSymlink", func(t *testing.T) {
+	test.Run("RegularFileNotSymlink", func(subtest *testing.T) {
 		regularFile := filepath.Join(tempDir, "regular.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
 		err := clerk.TouchFile(regularFile)
 		if err != nil {
-			t.Fatalf("CreateRegularFileFailed: %v", err)
+			subtest.Fatalf("CreateRegularFileFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		if clerk.IsSymlinkTo(regularFile, targetFile) {
-			t.Errorf("IsSymlinkToShouldReturnFalseForRegularFile: %s", regularFile)
+			subtest.Errorf("IsSymlinkToShouldReturnFalseForRegularFile: %s", regularFile)
 		}
 
 		err = clerk.DeleteFile(regularFile)
 		if err != nil {
-			t.Errorf("DeleteRegularFileFailed: %v", err)
+			subtest.Errorf("DeleteRegularFileFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 }
 
-func TestRemoveSymlink(t *testing.T) {
+func TestRemoveSymlink(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("RemoveExistingSymlink", func(t *testing.T) {
+	test.Run("RemoveExistingSymlink", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 		symlinkPath := filepath.Join(tempDir, "symlink.txt")
 
 		err := clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = clerk.CreateSymlink(targetFile, symlinkPath, false)
 		if err != nil {
-			t.Fatalf("CreateSymlinkFailed: %v", err)
+			subtest.Fatalf("CreateSymlinkFailed: %v", err)
 		}
 
 		err = clerk.RemoveSymlink(symlinkPath)
 		if err != nil {
-			t.Errorf("RemoveSymlinkFailed: %v", err)
+			subtest.Errorf("RemoveSymlinkFailed: %v", err)
 		}
 
 		if clerk.IsSymlink(symlinkPath) {
-			t.Errorf("SymlinkShouldNotExistAfterRemoval: %s", symlinkPath)
+			subtest.Errorf("SymlinkShouldNotExistAfterRemoval: %s", symlinkPath)
 		}
 
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("TargetFileShouldStillExist: %s", targetFile)
+			subtest.Errorf("TargetFileShouldStillExist: %s", targetFile)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteTargetFileFailed: %v", err)
+			subtest.Errorf("DeleteTargetFileFailed: %v", err)
 		}
 	})
 }
 
-func TestUpdateFilePermissions(t *testing.T) {
+func TestUpdateFilePermissions(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("UpdateFilePermissionsWithCustomValue", func(t *testing.T) {
+	test.Run("UpdateFilePermissionsWithCustomValue", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "permissions.txt")
 		customPermissions := os.FileMode(0600)
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(testFile, &customPermissions)
 		if err != nil {
-			t.Errorf("UpdateFilePermissionsFailed: %v", err)
+			subtest.Errorf("UpdateFilePermissionsFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("UpdateFilePermissionsWithDefaultValue", func(t *testing.T) {
+	test.Run("UpdateFilePermissionsWithDefaultValue", func(subtest *testing.T) {
 		testFile := filepath.Join(tempDir, "default_permissions.txt")
 
 		err := clerk.TouchFile(testFile)
 		if err != nil {
-			t.Fatalf("TouchFileFailed: %v", err)
+			subtest.Fatalf("TouchFileFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(testFile, nil)
 		if err != nil {
-			t.Errorf("UpdateFilePermissionsFailed: %v", err)
+			subtest.Errorf("UpdateFilePermissionsFailed: %v", err)
 		}
 
 		err = clerk.DeleteFile(testFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("UpdateDirectoryPermissions", func(t *testing.T) {
+	test.Run("UpdateDirectoryPermissions", func(subtest *testing.T) {
 		testDir := filepath.Join(tempDir, "permissions_dir")
 
 		err := clerk.CreateDir(testDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(testDir, nil)
 		if err != nil {
-			t.Errorf("UpdateFilePermissionsFailed: %v", err)
+			subtest.Errorf("UpdateFilePermissionsFailed: %v", err)
 		}
 
 		err = clerk.DeleteDir(testDir)
 		if err != nil {
-			t.Errorf("DeleteDirFailed: %v", err)
+			subtest.Errorf("DeleteDirFailed: %v", err)
 		}
 	})
 
-	t.Run("UpdateSymlinkPermissionsFails", func(t *testing.T) {
+	test.Run("UpdateSymlinkPermissionsFails", func(subtest *testing.T) {
 		targetFile := filepath.Join(tempDir, "chmod_target.txt")
 		symlinkPath := filepath.Join(tempDir, "chmod_link.txt")
 		restrictivePermissions := os.FileMode(0600)
 
 		err := os.WriteFile(targetFile, []byte("target"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = os.Symlink(targetFile, symlinkPath)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.UpdateFilePermissions(symlinkPath, &restrictivePermissions)
 		if err == nil {
-			t.Errorf("MissingExpectedError: TargetIsSymlink")
+			subtest.Errorf("MissingExpectedError: TargetIsSymlink")
 		}
 		if err != nil && err.Error() != "TargetIsSymlink" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsSymlink", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "TargetIsSymlink", err.Error())
 		}
 
 		targetInfo, statErr := os.Stat(targetFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if targetInfo.Mode().Perm() == 0600 {
-			t.Errorf("ChmodLandedOnSymlinkTarget")
+			subtest.Errorf("ChmodLandedOnSymlinkTarget")
 		}
 	})
 }
 
-func TestCompressFile(t *testing.T) {
+func TestCompressFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("CompressFileWithFormats", func(t *testing.T) {
+	test.Run("CompressFileWithFormats", func(subtest *testing.T) {
 		tarFormat := "tar"
 		gzFormat := "gz"
 		zipFormat := "zip"
@@ -1899,22 +1899,22 @@ func TestCompressFile(t *testing.T) {
 
 			err := clerk.TouchFile(testFile)
 			if err != nil {
-				t.Fatalf("TouchFileFailed: %v", err)
+				subtest.Fatalf("TouchFileFailed: %v", err)
 			}
 
 			err = os.WriteFile(testFile, []byte(testContent), 0644)
 			if err != nil {
-				t.Fatalf("WriteFileFailed: %v", err)
+				subtest.Fatalf("WriteFileFailed: %v", err)
 			}
 
 			compressedFilePath, err := clerk.CompressFile(testFile, testCase.format, nil)
 			if err != nil && testCase.shouldSucceed {
-				t.Errorf("[%s] CompressFileFailed: %v", formatName, err)
+				subtest.Errorf("[%s] CompressFileFailed: %v", formatName, err)
 			}
 
 			if err != nil && !testCase.shouldSucceed {
 				if testCase.expectedError != "" && err.Error() != testCase.expectedError {
-					t.Errorf(
+					subtest.Errorf(
 						"[%s] WrongErrorMessage: '%s' vs '%s'",
 						formatName, testCase.expectedError, err.Error(),
 					)
@@ -1922,11 +1922,11 @@ func TestCompressFile(t *testing.T) {
 			}
 
 			if err == nil && !testCase.shouldSucceed {
-				t.Errorf("[%s] UnexpectedCompressionSuccess: %s", formatName, testCase.expectedError)
+				subtest.Errorf("[%s] UnexpectedCompressionSuccess: %s", formatName, testCase.expectedError)
 			}
 
 			if err == nil && !strings.HasSuffix(compressedFilePath, testCase.expectedSuffix) {
-				t.Errorf(
+				subtest.Errorf(
 					"[%s] WrongCompressionSuffix: '%s' vs '%s'",
 					formatName, testCase.expectedSuffix, compressedFilePath,
 				)
@@ -1934,63 +1934,63 @@ func TestCompressFile(t *testing.T) {
 
 			err = clerk.DeleteFile(testFile)
 			if err != nil {
-				t.Errorf("DeleteOriginalFileFailed: %v", err)
+				subtest.Errorf("DeleteOriginalFileFailed: %v", err)
 			}
 		}
 	})
 
-	t.Run("CompressNonExistentFile", func(t *testing.T) {
+	test.Run("CompressNonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
 
 		_, err := clerk.CompressFile(nonExistentFile, nil, nil)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceFileNotFound")
+			subtest.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
 
-	t.Run("SourceDeletionContractIsFormatIndependent", func(t *testing.T) {
+	test.Run("SourceDeletionContractIsFormatIndependent", func(subtest *testing.T) {
 		keepSourceTrue := true
 		formats := []string{"tar", "gz", "zip", "xz", "br"}
 
 		for _, format := range formats {
 			formatName := format
 
-			t.Run("Keep_"+formatName, func(t *testing.T) {
+			subtest.Run("Keep_"+formatName, func(subtest *testing.T) {
 				testFile := filepath.Join(tempDir, "keep_"+formatName+".txt")
 				err := clerk.WriteNewFile(testFile, "content for keep "+formatName, 0644)
 				if err != nil {
-					t.Fatalf("WriteNewFileFailed: %v", err)
+					subtest.Fatalf("WriteNewFileFailed: %v", err)
 				}
 
 				compressedFile, err := clerk.CompressFile(testFile, &formatName, &keepSourceTrue)
 				if err != nil {
-					t.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
+					subtest.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
 				}
 				if !clerk.IsFile(testFile) {
-					t.Errorf("[%s] SourceMustBeKept: %s", formatName, testFile)
+					subtest.Errorf("[%s] SourceMustBeKept: %s", formatName, testFile)
 				}
 
 				_ = clerk.DeleteFile(testFile)
 				_ = clerk.DeleteFile(compressedFile)
 			})
 
-			t.Run("Remove_"+formatName, func(t *testing.T) {
+			subtest.Run("Remove_"+formatName, func(subtest *testing.T) {
 				testFile := filepath.Join(tempDir, "remove_"+formatName+".txt")
 				err := clerk.WriteNewFile(testFile, "content for remove "+formatName, 0644)
 				if err != nil {
-					t.Fatalf("WriteNewFileFailed: %v", err)
+					subtest.Fatalf("WriteNewFileFailed: %v", err)
 				}
 
 				compressedFile, err := clerk.CompressFile(testFile, &formatName, nil)
 				if err != nil {
-					t.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
+					subtest.Fatalf("[%s] CompressFileFailed: %v", formatName, err)
 				}
 				if clerk.FileExists(testFile) {
-					t.Errorf("[%s] SourceMustBeRemoved: %s", formatName, testFile)
+					subtest.Errorf("[%s] SourceMustBeRemoved: %s", formatName, testFile)
 				}
 
 				_ = clerk.DeleteFile(compressedFile)
@@ -1999,67 +1999,67 @@ func TestCompressFile(t *testing.T) {
 	})
 }
 
-func TestCompressDir(t *testing.T) {
+func TestCompressDir(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("DefaultBrotliStageSucceedsAndCleansIntermediateTar", func(t *testing.T) {
+	test.Run("DefaultBrotliStageSucceedsAndCleansIntermediateTar", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "compressdir_br")
 		nestedFile := filepath.Join(sourceDir, "nested.txt")
 
 		err := clerk.CreateDir(sourceDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err = clerk.WriteNewFile(nestedFile, "nested content", 0644)
 		if err != nil {
-			t.Fatalf("WriteNewFileFailed: %v", err)
+			subtest.Fatalf("WriteNewFileFailed: %v", err)
 		}
 
 		compressedFilePath, err := clerk.CompressDir(sourceDir, nil)
 		if err != nil {
-			t.Fatalf("CompressDirFailed: %v", err)
+			subtest.Fatalf("CompressDirFailed: %v", err)
 		}
 
 		if !strings.HasSuffix(compressedFilePath, ".tar.br") {
-			t.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
+			subtest.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
 		}
 		if !clerk.IsFile(compressedFilePath) {
-			t.Errorf("CompressedFileShouldExist: %s", compressedFilePath)
+			subtest.Errorf("CompressedFileShouldExist: %s", compressedFilePath)
 		}
 		if clerk.FileExists(sourceDir + ".tar") {
-			t.Errorf("IntermediateTarShouldBeRemoved: %s", sourceDir+".tar")
+			subtest.Errorf("IntermediateTarShouldBeRemoved: %s", sourceDir+".tar")
 		}
 		if !clerk.IsDir(sourceDir) {
-			t.Errorf("SourceDirMustBeKept: %s", sourceDir)
+			subtest.Errorf("SourceDirMustBeKept: %s", sourceDir)
 		}
 	})
 
-	t.Run("TarFormatSkipsSecondStage", func(t *testing.T) {
+	test.Run("TarFormatSkipsSecondStage", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "compressdir_tar")
 		tarFormat := "tar"
 
 		err := clerk.CreateDir(sourceDir)
 		if err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		compressedFilePath, err := clerk.CompressDir(sourceDir, &tarFormat)
 		if err != nil {
-			t.Fatalf("CompressDirFailed: %v", err)
+			subtest.Fatalf("CompressDirFailed: %v", err)
 		}
 		if !strings.HasSuffix(compressedFilePath, ".tar") {
-			t.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
+			subtest.Errorf("WrongCompressionSuffix: '%s'", compressedFilePath)
 		}
 	})
 }
 
-func TestDecompressFile(t *testing.T) {
+func TestDecompressFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("DecompressFileWithFormats", func(t *testing.T) {
+	test.Run("DecompressFileWithFormats", func(subtest *testing.T) {
 		keepSourceTrue := true
 		keepSourceFalse := false
 
@@ -2087,29 +2087,29 @@ func TestDecompressFile(t *testing.T) {
 
 			err := clerk.TouchFile(testFile)
 			if err != nil {
-				t.Fatalf("TouchFileFailed: %v", err)
+				subtest.Fatalf("TouchFileFailed: %v", err)
 			}
 
 			err = os.WriteFile(testFile, []byte(preCompressedContent), 0644)
 			if err != nil {
-				t.Fatalf("WriteFileFailed: %v", err)
+				subtest.Fatalf("WriteFileFailed: %v", err)
 			}
 
 			compressedFile, err := clerk.CompressFile(testFile, &testCase.format, nil)
 			if err != nil && testCase.shouldSucceed {
-				t.Fatalf("[%s] CompressFileFailed: %v", testCase.format, err)
+				subtest.Fatalf("[%s] CompressFileFailed: %v", testCase.format, err)
 
 				if clerk.FileExists(testFile) {
 					err = clerk.DeleteFile(testFile)
 					if err != nil {
-						t.Errorf("DeleteOriginalFileFailed: %v", err)
+						subtest.Errorf("DeleteOriginalFileFailed: %v", err)
 					}
 				}
 
 				if clerk.FileExists(compressedFile) {
 					err = clerk.DeleteFile(compressedFile)
 					if err != nil {
-						t.Errorf("DeleteCompressedFileFailed: %v", err)
+						subtest.Errorf("DeleteCompressedFileFailed: %v", err)
 					}
 				}
 
@@ -2118,24 +2118,24 @@ func TestDecompressFile(t *testing.T) {
 
 			decompressedFile, err := clerk.DecompressFile(compressedFile, nil, testCase.shouldKeepSource)
 			if err != nil && testCase.shouldSucceed {
-				t.Errorf("[%s] DecompressFileFailed: %v", testCase.format, err)
+				subtest.Errorf("[%s] DecompressFileFailed: %v", testCase.format, err)
 			}
 
 			if err == nil && !testCase.shouldSucceed {
-				t.Errorf("[%s] UnexpectedDecompressionSuccess", testCase.format)
+				subtest.Errorf("[%s] UnexpectedDecompressionSuccess", testCase.format)
 			}
 
 			if decompressedFile == "" && testCase.shouldSucceed {
-				t.Errorf("[%s] DecompressedFilePathShouldNotBeEmpty", testCase.format)
+				subtest.Errorf("[%s] DecompressedFilePathShouldNotBeEmpty", testCase.format)
 			}
 
 			if testCase.shouldSucceed && clerk.FileExists(decompressedFile) {
 				decompressedContent, err := clerk.ReadFileContent(decompressedFile, nil)
 				if err != nil {
-					t.Fatalf("[%s]ReadDecompressedFileFailed: %v", testCase.format, err)
+					subtest.Fatalf("[%s]ReadDecompressedFileFailed: %v", testCase.format, err)
 				}
 				if decompressedContent != preCompressedContent {
-					t.Errorf(
+					subtest.Errorf(
 						"[%s] DecompressedContentMismatch: '%s' vs '%s'",
 						testCase.format, preCompressedContent, decompressedContent,
 					)
@@ -2148,46 +2148,46 @@ func TestDecompressFile(t *testing.T) {
 			}
 
 			if shouldKeep && !clerk.FileExists(compressedFile) {
-				t.Errorf("[%s] CompressedFileShouldBeKept", testCase.format)
+				subtest.Errorf("[%s] CompressedFileShouldBeKept", testCase.format)
 			}
 
 			if !shouldKeep && clerk.FileExists(compressedFile) {
-				t.Errorf("[%s] CompressedFileShouldBeRemoved", testCase.format)
+				subtest.Errorf("[%s] CompressedFileShouldBeRemoved", testCase.format)
 			}
 
 			if clerk.FileExists(decompressedFile) {
 				err = clerk.DeleteFile(decompressedFile)
 				if err != nil {
-					t.Errorf("DeleteDecompressedFileFailed: %v", err)
+					subtest.Errorf("DeleteDecompressedFileFailed: %v", err)
 				}
 			}
 
 			if clerk.FileExists(compressedFile) {
 				err = clerk.DeleteFile(compressedFile)
 				if err != nil {
-					t.Errorf("DeleteCompressedFileFailed: %v", err)
+					subtest.Errorf("DeleteCompressedFileFailed: %v", err)
 				}
 			}
 		}
 	})
 
-	t.Run("DecompressNonExistentFile", func(t *testing.T) {
+	test.Run("DecompressNonExistentFile", func(subtest *testing.T) {
 		nonExistentFile := filepath.Join(tempDir, "nonexistent.tar")
 
 		_, err := clerk.DecompressFile(nonExistentFile, nil, nil)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceFileNotFound")
+			subtest.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
-			t.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
+			subtest.Errorf("WrongErrorMessage: '%s' vs '%s'", "SourceFileNotFound", err.Error())
 		}
 	})
 }
 
-func TestFileContentRegexSearch(t *testing.T) {
+func TestFileContentRegexSearch(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	testCaseStructs := []struct {
 		description      string
@@ -2276,11 +2276,11 @@ func TestFileContentRegexSearch(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.description, func(t *testing.T) {
+		test.Run(testCase.description, func(subtest *testing.T) {
 			targetFile := filepath.Join(tempDir, testCase.description+".txt")
 			createErr := clerk.TouchFile(targetFile)
 			if createErr != nil {
-				t.Fatalf("TouchFileFailed: %v", createErr)
+				subtest.Fatalf("TouchFileFailed: %v", createErr)
 			}
 
 			if testCase.fileContent != "" {
@@ -2288,25 +2288,25 @@ func TestFileContentRegexSearch(t *testing.T) {
 					targetFile, []byte(testCase.fileContent), 0644,
 				)
 				if writeErr != nil {
-					t.Fatalf("WriteFileFailed: %v", writeErr)
+					subtest.Fatalf("WriteFileFailed: %v", writeErr)
 				}
 			}
 
 			if testCase.description == "NonExistentFileReturnsFileNotFound" {
 				deleteErr := clerk.DeleteFile(targetFile)
 				if deleteErr != nil {
-					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+					subtest.Fatalf("DeleteFileFailed: %v", deleteErr)
 				}
 			}
 
 			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				deleteErr := clerk.DeleteFile(targetFile)
 				if deleteErr != nil {
-					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+					subtest.Fatalf("DeleteFileFailed: %v", deleteErr)
 				}
 				createDirErr := clerk.CreateDir(targetFile)
 				if createDirErr != nil {
-					t.Fatalf("CreateDirFailed: %v", createDirErr)
+					subtest.Fatalf("CreateDirFailed: %v", createDirErr)
 				}
 			}
 
@@ -2314,7 +2314,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 				targetFile, true,
 			)
 			if pathErr != nil {
-				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
+				subtest.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
 			}
 
 			var regexPattern *regexp.Regexp
@@ -2328,19 +2328,19 @@ func TestFileContentRegexSearch(t *testing.T) {
 
 			if testCase.expectedErrIsNil {
 				if searchErr != nil {
-					t.Errorf("UnexpectedError: '%s'", searchErr.Error())
+					subtest.Errorf("UnexpectedError: '%s'", searchErr.Error())
 					return
 				}
 			}
 
 			if !testCase.expectedErrIsNil {
 				if searchErr == nil {
-					t.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
+					subtest.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
 					return
 				}
 				if testCase.expectedErrMsg != "" &&
 					searchErr.Error() != testCase.expectedErrMsg {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongErrorMessage: '%s' vs '%s'",
 						testCase.expectedErrMsg, searchErr.Error(),
 					)
@@ -2349,7 +2349,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 			}
 
 			if len(regexSearchFindings) != len(testCase.expectedFindings) {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongFindingsCount: expected=%d actual=%d",
 					len(testCase.expectedFindings), len(regexSearchFindings),
 				)
@@ -2359,14 +2359,14 @@ func TestFileContentRegexSearch(t *testing.T) {
 			for findingIndex, expectedFinding := range testCase.expectedFindings {
 				actualFinding := regexSearchFindings[findingIndex]
 				if actualFinding.Match != expectedFinding.Match {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongFindingMatch%d: '%s' vs '%s'",
 						findingIndex, expectedFinding.Match, actualFinding.Match,
 					)
 				}
 				if len(actualFinding.LineNumRange) != 2 ||
 					len(expectedFinding.LineNumRange) != 2 {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongFindingLineRangeShape%d: expected=%v actual=%v",
 						findingIndex,
 						expectedFinding.LineNumRange,
@@ -2375,7 +2375,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 					continue
 				}
 				if actualFinding.LineNumRange[0] != expectedFinding.LineNumRange[0] {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongFindingLineRangeStart%d: '%d' vs '%d'",
 						findingIndex,
 						expectedFinding.LineNumRange[0],
@@ -2383,7 +2383,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 					)
 				}
 				if actualFinding.LineNumRange[1] != expectedFinding.LineNumRange[1] {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongFindingLineRangeEnd%d: '%d' vs '%d'",
 						findingIndex,
 						expectedFinding.LineNumRange[1],
@@ -2391,7 +2391,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 					)
 				}
 				if len(actualFinding.Groups) != len(expectedFinding.Groups) {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongFindingGroupCount%d: expected=%d actual=%d",
 						findingIndex,
 						len(expectedFinding.Groups), len(actualFinding.Groups),
@@ -2400,7 +2400,7 @@ func TestFileContentRegexSearch(t *testing.T) {
 				}
 				for groupIndex, expectedGroup := range expectedFinding.Groups {
 					if actualFinding.Groups[groupIndex] != expectedGroup {
-						t.Errorf(
+						subtest.Errorf(
 							"WrongFindingGroup%d-%d: '%s' vs '%s'",
 							findingIndex, groupIndex,
 							expectedGroup, actualFinding.Groups[groupIndex],
@@ -2411,24 +2411,24 @@ func TestFileContentRegexSearch(t *testing.T) {
 
 			cleanupErr := clerk.DeleteFile(targetFile)
 			if cleanupErr != nil {
-				t.Errorf("DeleteFileFailed: %v", cleanupErr)
+				subtest.Errorf("DeleteFileFailed: %v", cleanupErr)
 			}
 
 			if testCase.description == "DirectoryPathReturnsTargetIsDirectory" {
 				dirCleanupErr := clerk.DeleteDir(targetFile)
 				if dirCleanupErr != nil {
-					t.Errorf("DeleteDirFailed: %v", dirCleanupErr)
+					subtest.Errorf("DeleteDirFailed: %v", dirCleanupErr)
 				}
 			}
 		})
 	}
 }
 
-func TestOverwriteFile(t *testing.T) {
+func TestOverwriteFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
-	t.Run("OverwriteExistingTarget", func(t *testing.T) {
+	test.Run("OverwriteExistingTarget", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 		sourceContent := "new content via overwrite"
@@ -2436,44 +2436,44 @@ func TestOverwriteFile(t *testing.T) {
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateSourceFileFailed: %v", err)
+			subtest.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(sourceFile, []byte(sourceContent), 0644)
 		if err != nil {
-			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateSourceFileContentFailed: %v", err)
 		}
 
 		err = clerk.TouchFile(targetFile)
 		if err != nil {
-			t.Fatalf("CreateTargetFileFailed: %v", err)
+			subtest.Fatalf("CreateTargetFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(targetFile, []byte(targetContent), 0644)
 		if err != nil {
-			t.Fatalf("UpdateTargetFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateTargetFileContentFailed: %v", err)
 		}
 
 		err = clerk.OverwriteFile(sourceFile, targetFile)
 		if err != nil {
-			t.Errorf("OverwriteFileFailed: %v", err)
+			subtest.Errorf("OverwriteFileFailed: %v", err)
 		}
 
 		if clerk.IsFile(sourceFile) {
-			t.Errorf("SourceFileShouldNotExist: %s", sourceFile)
+			subtest.Errorf("SourceFileShouldNotExist: %s", sourceFile)
 		}
 
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("TargetFileShouldExist: %s", targetFile)
+			subtest.Errorf("TargetFileShouldExist: %s", targetFile)
 		}
 
 		actualContent, err := clerk.ReadFileContent(targetFile, nil)
 		if err != nil {
-			t.Errorf("ReadFileContentFailed: %v", err)
+			subtest.Errorf("ReadFileContentFailed: %v", err)
 		}
 
 		if actualContent != sourceContent {
-			t.Errorf(
+			subtest.Errorf(
 				"ContentMismatch: '%s' vs '%s'",
 				actualContent, sourceContent,
 			)
@@ -2481,108 +2481,108 @@ func TestOverwriteFile(t *testing.T) {
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("OverwriteWithNonExistentTarget", func(t *testing.T) {
+	test.Run("OverwriteWithNonExistentTarget", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "source2.txt")
 		targetFile := filepath.Join(tempDir, "new_target.txt")
 		sourceContent := "content"
 
 		err := clerk.TouchFile(sourceFile)
 		if err != nil {
-			t.Fatalf("CreateSourceFileFailed: %v", err)
+			subtest.Fatalf("CreateSourceFileFailed: %v", err)
 		}
 
 		err = os.WriteFile(sourceFile, []byte(sourceContent), 0644)
 		if err != nil {
-			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateSourceFileContentFailed: %v", err)
 		}
 
 		err = clerk.OverwriteFile(sourceFile, targetFile)
 		if err != nil {
-			t.Errorf("OverwriteFileFailed: %v", err)
+			subtest.Errorf("OverwriteFileFailed: %v", err)
 		}
 
 		if clerk.IsFile(sourceFile) {
-			t.Errorf("SourceFileShouldNotExist: %s", sourceFile)
+			subtest.Errorf("SourceFileShouldNotExist: %s", sourceFile)
 		}
 
 		if !clerk.IsFile(targetFile) {
-			t.Errorf("TargetFileShouldExist: %s", targetFile)
+			subtest.Errorf("TargetFileShouldExist: %s", targetFile)
 		}
 
 		err = clerk.DeleteFile(targetFile)
 		if err != nil {
-			t.Errorf("DeleteFileFailed: %v", err)
+			subtest.Errorf("DeleteFileFailed: %v", err)
 		}
 	})
 
-	t.Run("OverwriteNonExistentSource", func(t *testing.T) {
+	test.Run("OverwriteNonExistentSource", func(subtest *testing.T) {
 		sourceFile := filepath.Join(tempDir, "nonexistent.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
 		err := clerk.OverwriteFile(sourceFile, targetFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: SourceFileNotFound")
+			subtest.Errorf("MissingExpectedError: SourceFileNotFound")
 		}
 
 		if err != nil && err.Error() != "SourceFileNotFound" {
-			t.Errorf(
+			subtest.Errorf(
 				"WrongErrorMessage: '%s' vs '%s'",
 				"SourceFileNotFound", err.Error(),
 			)
 		}
 	})
 
-	t.Run("OverwriteSymlinkTargetReplacesUnderlyingFile", func(t *testing.T) {
+	test.Run("OverwriteSymlinkTargetReplacesUnderlyingFile", func(subtest *testing.T) {
 		realFile := filepath.Join(tempDir, "real.txt")
 		linkFile := filepath.Join(tempDir, "link.txt")
 		sourceFile := filepath.Join(tempDir, "source3.txt")
 
 		if err := os.WriteFile(realFile, []byte("original"), 0644); err != nil {
-			t.Fatalf("UpdateRealFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateRealFileContentFailed: %v", err)
 		}
 		if err := os.Symlink(realFile, linkFile); err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 		if err := os.WriteFile(sourceFile, []byte("replaced"), 0644); err != nil {
-			t.Fatalf("UpdateSourceFileContentFailed: %v", err)
+			subtest.Fatalf("UpdateSourceFileContentFailed: %v", err)
 		}
 
 		if err := clerk.OverwriteFile(sourceFile, linkFile); err != nil {
-			t.Fatalf("OverwriteFileFailed: %v", err)
+			subtest.Fatalf("OverwriteFileFailed: %v", err)
 		}
 
 		if !clerk.IsSymlink(linkFile) {
-			t.Errorf("SymlinkShouldBePreserved: %s", linkFile)
+			subtest.Errorf("SymlinkShouldBePreserved: %s", linkFile)
 		}
 		realContent, err := clerk.ReadFileContent(realFile, nil)
 		if err != nil {
-			t.Fatalf("ReadFileContentFailed: %v", err)
+			subtest.Fatalf("ReadFileContentFailed: %v", err)
 		}
 		if realContent != "replaced" {
-			t.Errorf("ContentMismatch: '%s' vs 'replaced'", realContent)
+			subtest.Errorf("ContentMismatch: '%s' vs 'replaced'", realContent)
 		}
 	})
 
-	t.Run("OverwriteWithDirectorySourceReturnsSourceIsDirectory", func(t *testing.T) {
+	test.Run("OverwriteWithDirectorySourceReturnsSourceIsDirectory", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "sourceDir")
 		if err := clerk.CreateDir(sourceDir); err != nil {
-			t.Fatalf("CreateDirFailed: %v", err)
+			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
 		err := clerk.OverwriteFile(sourceDir, filepath.Join(tempDir, "any.txt"))
 		if err == nil || err.Error() != "SourceIsDirectory" {
-			t.Errorf("WrongErrorMessage: 'SourceIsDirectory' vs '%v'", err)
+			subtest.Errorf("WrongErrorMessage: 'SourceIsDirectory' vs '%v'", err)
 		}
 	})
 }
 
-func TestFileContentRegexReplace(t *testing.T) {
+func TestFileContentRegexReplace(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	testCaseStructs := []struct {
 		description      string
@@ -2676,11 +2676,11 @@ func TestFileContentRegexReplace(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.description, func(t *testing.T) {
+		test.Run(testCase.description, func(subtest *testing.T) {
 			targetFile := filepath.Join(tempDir, testCase.description+".txt")
 			createErr := clerk.TouchFile(targetFile)
 			if createErr != nil {
-				t.Fatalf("TouchFileFailed: %v", createErr)
+				subtest.Fatalf("TouchFileFailed: %v", createErr)
 			}
 
 			if testCase.fileContent != "" {
@@ -2688,14 +2688,14 @@ func TestFileContentRegexReplace(t *testing.T) {
 					targetFile, []byte(testCase.fileContent), 0644,
 				)
 				if writeErr != nil {
-					t.Fatalf("WriteFileFailed: %v", writeErr)
+					subtest.Fatalf("WriteFileFailed: %v", writeErr)
 				}
 			}
 
 			if testCase.description == "NonExistentFileReturnsFileNotFound" {
 				deleteErr := clerk.DeleteFile(targetFile)
 				if deleteErr != nil {
-					t.Fatalf("DeleteFileFailed: %v", deleteErr)
+					subtest.Fatalf("DeleteFileFailed: %v", deleteErr)
 				}
 			}
 
@@ -2703,7 +2703,7 @@ func TestFileContentRegexReplace(t *testing.T) {
 				targetFile, true,
 			)
 			if pathErr != nil {
-				t.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
+				subtest.Fatalf("NewUnixAbsoluteFilePathFailed: %v", pathErr)
 			}
 
 			var regexPattern *regexp.Regexp
@@ -2718,12 +2718,12 @@ func TestFileContentRegexReplace(t *testing.T) {
 
 			if testCase.expectedErrIsNil {
 				if replaceErr != nil {
-					t.Errorf("UnexpectedError: '%s'", replaceErr.Error())
+					subtest.Errorf("UnexpectedError: '%s'", replaceErr.Error())
 					return
 				}
 
 				if replacementCount != testCase.expectedCount {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongReplacementCount: expected=%d actual=%d",
 						testCase.expectedCount, replacementCount,
 					)
@@ -2731,12 +2731,12 @@ func TestFileContentRegexReplace(t *testing.T) {
 
 				actualContent, readErr := clerk.ReadFileContent(targetFile, nil)
 				if readErr != nil {
-					t.Errorf("ReadFileContentFailed: %v", readErr)
+					subtest.Errorf("ReadFileContentFailed: %v", readErr)
 					return
 				}
 
 				if actualContent != testCase.expectedContent {
-					t.Errorf(
+					subtest.Errorf(
 						"WrongContent: '%s' vs '%s'",
 						actualContent, testCase.expectedContent,
 					)
@@ -2746,7 +2746,7 @@ func TestFileContentRegexReplace(t *testing.T) {
 					filepath.Join(filepath.Dir(targetFile), ".*.tk-tmp*"),
 				)
 				for _, tempLeftoverPath := range tempLeftoverMatches {
-					t.Errorf(
+					subtest.Errorf(
 						"TempFileShouldNotExistAfterReplace: %s",
 						tempLeftoverPath,
 					)
@@ -2757,12 +2757,12 @@ func TestFileContentRegexReplace(t *testing.T) {
 			}
 
 			if replaceErr == nil {
-				t.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
+				subtest.Errorf("MissingExpectedError: %s", testCase.expectedErrMsg)
 				return
 			}
 			if testCase.expectedErrMsg != "" &&
 				replaceErr.Error() != testCase.expectedErrMsg {
-				t.Errorf(
+				subtest.Errorf(
 					"WrongErrorMessage: '%s' vs '%s'",
 					testCase.expectedErrMsg, replaceErr.Error(),
 				)
@@ -2772,7 +2772,7 @@ func TestFileContentRegexReplace(t *testing.T) {
 				filepath.Join(filepath.Dir(targetFile), ".*.tk-tmp*"),
 			)
 			for _, tempLeftoverPath := range tempLeftoverMatches {
-				t.Errorf(
+				subtest.Errorf(
 					"TempFileShouldNotExistAfterFailedReplace: %s",
 					tempLeftoverPath,
 				)
@@ -2784,11 +2784,11 @@ func TestFileContentRegexReplace(t *testing.T) {
 					targetFile, nil,
 				)
 				if readErr != nil {
-					t.Errorf("ReadFileContentAfterFailFailed: %v", readErr)
+					subtest.Errorf("ReadFileContentAfterFailFailed: %v", readErr)
 					return
 				}
 				if actualContentAfterFail != testCase.expectedContent {
-					t.Errorf(
+					subtest.Errorf(
 						"OriginalFileShouldBeUnchangedAfterFailedReplace: '%s' vs '%s'",
 						testCase.expectedContent, actualContentAfterFail,
 					)
@@ -2797,209 +2797,209 @@ func TestFileContentRegexReplace(t *testing.T) {
 		})
 	}
 
-	t.Run("RefusesSymlinkTargetByDefault", func(t *testing.T) {
+	test.Run("RefusesSymlinkTargetByDefault", func(subtest *testing.T) {
 		realFile := filepath.Join(tempDir, "replaceSymlinkReal.txt")
 		err := os.WriteFile(realFile, []byte("alpha=1"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		linkFile := filepath.Join(tempDir, "replaceSymlinkLink.txt")
 		err = os.Symlink(realFile, linkFile)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
 		_, replaceErr := clerk.FileContentRegexReplace(
 			FileRegexReplaceSettings{
-				FilePath: absoluteFilePathForTest(t, linkFile),
+				FilePath: absoluteFilePathForTest(subtest, linkFile),
 			},
 			regexPattern, `alpha=$1!`,
 		)
 		if !errors.Is(replaceErr, ErrTargetIsSymlink) {
-			t.Errorf("ExpectedErrTargetIsSymlink, got: %v", replaceErr)
+			subtest.Errorf("ExpectedErrTargetIsSymlink, got: %v", replaceErr)
 		}
 	})
 
-	t.Run("ResolvesSymlinkTargetWhenRequested", func(t *testing.T) {
+	test.Run("ResolvesSymlinkTargetWhenRequested", func(subtest *testing.T) {
 		realFile := filepath.Join(tempDir, "resolveReplaceReal.txt")
 		err := os.WriteFile(realFile, []byte("alpha=1"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		linkFile := filepath.Join(tempDir, "resolveReplaceLink.txt")
 		err = os.Symlink(realFile, linkFile)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		symlinkPolicy := FileClerkSymlinkPolicyResolve
 		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
 		replacementCount, replaceErr := clerk.FileContentRegexReplace(
 			FileRegexReplaceSettings{
-				FilePath:      absoluteFilePathForTest(t, linkFile),
+				FilePath:      absoluteFilePathForTest(subtest, linkFile),
 				SymlinkPolicy: &symlinkPolicy,
 			},
 			regexPattern, `alpha=$1!`,
 		)
 		if replaceErr != nil {
-			t.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
+			subtest.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
 		}
 		if replacementCount != 1 {
-			t.Errorf("WrongReplacementCount: expected=1 actual=%d", replacementCount)
+			subtest.Errorf("WrongReplacementCount: expected=1 actual=%d", replacementCount)
 		}
 
 		actualContent, readErr := clerk.ReadFileContent(realFile, nil)
 		if readErr != nil {
-			t.Fatalf("ReadFileContentFailed: %v", readErr)
+			subtest.Fatalf("ReadFileContentFailed: %v", readErr)
 		}
 		if actualContent != "alpha=1!" {
-			t.Errorf("WrongContent: '%s'", actualContent)
+			subtest.Errorf("WrongContent: '%s'", actualContent)
 		}
 		if !clerk.IsSymlink(linkFile) {
-			t.Errorf("SymlinkWasReplaced")
+			subtest.Errorf("SymlinkWasReplaced")
 		}
 	})
 
-	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableDirChainWhenRequired", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "writableReplaceDir")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chmod(dir, 0o777)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 		targetFile := filepath.Join(dir, "replace.txt")
 		err = os.WriteFile(targetFile, []byte("alpha=1"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
 		_, replaceErr := clerk.FileContentRegexReplace(
 			FileRegexReplaceSettings{
-				FilePath:       absoluteFilePathForTest(t, targetFile),
+				FilePath:       absoluteFilePathForTest(subtest, targetFile),
 				DirChainPolicy: &sharedWriteRefusedPolicy,
 			},
 			regexPattern, `alpha=$1!`,
 		)
 		if !errors.Is(replaceErr, ErrDirectoryWritableByOthers) {
-			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", replaceErr)
+			subtest.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", replaceErr)
 		}
 	})
 
-	t.Run("PreservesTargetOwnerAndSpecialModeBits", func(t *testing.T) {
+	test.Run("PreservesTargetOwnerAndSpecialModeBits", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 
 		targetFile := filepath.Join(tempDir, "ownerPreserved.txt")
 		err := os.WriteFile(targetFile, []byte("alpha=1"), 0640)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		err = os.Chown(targetFile, nobodyUid, nobodyGid)
 		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
+			subtest.Fatalf("ChownFailed: %v", err)
 		}
 		err = os.Chmod(targetFile, os.FileMode(0640)|os.ModeSetgid)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 
 		regexPattern := regexp.MustCompile(`alpha=(\d+)`)
 		_, replaceErr := clerk.FileContentRegexReplace(
 			FileRegexReplaceSettings{
-				FilePath: absoluteFilePathForTest(t, targetFile),
+				FilePath: absoluteFilePathForTest(subtest, targetFile),
 			},
 			regexPattern, `alpha=$1!`,
 		)
 		if replaceErr != nil {
-			t.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
+			subtest.Fatalf("FileContentRegexReplaceFailed: %v", replaceErr)
 		}
 
 		fileInfo, statErr := os.Stat(targetFile)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnerChanged: expected %d:%d, got %d:%d",
 				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 		if fileInfo.Mode().Perm() != 0640 {
-			t.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
+			subtest.Errorf("ModeChanged: expected 0640, got %o", fileInfo.Mode().Perm())
 		}
 		if fileInfo.Mode()&os.ModeSetgid == 0 {
-			t.Errorf("SetgidBitLost: %v", fileInfo.Mode())
+			subtest.Errorf("SetgidBitLost: %v", fileInfo.Mode())
 		}
 	})
 }
 
 func absoluteFilePathForTest(
-	t *testing.T, path string,
+	test *testing.T, path string,
 ) tkValueObject.UnixAbsoluteFilePath {
-	t.Helper()
+	test.Helper()
 	filePath, pathErr := tkValueObject.NewUnixAbsoluteFilePath(path, true)
 	if pathErr != nil {
-		t.Fatalf("FilePathInvalid: %v", pathErr)
+		test.Fatalf("FilePathInvalid: %v", pathErr)
 	}
 	return filePath
 }
 
 func absoluteGlobPathForTest(
-	t *testing.T, path string,
+	test *testing.T, path string,
 ) tkValueObject.UnixAbsoluteGlobPath {
-	t.Helper()
+	test.Helper()
 	globPath, globPathErr := tkValueObject.NewUnixAbsoluteGlobPath(path)
 	if globPathErr != nil {
-		t.Fatalf("GlobPathInvalid: %v", globPathErr)
+		test.Fatalf("GlobPathInvalid: %v", globPathErr)
 	}
 	return globPath
 }
 
-func TestInspectedTargetFileOpener(t *testing.T) {
+func TestInspectedTargetFileOpener(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	targetFileName, fileNameErr := tkValueObject.NewUnixFileName(
 		"verified.txt", true,
 	)
 	if fileNameErr != nil {
-		t.Fatalf("FileNameInvalid: %v", fileNameErr)
+		test.Fatalf("FileNameInvalid: %v", fileNameErr)
 	}
 	targetFilePath := filepath.Join(tempDir, targetFileName.String())
 	writeErr := os.WriteFile(targetFilePath, []byte("alpha=1"), 0644)
 	if writeErr != nil {
-		t.Fatalf("WriteFileFailed: %v", writeErr)
+		test.Fatalf("WriteFileFailed: %v", writeErr)
 	}
 
 	dirHandle, openErr := unix.Open(
 		tempDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0,
 	)
 	if openErr != nil {
-		t.Fatalf("OpenDirFailed: %v", openErr)
+		test.Fatalf("OpenDirFailed: %v", openErr)
 	}
 	defer func() { _ = unix.Close(dirHandle) }()
 
@@ -3007,28 +3007,28 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 		dirHandle, targetFileName.String(),
 	)
 	if snapshotErr != nil {
-		t.Fatalf("TargetFileSnapshotReadFailed: %v", snapshotErr)
+		test.Fatalf("TargetFileSnapshotReadFailed: %v", snapshotErr)
 	}
 
-	t.Run("AcceptsTheInspectedInode", func(t *testing.T) {
+	test.Run("AcceptsTheInspectedInode", func(subtest *testing.T) {
 		fileHandle, openErr := clerk.inspectedTargetFileOpener(
 			dirHandle, targetFileName, targetSnapshot, targetFileReadOpenFlags,
 		)
 		if openErr != nil {
-			t.Fatalf("UnexpectedOpenError: %v", openErr)
+			subtest.Fatalf("UnexpectedOpenError: %v", openErr)
 		}
 		_ = unix.Close(fileHandle)
 	})
 
-	t.Run("RefusesSwappedRegularFile", func(t *testing.T) {
+	test.Run("RefusesSwappedRegularFile", func(subtest *testing.T) {
 		swappedFilePath := filepath.Join(tempDir, "swapped.txt")
 		writeErr := os.WriteFile(swappedFilePath, []byte("bravo=2"), 0644)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		renameErr := os.Rename(swappedFilePath, targetFilePath)
 		if renameErr != nil {
-			t.Fatalf("RenameFailed: %v", renameErr)
+			subtest.Fatalf("RenameFailed: %v", renameErr)
 		}
 
 		openFlagCases := []int{targetFileReadOpenFlags, targetFileAppendOpenFlags}
@@ -3037,20 +3037,20 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 				dirHandle, targetFileName, targetSnapshot, openFlags,
 			)
 			if !errors.Is(openErr, ErrTargetFileChanged) {
-				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+				subtest.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 			}
 		}
 	})
 
-	t.Run("RefusesFifoSwap", func(t *testing.T) {
+	test.Run("RefusesFifoSwap", func(subtest *testing.T) {
 		fifoPath := filepath.Join(tempDir, "swapped.fifo")
 		fifoErr := unix.Mkfifo(fifoPath, 0o600)
 		if fifoErr != nil {
-			t.Fatalf("MkfifoFailed: %v", fifoErr)
+			subtest.Fatalf("MkfifoFailed: %v", fifoErr)
 		}
 		renameErr := os.Rename(fifoPath, targetFilePath)
 		if renameErr != nil {
-			t.Fatalf("RenameFailed: %v", renameErr)
+			subtest.Fatalf("RenameFailed: %v", renameErr)
 		}
 
 		openResultChan := make(chan error, 1)
@@ -3067,30 +3067,30 @@ func TestInspectedTargetFileOpener(t *testing.T) {
 		select {
 		case openErr := <-openResultChan:
 			if !errors.Is(openErr, ErrTargetFileChanged) {
-				t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+				subtest.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatalf("OpenBlockedOnFifo")
+			subtest.Fatalf("OpenBlockedOnFifo")
 		}
 	})
 }
 
-func TestInspectedSubDirOpener(t *testing.T) {
+func TestInspectedSubDirOpener(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	inspectedDirName := "inspected"
 	inspectedDirPath := filepath.Join(tempDir, inspectedDirName)
 	mkdirErr := os.MkdirAll(inspectedDirPath, 0755)
 	if mkdirErr != nil {
-		t.Fatalf("MkdirFailed: %v", mkdirErr)
+		test.Fatalf("MkdirFailed: %v", mkdirErr)
 	}
 
 	dirHandle, openErr := unix.Open(
 		tempDir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0,
 	)
 	if openErr != nil {
-		t.Fatalf("OpenDirFailed: %v", openErr)
+		test.Fatalf("OpenDirFailed: %v", openErr)
 	}
 	defer func() { _ = unix.Close(dirHandle) }()
 
@@ -3098,145 +3098,145 @@ func TestInspectedSubDirOpener(t *testing.T) {
 		dirHandle, inspectedDirName,
 	)
 	if snapshotErr != nil {
-		t.Fatalf("DirSnapshotReadFailed: %v", snapshotErr)
+		test.Fatalf("DirSnapshotReadFailed: %v", snapshotErr)
 	}
 
-	t.Run("AcceptsTheInspectedDirectory", func(t *testing.T) {
+	test.Run("AcceptsTheInspectedDirectory", func(subtest *testing.T) {
 		subDirHandle, openErr := clerk.inspectedSubDirOpener(
 			dirHandle, inspectedDirName, inspectedSnapshot,
 		)
 		if openErr != nil {
-			t.Fatalf("UnexpectedOpenError: %v", openErr)
+			subtest.Fatalf("UnexpectedOpenError: %v", openErr)
 		}
 		_ = unix.Close(subDirHandle)
 	})
 
-	t.Run("RefusesSwappedDirectory", func(t *testing.T) {
+	test.Run("RefusesSwappedDirectory", func(subtest *testing.T) {
 		swappedDirPath := filepath.Join(tempDir, "swapped")
 		mkdirErr := os.MkdirAll(swappedDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		renameErr := unix.Rename(swappedDirPath, inspectedDirPath)
 		if renameErr != nil {
-			t.Fatalf("RenameFailed: %v", renameErr)
+			subtest.Fatalf("RenameFailed: %v", renameErr)
 		}
 
 		_, openErr := clerk.inspectedSubDirOpener(
 			dirHandle, inspectedDirName, inspectedSnapshot,
 		)
 		if !errors.Is(openErr, ErrTargetFileChanged) {
-			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			subtest.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 		}
 	})
 
-	t.Run("RefusesSymlinkSwap", func(t *testing.T) {
+	test.Run("RefusesSymlinkSwap", func(subtest *testing.T) {
 		removeErr := os.Remove(inspectedDirPath)
 		if removeErr != nil {
-			t.Fatalf("RemoveFailed: %v", removeErr)
+			subtest.Fatalf("RemoveFailed: %v", removeErr)
 		}
 		symlinkErr := os.Symlink(tempDir, inspectedDirPath)
 		if symlinkErr != nil {
-			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+			subtest.Fatalf("SymlinkFailed: %v", symlinkErr)
 		}
 
 		_, openErr := clerk.inspectedSubDirOpener(
 			dirHandle, inspectedDirName, inspectedSnapshot,
 		)
 		if !errors.Is(openErr, ErrTargetFileChanged) {
-			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			subtest.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 		}
 	})
 
-	t.Run("RefusesNonDirectorySwap", func(t *testing.T) {
+	test.Run("RefusesNonDirectorySwap", func(subtest *testing.T) {
 		removeErr := os.Remove(inspectedDirPath)
 		if removeErr != nil {
-			t.Fatalf("RemoveFailed: %v", removeErr)
+			subtest.Fatalf("RemoveFailed: %v", removeErr)
 		}
 		writeErr := os.WriteFile(inspectedDirPath, []byte("x"), 0644)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
 		_, openErr := clerk.inspectedSubDirOpener(
 			dirHandle, inspectedDirName, inspectedSnapshot,
 		)
 		if !errors.Is(openErr, ErrTargetFileChanged) {
-			t.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
+			subtest.Fatalf("ExpectedErrTargetFileChanged, got: %v", openErr)
 		}
 	})
 }
 
-func TestTempFileNameFactory(t *testing.T) {
+func TestTempFileNameFactory(test *testing.T) {
 	clerk := FileClerk{}
 
 	targetFileName, fileNameErr := tkValueObject.NewUnixFileName(
 		"unit.service", true,
 	)
 	if fileNameErr != nil {
-		t.Fatalf("FileNameInvalid: %v", fileNameErr)
+		test.Fatalf("FileNameInvalid: %v", fileNameErr)
 	}
 
-	t.Run("KeepsBaseNameWithTempMarker", func(t *testing.T) {
+	test.Run("KeepsBaseNameWithTempMarker", func(subtest *testing.T) {
 		tempFileName := clerk.TempFileNameFactory(targetFileName)
 
 		if !strings.HasPrefix(tempFileName, ".unit.service.") {
-			t.Errorf("MissingHiddenBaseNamePrefix: %s", tempFileName)
+			subtest.Errorf("MissingHiddenBaseNamePrefix: %s", tempFileName)
 		}
 		if !strings.HasSuffix(tempFileName, tempFileNameSuffix) {
-			t.Errorf("MissingTempSuffix: %s", tempFileName)
+			subtest.Errorf("MissingTempSuffix: %s", tempFileName)
 		}
 	})
 
-	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+	test.Run("DistinctAcrossCalls", func(subtest *testing.T) {
 		first := clerk.TempFileNameFactory(targetFileName)
 		second := clerk.TempFileNameFactory(targetFileName)
 		if first == second {
-			t.Errorf("IdenticalTempNamesAcrossCalls: %s", first)
+			subtest.Errorf("IdenticalTempNamesAcrossCalls: %s", first)
 		}
 	})
 }
 
-func TestTempFilePathFactory(t *testing.T) {
+func TestTempFilePathFactory(test *testing.T) {
 	clerk := FileClerk{}
 
-	target := absoluteFilePathForTest(t, "/tmp/example/unit.service")
+	target := absoluteFilePathForTest(test, "/tmp/example/unit.service")
 
-	t.Run("KeepsDirAndBaseNameWithTempMarker", func(t *testing.T) {
+	test.Run("KeepsDirAndBaseNameWithTempMarker", func(subtest *testing.T) {
 		tempPath, tempPathErr := clerk.TempFilePathFactory(target)
 		if tempPathErr != nil {
-			t.Fatalf("UnexpectedError: %v", tempPathErr)
+			subtest.Fatalf("UnexpectedError: %v", tempPathErr)
 		}
 
 		if filepath.Dir(tempPath) != "/tmp/example" {
-			t.Errorf("UnexpectedDir: %s", tempPath)
+			subtest.Errorf("UnexpectedDir: %s", tempPath)
 		}
 		baseName := filepath.Base(tempPath)
 		if !strings.HasPrefix(baseName, ".unit.service.") {
-			t.Errorf("MissingHiddenBaseNamePrefix: %s", baseName)
+			subtest.Errorf("MissingHiddenBaseNamePrefix: %s", baseName)
 		}
 		if !strings.HasSuffix(baseName, tempFileNameSuffix) {
-			t.Errorf("MissingTempSuffix: %s", baseName)
+			subtest.Errorf("MissingTempSuffix: %s", baseName)
 		}
 	})
 
-	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+	test.Run("DistinctAcrossCalls", func(subtest *testing.T) {
 		first, firstErr := clerk.TempFilePathFactory(target)
 		if firstErr != nil {
-			t.Fatalf("UnexpectedError: %v", firstErr)
+			subtest.Fatalf("UnexpectedError: %v", firstErr)
 		}
 		second, secondErr := clerk.TempFilePathFactory(target)
 		if secondErr != nil {
-			t.Fatalf("UnexpectedError: %v", secondErr)
+			subtest.Fatalf("UnexpectedError: %v", secondErr)
 		}
 		if first == second {
-			t.Errorf("IdenticalTempNamesAcrossCalls: %s", first)
+			subtest.Errorf("IdenticalTempNamesAcrossCalls: %s", first)
 		}
 	})
 }
 
-func unresolvableUnixUserIdFinder(t *testing.T) uint32 {
-	t.Helper()
+func unresolvableUnixUserIdFinder(test *testing.T) uint32 {
+	test.Helper()
 
 	for candidate := uint32(999999); candidate > 0; candidate-- {
 		_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
@@ -3245,13 +3245,13 @@ func unresolvableUnixUserIdFinder(t *testing.T) uint32 {
 		}
 	}
 
-	t.Fatal("NoUnresolvableUserIdFound")
+	test.Fatal("NoUnresolvableUserIdFound")
 	return 0
 }
 
-func TestUpsertFile(t *testing.T) {
+func TestUpsertFile(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	newFileContent := []byte("unit content")
 
@@ -3260,286 +3260,286 @@ func TestUpsertFile(t *testing.T) {
 
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
-		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+		test.Fatalf("CurrentUserLookupFailed: %v", accountErr)
 	}
 	currentUsername, usernameErr := tkValueObject.NewUnixUsername(
 		currentAccount.Username,
 	)
 	if usernameErr != nil {
-		t.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
+		test.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
 	}
 
-	t.Run("WritesNewFileWithDefaultMode", func(t *testing.T) {
+	test.Run("WritesNewFileWithDefaultMode", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "defaultMode")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		written, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
+			subtest.Errorf("ContentMismatch: %s", written)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != FileClerkDefaultNewFileMode {
-			t.Errorf(
+			subtest.Errorf(
 				"ModeMismatch: expected %v, got %v",
 				FileClerkDefaultNewFileMode, fileInfo.Mode().Perm(),
 			)
 		}
 	})
 
-	t.Run("WritesNewFileWithStatedMode", func(t *testing.T) {
+	test.Run("WritesNewFileWithStatedMode", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "statedMode")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		statedPermissions := os.FileMode(0640)
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:    absoluteFilePathForTest(t, target),
+			FilePath:    absoluteFilePathForTest(subtest, target),
 			Permissions: &statedPermissions,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != 0640 {
-			t.Errorf("ModeMismatch: expected 0640, got %v", fileInfo.Mode().Perm())
+			subtest.Errorf("ModeMismatch: expected 0640, got %v", fileInfo.Mode().Perm())
 		}
 	})
 
-	t.Run("WritesNewFileWithZeroStatedMode", func(t *testing.T) {
+	test.Run("WritesNewFileWithZeroStatedMode", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "zeroMode")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		zeroPermissions := os.FileMode(0)
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:    absoluteFilePathForTest(t, target),
+			FilePath:    absoluteFilePathForTest(subtest, target),
 			Permissions: &zeroPermissions,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != 0 {
-			t.Errorf("ModeMismatch: expected 0000, got %v", fileInfo.Mode().Perm())
+			subtest.Errorf("ModeMismatch: expected 0000, got %v", fileInfo.Mode().Perm())
 		}
 	})
 
-	t.Run("WritesNewFileWithProcessOwnership", func(t *testing.T) {
+	test.Run("WritesNewFileWithProcessOwnership", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "processOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		written, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
+			subtest.Errorf("ContentMismatch: %s", written)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != os.Geteuid() || int(fileStat.Gid) != os.Getegid() {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnershipMismatch: expected %d:%d, got %d:%d",
 				os.Geteuid(), os.Getegid(), fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("UsesRunningProcessOwnerWhenRequested", func(t *testing.T) {
+	test.Run("UsesRunningProcessOwnerWhenRequested", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "runningProcessOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		ownerSource := FileClerkOwnerSourceRunningProcess
 		target := filepath.Join(dir, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:    absoluteFilePathForTest(t, target),
+			FilePath:    absoluteFilePathForTest(subtest, target),
 			OwnerSource: &ownerSource,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != os.Geteuid() || int(fileStat.Gid) != os.Getegid() {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnershipMismatch: expected %d:%d, got %d:%d",
 				os.Geteuid(), os.Getegid(), fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("RefusesTempNameAboveNameMax", func(t *testing.T) {
+	test.Run("RefusesTempNameAboveNameMax", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "longName")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		longBaseName := strings.Repeat("a", 246) + ".txt"
 		statedPermissions := os.FileMode(0644)
 		target := filepath.Join(dir, longBaseName)
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
+			FilePath:      absoluteFilePathForTest(subtest, target),
 			Permissions:   &statedPermissions,
 			OwnerUsername: &currentUsername,
 		}, newFileContent)
 		if !errors.Is(err, ErrTempFileNameTooLong) {
-			t.Fatalf("ExpectedErrTempFileNameTooLong, got: %v", err)
+			subtest.Fatalf("ExpectedErrTempFileNameTooLong, got: %v", err)
 		}
 
 		entries, readErr := os.ReadDir(dir)
 		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
+			subtest.Fatalf("ReadDirFailed: %v", readErr)
 		}
 		if len(entries) != 0 {
-			t.Errorf("TempFileLeaked: %v", entries)
+			subtest.Errorf("TempFileLeaked: %v", entries)
 		}
 	})
 
-	t.Run("ReplacesExistingFileWithStatedMode", func(t *testing.T) {
+	test.Run("ReplacesExistingFileWithStatedMode", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "replace")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = os.WriteFile(target, []byte("old"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		statedPermissions := os.FileMode(0640)
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
+			FilePath:        absoluteFilePathForTest(subtest, target),
 			OverwritePolicy: &overwritePolicy,
 			Permissions:     &statedPermissions,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		written, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
+			subtest.Errorf("ContentMismatch: %s", written)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if fileInfo.Mode().Perm() != 0640 {
-			t.Errorf("ModeMismatch: expected 0640, got %v", fileInfo.Mode().Perm())
+			subtest.Errorf("ModeMismatch: expected 0640, got %v", fileInfo.Mode().Perm())
 		}
 	})
 
-	t.Run("InheritsTargetModeAndOwnershipOnReplace", func(t *testing.T) {
+	test.Run("InheritsTargetModeAndOwnershipOnReplace", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "inherit")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = os.WriteFile(target, []byte("old"), 0640)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		originalInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		originalStat, assertOk := originalInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
+			FilePath:        absoluteFilePathForTest(subtest, target),
 			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		written, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
+			subtest.Errorf("ContentMismatch: %s", written)
 		}
 
 		replacedInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		if replacedInfo.Mode().Perm() != 0640 {
-			t.Errorf(
+			subtest.Errorf(
 				"ModeNotInherited: expected 0640, got %v",
 				replacedInfo.Mode().Perm(),
 			)
@@ -3547,10 +3547,10 @@ func TestUpsertFile(t *testing.T) {
 
 		replacedStat, assertOk := replacedInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if replacedStat.Uid != originalStat.Uid || replacedStat.Gid != originalStat.Gid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnershipNotInherited: expected %d:%d, got %d:%d",
 				originalStat.Uid, originalStat.Gid,
 				replacedStat.Uid, replacedStat.Gid,
@@ -3558,225 +3558,225 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("InheritsSpecialModeBitsOnReplace", func(t *testing.T) {
+	test.Run("InheritsSpecialModeBitsOnReplace", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "inheritSpecialMode")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = os.WriteFile(target, []byte("old"), 0755)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		specialMode := os.ModeSetuid | os.ModeSetgid | os.ModeSticky | 0755
 		err = os.Chmod(target, specialMode)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
+			FilePath:        absoluteFilePathForTest(subtest, target),
 			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		specialModeMask := os.ModeSetuid | os.ModeSetgid | os.ModeSticky
 		inheritedSpecialMode := fileInfo.Mode() & specialModeMask
 		if inheritedSpecialMode != specialMode&specialModeMask {
-			t.Errorf(
+			subtest.Errorf(
 				"SpecialModeNotInherited: expected %v, got %v",
 				specialMode, fileInfo.Mode(),
 			)
 		}
 	})
 
-	t.Run("RefusesExistingFileByDefault", func(t *testing.T) {
+	test.Run("RefusesExistingFileByDefault", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "refuseTaken")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = os.WriteFile(target, []byte("old"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetFileExists) {
-			t.Fatalf("ExpectedErrTargetFileExists, got: %v", err)
+			subtest.Fatalf("ExpectedErrTargetFileExists, got: %v", err)
 		}
 
 		written, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != "old" {
-			t.Errorf("ExistingContentWasOverwritten: %s", written)
+			subtest.Errorf("ExistingContentWasOverwritten: %s", written)
 		}
 
 		entries, readErr := os.ReadDir(dir)
 		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
+			subtest.Fatalf("ReadDirFailed: %v", readErr)
 		}
 		if len(entries) != 1 || entries[0].Name() != "unit.service" {
-			t.Errorf("TempFileLeaked: %v", entries)
+			subtest.Errorf("TempFileLeaked: %v", entries)
 		}
 	})
 
-	t.Run("RefusesFinalComponentSymlinkByDefault", func(t *testing.T) {
+	test.Run("RefusesFinalComponentSymlinkByDefault", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "refuseLink")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		canaryPath := filepath.Join(dir, "canary.txt")
 		canaryContent := "do-not-touch"
 		err = os.WriteFile(canaryPath, []byte(canaryContent), 0600)
 		if err != nil {
-			t.Fatalf("CanaryWriteFailed: %v", err)
+			subtest.Fatalf("CanaryWriteFailed: %v", err)
 		}
 		target := filepath.Join(dir, "unit.service")
 		err = os.Symlink(canaryPath, target)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetIsSymlink) {
-			t.Fatalf("ExpectedErrTargetIsSymlink, got: %v", err)
+			subtest.Fatalf("ExpectedErrTargetIsSymlink, got: %v", err)
 		}
 		if !clerk.IsSymlink(target) {
-			t.Errorf("SymlinkWasReplacedDespiteRefusal")
+			subtest.Errorf("SymlinkWasReplacedDespiteRefusal")
 		}
 
 		canary, canaryErr := os.ReadFile(canaryPath)
 		if canaryErr != nil {
-			t.Fatalf("CanaryReadFailed: %v", canaryErr)
+			subtest.Fatalf("CanaryReadFailed: %v", canaryErr)
 		}
 		if string(canary) != canaryContent {
-			t.Errorf("CanaryWasModifiedThroughSymlink: %s", canary)
+			subtest.Errorf("CanaryWasModifiedThroughSymlink: %s", canary)
 		}
 	})
 
-	t.Run("ResolvesFinalComponentSymlinkWhenRequested", func(t *testing.T) {
+	test.Run("ResolvesFinalComponentSymlinkWhenRequested", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "resolveLink")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		canaryPath := filepath.Join(dir, "canary.txt")
 		err = os.WriteFile(canaryPath, []byte("old"), 0600)
 		if err != nil {
-			t.Fatalf("CanaryWriteFailed: %v", err)
+			subtest.Fatalf("CanaryWriteFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unit.service")
 		err = os.Symlink(canaryPath, target)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
+			FilePath:        absoluteFilePathForTest(subtest, target),
 			SymlinkPolicy:   &symlinkPolicy,
 			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		if !clerk.IsSymlink(target) {
-			t.Errorf("TargetSymlinkWasReplacedInsteadOfFollowed")
+			subtest.Errorf("TargetSymlinkWasReplacedInsteadOfFollowed")
 		}
 		canary, canaryErr := os.ReadFile(canaryPath)
 		if canaryErr != nil {
-			t.Fatalf("CanaryReadFailed: %v", canaryErr)
+			subtest.Fatalf("CanaryReadFailed: %v", canaryErr)
 		}
 		if string(canary) != string(newFileContent) {
-			t.Errorf("CanaryContentMismatch: %s", canary)
+			subtest.Errorf("CanaryContentMismatch: %s", canary)
 		}
 	})
 
-	t.Run("RefusesSymlinkedParentDirectory", func(t *testing.T) {
+	test.Run("RefusesSymlinkedParentDirectory", func(subtest *testing.T) {
 		outsideDir := filepath.Join(tempDir, "outside", "nested")
 		err := os.MkdirAll(outsideDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		escapeTarget := filepath.Join(tempDir, "outside")
 		trapLink := filepath.Join(tempDir, "trap")
 		err = os.Symlink(escapeTarget, trapLink)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		escapedFilePath := filepath.Join(trapLink, "nested", "escape.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, escapedFilePath),
+			FilePath: absoluteFilePathForTest(subtest, escapedFilePath),
 		}, newFileContent)
 		if !errors.Is(err, ErrSymlinkedPathInvalid) {
-			t.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
+			subtest.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
 		}
 
 		escapedFile := filepath.Join(outsideDir, "escape.service")
 		if clerk.FileExists(escapedFile) {
-			t.Errorf("WriteLandedOutsideIntendedTree: %s", escapedFile)
+			subtest.Errorf("WriteLandedOutsideIntendedTree: %s", escapedFile)
 		}
 	})
 
-	t.Run("ResolvesSymlinkedParentChainWhenRequested", func(t *testing.T) {
+	test.Run("ResolvesSymlinkedParentChainWhenRequested", func(subtest *testing.T) {
 		realParent := filepath.Join(tempDir, "realParent")
 		err := os.MkdirAll(realParent, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		linkedParent := filepath.Join(tempDir, "linkedParent")
 		err = os.Symlink(realParent, linkedParent)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		target := filepath.Join(linkedParent, "unit.service")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
+			FilePath:      absoluteFilePathForTest(subtest, target),
 			SymlinkPolicy: &symlinkPolicy,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		written, readErr := os.ReadFile(filepath.Join(realParent, "unit.service"))
 		if readErr != nil {
-			t.Fatalf("ReadFailed: %v", readErr)
+			subtest.Fatalf("ReadFailed: %v", readErr)
 		}
 		if string(written) != string(newFileContent) {
-			t.Errorf("ContentMismatch: %s", written)
+			subtest.Errorf("ContentMismatch: %s", written)
 		}
 	})
 
-	t.Run("RefusesDegenerateFilePaths", func(t *testing.T) {
+	test.Run("RefusesDegenerateFilePaths", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "degenerate")
 		err := os.MkdirAll(filepath.Join(dir, "sub"), 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		testCases := []struct {
@@ -3789,12 +3789,12 @@ func TestUpsertFile(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
+			subtest.Run(testCase.name, func(subtest *testing.T) {
 				err := clerk.UpsertFile(FileUpsertSettings{
-					FilePath: absoluteFilePathForTest(t, testCase.filePath),
+					FilePath: absoluteFilePathForTest(subtest, testCase.filePath),
 				}, newFileContent)
 				if !errors.Is(err, ErrFileNameInvalid) {
-					t.Errorf(
+					subtest.Errorf(
 						"ExpectedErrFileNameInvalid, got: %v [%s]",
 						err, testCase.filePath,
 					)
@@ -3803,129 +3803,129 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("RefusesNonDirectoryComponent", func(t *testing.T) {
+	test.Run("RefusesNonDirectoryComponent", func(subtest *testing.T) {
 		blockerFile := filepath.Join(tempDir, "blocker")
 		err := os.WriteFile(blockerFile, []byte("x"), 0644)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 
 		blockedFilePath := filepath.Join(blockerFile, "nested", "blocked.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, blockedFilePath),
+			FilePath: absoluteFilePathForTest(subtest, blockedFilePath),
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetNotDirectory) {
-			t.Errorf("ExpectedErrTargetNotDirectory, got: %v", err)
+			subtest.Errorf("ExpectedErrTargetNotDirectory, got: %v", err)
 		}
 	})
 
-	t.Run("ToleratesDotAndEmptyComponents", func(t *testing.T) {
+	test.Run("ToleratesDotAndEmptyComponents", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "dotted", "inner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		dottedFilePath := tempDir + "/./dotted//inner/dotted.txt"
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, dottedFilePath),
+			FilePath: absoluteFilePathForTest(subtest, dottedFilePath),
 		}, newFileContent)
 		if err != nil {
-			t.Errorf("UnexpectedSurprise: %v", err)
+			subtest.Errorf("UnexpectedSurprise: %v", err)
 		}
 	})
 
-	t.Run("ReportsUninspectableDirStep", func(t *testing.T) {
+	test.Run("ReportsUninspectableDirStep", func(subtest *testing.T) {
 		missingFilePath := filepath.Join(tempDir, "missing", "deeper", "file.txt")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, missingFilePath),
+			FilePath: absoluteFilePathForTest(subtest, missingFilePath),
 		}, newFileContent)
 		if err == nil {
-			t.Fatalf("MissingErrorForUninspectableStep")
+			subtest.Fatalf("MissingErrorForUninspectableStep")
 		}
 		if !strings.Contains(err.Error(), "PathCheckFailed") {
-			t.Errorf("ErrorMissingPathCheckFailed: %v", err)
+			subtest.Errorf("ErrorMissingPathCheckFailed: %v", err)
 		}
 	})
 
-	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+	test.Run("ReportsUnknownTrustedDirOwner", func(subtest *testing.T) {
 		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
 			"no-such-user-xyz-42",
 		)
 		if usernameErr != nil {
-			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+			subtest.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
 		}
 
 		filePath := filepath.Join(tempDir, "unknownOwner.txt")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, filePath),
+			FilePath: absoluteFilePathForTest(subtest, filePath),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				unknownUsername,
 			},
 		}, newFileContent)
 		if err == nil {
-			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+			subtest.Fatalf("MissingErrorForUnknownTrustedDirOwner")
 		}
 		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
-			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+			subtest.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 
-	t.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(t *testing.T) {
+	test.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
 
 		unresolvableUserId, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUnixUserIdFinder(t),
+			unresolvableUnixUserIdFinder(subtest),
 		)
 		if userIdErr != nil {
-			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
 		}
 
 		filePath := filepath.Join(tempDir, "numericOwner.txt")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, filePath),
+			FilePath: absoluteFilePathForTest(subtest, filePath),
 			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
 				unresolvableUserId,
 			},
 		}, newFileContent)
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
 		}
 	})
 
-	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableDirChainWhenRequired", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "writableUpsertDir")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chmod(dir, 0o777)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		filePath := filepath.Join(dir, "strict.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:       absoluteFilePathForTest(t, filePath),
+			FilePath:       absoluteFilePathForTest(subtest, filePath),
 			DirChainPolicy: &sharedWriteRefusedPolicy,
 		}, newFileContent)
 		if !errors.Is(err, ErrDirectoryWritableByOthers) {
-			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
 		}
 	})
 
-	t.Run("ReadersNeverSeePartialContent", func(t *testing.T) {
+	test.Run("ReadersNeverSeePartialContent", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "atomic")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "target.txt")
-		targetPath := absoluteFilePathForTest(t, target)
+		targetPath := absoluteFilePathForTest(subtest, target)
 		contentSizeBytes := 1024 * 1024
 		contentA := strings.Repeat("a", contentSizeBytes)
 		contentB := strings.Repeat("b", contentSizeBytes)
@@ -3934,7 +3934,7 @@ func TestUpsertFile(t *testing.T) {
 			OverwritePolicy: &overwritePolicy,
 		}, []byte(contentA))
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		writesDone := make(chan struct{})
@@ -3950,7 +3950,7 @@ func TestUpsertFile(t *testing.T) {
 					OverwritePolicy: &overwritePolicy,
 				}, []byte(content))
 				if writeErr != nil {
-					t.Errorf("ConcurrentWriteFailed: %v", writeErr)
+					subtest.Errorf("ConcurrentWriteFailed: %v", writeErr)
 					return
 				}
 			}
@@ -3960,11 +3960,11 @@ func TestUpsertFile(t *testing.T) {
 		for {
 			readContent, readErr := os.ReadFile(target)
 			if readErr != nil {
-				t.Errorf("ConcurrentReadFailed: %v", readErr)
+				subtest.Errorf("ConcurrentReadFailed: %v", readErr)
 				break
 			}
 			if string(readContent) != contentA && string(readContent) != contentB {
-				t.Errorf(
+				subtest.Errorf(
 					"ReaderObservedPartialContent: length %d", len(readContent),
 				)
 				break
@@ -3977,371 +3977,371 @@ func TestUpsertFile(t *testing.T) {
 		}
 	})
 
-	t.Run("RefusesDirectoryTargetLeavingNoTempFile", func(t *testing.T) {
+	test.Run("RefusesDirectoryTargetLeavingNoTempFile", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "leakCheck")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		blockingDir := filepath.Join(dir, "taken.txt")
 		err = os.Mkdir(blockingDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, blockingDir),
+			FilePath:        absoluteFilePathForTest(subtest, blockingDir),
 			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if !errors.Is(err, ErrTargetIsDirectory) {
-			t.Fatalf("ExpectedErrTargetIsDirectory, got: %v", err)
+			subtest.Fatalf("ExpectedErrTargetIsDirectory, got: %v", err)
 		}
 
 		entries, readErr := os.ReadDir(dir)
 		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
+			subtest.Fatalf("ReadDirFailed: %v", readErr)
 		}
 		if len(entries) != 1 || entries[0].Name() != "taken.txt" {
-			t.Errorf("TempFileLeaked: %v", entries)
+			subtest.Errorf("TempFileLeaked: %v", entries)
 		}
 	})
 
-	t.Run("SetsRequestedOwner", func(t *testing.T) {
+	test.Run("SetsRequestedOwner", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 
 		dir := filepath.Join(tempDir, "ownership")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		ownerName, ownerNameErr := tkValueObject.NewUnixUsername("nobody")
 		if ownerNameErr != nil {
-			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
+			subtest.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
 		}
 		statedPermissions := os.FileMode(0644)
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, filepath.Join(dir, "owned.txt")),
+			FilePath:      absoluteFilePathForTest(subtest, filepath.Join(dir, "owned.txt")),
 			Permissions:   &statedPermissions,
 			OwnerUsername: &ownerName,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(filepath.Join(dir, "owned.txt"))
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnerMismatch: expected %d:%d, got %d:%d",
 				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("RefusesDirectoryChainOwnedByUnexpectedUser", func(t *testing.T) {
+	test.Run("RefusesDirectoryChainOwnedByUnexpectedUser", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		daemon, lookupErr := user.Lookup("daemon")
 		if lookupErr != nil {
-			t.Skipf("DaemonUserMissing: %v", lookupErr)
+			subtest.Skipf("DaemonUserMissing: %v", lookupErr)
 		}
 		_, nobodyErr := user.Lookup("nobody")
 		if nobodyErr != nil {
-			t.Skipf("NobodyUserMissing: %v", nobodyErr)
+			subtest.Skipf("NobodyUserMissing: %v", nobodyErr)
 		}
 		daemonUid, uidErr := strconv.Atoi(daemon.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 
 		dir := filepath.Join(tempDir, "wrongOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chown(dir, daemonUid, -1)
 		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
+			subtest.Fatalf("ChownFailed: %v", err)
 		}
 
 		ownerName, ownerNameErr := tkValueObject.NewUnixUsername("nobody")
 		if ownerNameErr != nil {
-			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
+			subtest.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
 		}
 		target := filepath.Join(dir, "refused.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				ownerName,
 			},
 		}, newFileContent)
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedErrDirectoryOwnerInvalid, got: %v", err,
 			)
 		}
 	})
 
-	t.Run("InheritsTargetOwnerOnReplace", func(t *testing.T) {
+	test.Run("InheritsTargetOwnerOnReplace", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 
 		dir := filepath.Join(tempDir, "inheritOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "owned.txt")
 		err = os.WriteFile(target, []byte("old"), 0640)
 		if err != nil {
-			t.Fatalf("WriteFileFailed: %v", err)
+			subtest.Fatalf("WriteFileFailed: %v", err)
 		}
 		err = os.Chown(target, nobodyUid, nobodyGid)
 		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
+			subtest.Fatalf("ChownFailed: %v", err)
 		}
 
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:        absoluteFilePathForTest(t, target),
+			FilePath:        absoluteFilePathForTest(subtest, target),
 			OverwritePolicy: &overwritePolicy,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnerNotInherited: expected %d:%d, got %d:%d",
 				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("UsesContainingDirectoryOwnerWhenRequested", func(t *testing.T) {
+	test.Run("UsesContainingDirectoryOwnerWhenRequested", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyGid, gidErr := strconv.Atoi(nobody.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 		nobodyUserId, userIdErr := tkValueObject.NewUnixUserId(nobodyUid)
 		if userIdErr != nil {
-			t.Fatalf("NobodyUserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("NobodyUserIdInvalid: %v", userIdErr)
 		}
 
 		dir := filepath.Join(tempDir, "dirOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chown(dir, nobodyUid, nobodyGid)
 		if err != nil {
-			t.Fatalf("ChownFailed: %v", err)
+			subtest.Fatalf("ChownFailed: %v", err)
 		}
 
 		ownerSource := FileClerkOwnerSourceContainingDirectory
 		target := filepath.Join(dir, "owned.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
 				nobodyUserId,
 			},
 			OwnerSource: &ownerSource,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != nobodyGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnerMismatch: expected %d:%d, got %d:%d",
 				nobodyUid, nobodyGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("StatesOwnerGroup", func(t *testing.T) {
+	test.Run("StatesOwnerGroup", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		daemon, daemonErr := user.Lookup("daemon")
 		if daemonErr != nil {
-			t.Skipf("DaemonUserMissing: %v", daemonErr)
+			subtest.Skipf("DaemonUserMissing: %v", daemonErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		daemonGid, gidErr := strconv.Atoi(daemon.Gid)
 		if gidErr != nil {
-			t.Fatalf("GidParseFailed: %v", gidErr)
+			subtest.Fatalf("GidParseFailed: %v", gidErr)
 		}
 
 		dir := filepath.Join(tempDir, "statedGroup")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		ownerName, ownerNameErr := tkValueObject.NewUnixUsername("nobody")
 		if ownerNameErr != nil {
-			t.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
+			subtest.Fatalf("OwnerNameInvalid: %v", ownerNameErr)
 		}
 		ownerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(daemonGid)
 		if groupIdErr != nil {
-			t.Fatalf("GroupIdInvalid: %v", groupIdErr)
+			subtest.Fatalf("GroupIdInvalid: %v", groupIdErr)
 		}
 
 		target := filepath.Join(dir, "owned.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
+			FilePath:      absoluteFilePathForTest(subtest, target),
 			OwnerUsername: &ownerName,
 			OwnerGroupId:  &ownerGroupId,
 		}, newFileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		fileInfo, statErr := os.Stat(target)
 		if statErr != nil {
-			t.Fatalf("StatFailed: %v", statErr)
+			subtest.Fatalf("StatFailed: %v", statErr)
 		}
 		fileStat, assertOk := fileInfo.Sys().(*syscall.Stat_t)
 		if !assertOk {
-			t.Fatalf("StatAssertionFailed")
+			subtest.Fatalf("StatAssertionFailed")
 		}
 		if int(fileStat.Uid) != nobodyUid || int(fileStat.Gid) != daemonGid {
-			t.Errorf(
+			subtest.Errorf(
 				"OwnershipMismatch: expected %d:%d, got %d:%d",
 				nobodyUid, daemonGid, fileStat.Uid, fileStat.Gid,
 			)
 		}
 	})
 
-	t.Run("RefusesStatedOwnerWithContainingDirectorySource", func(t *testing.T) {
+	test.Run("RefusesStatedOwnerWithContainingDirectorySource", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "ownerConflict")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		ownerSource := FileClerkOwnerSourceContainingDirectory
 		target := filepath.Join(dir, "conflict.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
+			FilePath:      absoluteFilePathForTest(subtest, target),
 			OwnerSource:   &ownerSource,
 			OwnerUsername: &currentUsername,
 		}, newFileContent)
 		if !errors.Is(err, ErrOwnerSourceConflict) {
-			t.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
+			subtest.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
 		}
 		if clerk.FileExists(target) {
-			t.Errorf("TargetWrittenDespiteConflict")
+			subtest.Errorf("TargetWrittenDespiteConflict")
 		}
 	})
 
-	t.Run("RefusesStatedOwnerWithRunningProcessSource", func(t *testing.T) {
+	test.Run("RefusesStatedOwnerWithRunningProcessSource", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "ownerProcessConflict")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		ownerSource := FileClerkOwnerSourceRunningProcess
 		target := filepath.Join(dir, "conflict.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:      absoluteFilePathForTest(t, target),
+			FilePath:      absoluteFilePathForTest(subtest, target),
 			OwnerSource:   &ownerSource,
 			OwnerUsername: &currentUsername,
 		}, newFileContent)
 		if !errors.Is(err, ErrOwnerSourceConflict) {
-			t.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
+			subtest.Fatalf("ExpectedErrOwnerSourceConflict, got: %v", err)
 		}
 		if clerk.FileExists(target) {
-			t.Errorf("TargetWrittenDespiteConflict")
+			subtest.Errorf("TargetWrittenDespiteConflict")
 		}
 	})
 
-	t.Run("RefusesUnknownPolicyValues", func(t *testing.T) {
+	test.Run("RefusesUnknownPolicyValues", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "unknownPolicy")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		target := filepath.Join(dir, "unknown.txt")
-		targetPath := absoluteFilePathForTest(t, target)
+		targetPath := absoluteFilePathForTest(subtest, target)
 		unsupportedOwnerSource := FileClerkOwnerSource("unsupported")
 		unsupportedSymlinkPolicy := FileClerkSymlinkPolicy("unsupported")
 		unsupportedOverwritePolicy := FileClerkOverwritePolicy("unsupported")
@@ -4387,93 +4387,93 @@ func TestUpsertFile(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
+			subtest.Run(testCase.name, func(subtest *testing.T) {
 				err := clerk.UpsertFile(testCase.settings, newFileContent)
 				if !errors.Is(err, testCase.expectedError) {
-					t.Errorf("Expected%v, got: %v", testCase.expectedError, err)
+					subtest.Errorf("Expected%v, got: %v", testCase.expectedError, err)
 				}
 			})
 		}
 
 		if clerk.FileExists(target) {
-			t.Errorf("TargetWrittenDespiteInvalidSettings")
+			subtest.Errorf("TargetWrittenDespiteInvalidSettings")
 		}
 	})
 
-	t.Run("RefusesUnprivilegedOwnerChange", func(t *testing.T) {
+	test.Run("RefusesUnprivilegedOwnerChange", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
 
 		dir := filepath.Join(tempDir, "unprivilegedOwner")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		foreignOwnerUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid() + 1)
 		if userIdErr != nil {
-			t.Fatalf("ForeignOwnerUserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("ForeignOwnerUserIdInvalid: %v", userIdErr)
 		}
 		foreignOwnerGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
 		if groupIdErr != nil {
-			t.Fatalf("ForeignOwnerGroupIdInvalid: %v", groupIdErr)
+			subtest.Fatalf("ForeignOwnerGroupIdInvalid: %v", groupIdErr)
 		}
 
 		target := filepath.Join(dir, "owned.txt")
 		err = clerk.UpsertFile(FileUpsertSettings{
-			FilePath:     absoluteFilePathForTest(t, target),
+			FilePath:     absoluteFilePathForTest(subtest, target),
 			OwnerUserId:  &foreignOwnerUserId,
 			OwnerGroupId: &foreignOwnerGroupId,
 		}, newFileContent)
 		if !errors.Is(err, ErrFileOwnerChangeFailed) {
-			t.Fatalf("ExpectedErrFileOwnerChangeFailed, got: %v", err)
+			subtest.Fatalf("ExpectedErrFileOwnerChangeFailed, got: %v", err)
 		}
 		if clerk.FileExists(target) {
-			t.Errorf("TargetWrittenDespiteOwnerChangeFailure")
+			subtest.Errorf("TargetWrittenDespiteOwnerChangeFailure")
 		}
 
 		entries, readErr := os.ReadDir(dir)
 		if readErr != nil {
-			t.Fatalf("ReadDirFailed: %v", readErr)
+			subtest.Fatalf("ReadDirFailed: %v", readErr)
 		}
 		if len(entries) != 0 {
-			t.Errorf("TempFileLeaked: %v", entries)
+			subtest.Errorf("TempFileLeaked: %v", entries)
 		}
 	})
 }
 
-func TestFileUpsertOwnerResolver(t *testing.T) {
+func TestFileUpsertOwnerResolver(test *testing.T) {
 	clerk := FileClerk{}
 
 	runningProcessUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
 	if userIdErr != nil {
-		t.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
+		test.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
 	}
 	runningProcessGroupId, groupIdErr := tkValueObject.NewUnixGroupId(os.Getegid())
 	if groupIdErr != nil {
-		t.Fatalf("RunningProcessGroupIdInvalid: %v", groupIdErr)
+		test.Fatalf("RunningProcessGroupIdInvalid: %v", groupIdErr)
 	}
 
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
-		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+		test.Fatalf("CurrentUserLookupFailed: %v", accountErr)
 	}
 	currentUsername, usernameErr := tkValueObject.NewUnixUsername(
 		currentAccount.Username,
 	)
 	if usernameErr != nil {
-		t.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
+		test.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
 	}
 	currentUserId, userIdErr := tkValueObject.NewUnixUserId(currentAccount.Uid)
 	if userIdErr != nil {
-		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
+		test.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
 	}
 	currentPrimaryGroupId, groupIdErr := tkValueObject.NewUnixGroupId(
 		currentAccount.Gid,
 	)
 	if groupIdErr != nil {
-		t.Fatalf("CurrentPrimaryGroupIdInvalid: %v", groupIdErr)
+		test.Fatalf("CurrentPrimaryGroupIdInvalid: %v", groupIdErr)
 	}
 
 	existingFileOwnerUserId := tkValueObject.UnixUserId(1234)
@@ -4575,7 +4575,7 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			ownership, err := clerk.fileUpsertOwnerResolver(
 				testCase.ownerSource, testCase.ownerUsername, testCase.ownerUserId,
 				testCase.ownerGroupId, testCase.targetSnapshot, containingDirStat,
@@ -4583,21 +4583,21 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 
 			if testCase.expectedError != nil {
 				if !errors.Is(err, testCase.expectedError) {
-					t.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
+					subtest.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("UnexpectedError: %v", err)
+				subtest.Fatalf("UnexpectedError: %v", err)
 			}
 			if ownership.UserId != testCase.expectedUserId {
-				t.Errorf(
+				subtest.Errorf(
 					"UserIdMismatch: expected %d, got %d",
 					testCase.expectedUserId, ownership.UserId,
 				)
 			}
 			if ownership.GroupId != testCase.expectedGroupId {
-				t.Errorf(
+				subtest.Errorf(
 					"GroupIdMismatch: expected %d, got %d",
 					testCase.expectedGroupId, ownership.GroupId,
 				)
@@ -4606,7 +4606,7 @@ func TestFileUpsertOwnerResolver(t *testing.T) {
 	}
 }
 
-func TestFileUpsertPermissionsResolver(t *testing.T) {
+func TestFileUpsertPermissionsResolver(test *testing.T) {
 	clerk := FileClerk{}
 
 	statedPermissions := os.FileMode(0640)
@@ -4643,12 +4643,12 @@ func TestFileUpsertPermissionsResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			permissions := clerk.fileUpsertPermissionsResolver(
 				testCase.statedPermissionsPtr, testCase.targetSnapshot,
 			)
 			if permissions != testCase.expectedPermissions {
-				t.Errorf(
+				subtest.Errorf(
 					"PermissionsMismatch: expected %v, got %v",
 					testCase.expectedPermissions, permissions,
 				)
@@ -4657,7 +4657,7 @@ func TestFileUpsertPermissionsResolver(t *testing.T) {
 	}
 }
 
-func TestUnixFileModeConverter(t *testing.T) {
+func TestUnixFileModeConverter(test *testing.T) {
 	clerk := FileClerk{}
 
 	specialModeMask := os.ModeSetuid | os.ModeSetgid | os.ModeSticky
@@ -4680,10 +4680,10 @@ func TestUnixFileModeConverter(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			fileMode := clerk.unixFileModeConverter(testCase.rawMode)
 			if fileMode != testCase.expectedFileMode {
-				t.Errorf(
+				subtest.Errorf(
 					"FileModeMismatch: expected %v, got %v",
 					testCase.expectedFileMode, fileMode,
 				)
@@ -4692,17 +4692,17 @@ func TestUnixFileModeConverter(t *testing.T) {
 	}
 }
 
-func TestOpenRedirectProofDirChain(t *testing.T) {
+func TestOpenRedirectProofDirChain(test *testing.T) {
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
-		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+		test.Fatalf("CurrentUserLookupFailed: %v", accountErr)
 	}
 	currentUserId, userIdErr := tkValueObject.NewUnixUserId(currentAccount.Uid)
 	if userIdErr != nil {
-		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
+		test.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
 	}
 	currentTrustedDirOwnerIds := trustedDirOwnerIdSet{
 		currentUserId.Uint64(): struct{}{},
@@ -4711,7 +4711,7 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 	sharedWriteAllowedPolicy := FileClerkDirChainPolicySharedWriteAllowed
 	sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 
-	t.Run("RefusesParentTraversalComponents", func(t *testing.T) {
+	test.Run("RefusesParentTraversalComponents", func(subtest *testing.T) {
 		traversalPath := tkValueObject.UnixAbsoluteFilePath(
 			tempDir + "/../traversal.txt",
 		)
@@ -4719,92 +4719,92 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 			traversalPath, currentTrustedDirOwnerIds, sharedWriteAllowedPolicy,
 		)
 		if !errors.Is(dirChainErr, ErrDirPathTraversalInvalid) {
-			t.Errorf("ExpectedErrDirPathTraversalInvalid, got: %v", dirChainErr)
+			subtest.Errorf("ExpectedErrDirPathTraversalInvalid, got: %v", dirChainErr)
 		}
 	})
 
-	t.Run("RefusesWritableComponentWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableComponentWhenRequired", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "writable")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chmod(dir, 0o777)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 
 		_, strictChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			absoluteFilePathForTest(subtest, dir), currentTrustedDirOwnerIds,
 			sharedWriteRefusedPolicy,
 		)
 		if !errors.Is(strictChainErr, ErrDirectoryWritableByOthers) {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedErrDirectoryWritableByOthers, got: %v", strictChainErr,
 			)
 		}
 
 		lenientHandle, lenientChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			absoluteFilePathForTest(subtest, dir), currentTrustedDirOwnerIds,
 			sharedWriteAllowedPolicy,
 		)
 		if lenientChainErr != nil {
-			t.Fatalf("UnexpectedErrorForLenientChain: %v", lenientChainErr)
+			subtest.Fatalf("UnexpectedErrorForLenientChain: %v", lenientChainErr)
 		}
 		_ = unix.Close(lenientHandle)
 	})
 
-	t.Run("AcceptsStickyWritableComponentWhenRequired", func(t *testing.T) {
+	test.Run("AcceptsStickyWritableComponentWhenRequired", func(subtest *testing.T) {
 		dir := filepath.Join(tempDir, "stickyWritable")
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Chmod(dir, os.ModeSticky|0o777)
 		if err != nil {
-			t.Fatalf("ChmodFailed: %v", err)
+			subtest.Fatalf("ChmodFailed: %v", err)
 		}
 
 		dirHandle, strictChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, dir), currentTrustedDirOwnerIds,
+			absoluteFilePathForTest(subtest, dir), currentTrustedDirOwnerIds,
 			sharedWriteRefusedPolicy,
 		)
 		if strictChainErr != nil {
-			t.Fatalf("UnexpectedSurprise: %v", strictChainErr)
+			subtest.Fatalf("UnexpectedSurprise: %v", strictChainErr)
 		}
 		_ = unix.Close(dirHandle)
 	})
 
-	t.Run("HandleStaysOnOriginalInodeAfterPathSwap", func(t *testing.T) {
+	test.Run("HandleStaysOnOriginalInodeAfterPathSwap", func(subtest *testing.T) {
 		parentDir := filepath.Join(tempDir, "pinning")
 		originalDir := filepath.Join(parentDir, "original")
 		err := os.MkdirAll(originalDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 
 		dirHandle, dirChainErr := clerk.openRedirectProofDirChain(
-			absoluteFilePathForTest(t, originalDir), currentTrustedDirOwnerIds,
+			absoluteFilePathForTest(subtest, originalDir), currentTrustedDirOwnerIds,
 			sharedWriteAllowedPolicy,
 		)
 		if dirChainErr != nil {
-			t.Fatalf("RedirectProofFailed: %v", dirChainErr)
+			subtest.Fatalf("RedirectProofFailed: %v", dirChainErr)
 		}
 		defer func() { _ = unix.Close(dirHandle) }()
 
 		movedDir := filepath.Join(parentDir, "moved")
 		err = os.Rename(originalDir, movedDir)
 		if err != nil {
-			t.Fatalf("RenameFailed: %v", err)
+			subtest.Fatalf("RenameFailed: %v", err)
 		}
 		escapeDir := filepath.Join(parentDir, "escape")
 		err = os.MkdirAll(escapeDir, 0755)
 		if err != nil {
-			t.Fatalf("MkdirFailed: %v", err)
+			subtest.Fatalf("MkdirFailed: %v", err)
 		}
 		err = os.Symlink(escapeDir, originalDir)
 		if err != nil {
-			t.Fatalf("SymlinkFailed: %v", err)
+			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
 
 		stageHandle, openErr := unix.Openat(
@@ -4812,45 +4812,45 @@ func TestOpenRedirectProofDirChain(t *testing.T) {
 			unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL, 0o600,
 		)
 		if openErr != nil {
-			t.Fatalf("OpenatFailed: %v", openErr)
+			subtest.Fatalf("OpenatFailed: %v", openErr)
 		}
 		_ = unix.Close(stageHandle)
 
 		if !clerk.FileExists(filepath.Join(movedDir, "staged.txt")) {
-			t.Errorf("WriteDidNotLandOnScoutedInode")
+			subtest.Errorf("WriteDidNotLandOnScoutedInode")
 		}
 		if clerk.FileExists(filepath.Join(escapeDir, "staged.txt")) {
-			t.Errorf("WriteFollowedReplacementSymlink")
+			subtest.Errorf("WriteFollowedReplacementSymlink")
 		}
 	})
 }
 
-func TestTrustedDirOwnerIdSetResolver(t *testing.T) {
+func TestTrustedDirOwnerIdSetResolver(test *testing.T) {
 	clerk := FileClerk{}
 
 	currentAccount, accountErr := user.Current()
 	if accountErr != nil {
-		t.Fatalf("CurrentUserLookupFailed: %v", accountErr)
+		test.Fatalf("CurrentUserLookupFailed: %v", accountErr)
 	}
 	currentUsername, usernameErr := tkValueObject.NewUnixUsername(
 		currentAccount.Username,
 	)
 	if usernameErr != nil {
-		t.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
+		test.Fatalf("CurrentUsernameInvalid: %v", usernameErr)
 	}
 	currentUserId, userIdErr := tkValueObject.NewUnixUserId(currentAccount.Uid)
 	if userIdErr != nil {
-		t.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
+		test.Fatalf("CurrentUserIdInvalid: %v", userIdErr)
 	}
 	runningProcessUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
 	if userIdErr != nil {
-		t.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
+		test.Fatalf("RunningProcessUserIdInvalid: %v", userIdErr)
 	}
 	unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
 		"no-such-user-xyz-42",
 	)
 	if usernameErr != nil {
-		t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+		test.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
 	}
 	arbitraryUserId := tkValueObject.UnixUserId(4242)
 
@@ -4891,7 +4891,7 @@ func TestTrustedDirOwnerIdSetResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			trustedDirOwnerIds, err := clerk.trustedDirOwnerIdSetResolver(
 				testCase.usernames, testCase.userIds,
 			)
@@ -4899,17 +4899,17 @@ func TestTrustedDirOwnerIdSetResolver(t *testing.T) {
 				errorMissing := err == nil ||
 					!strings.Contains(err.Error(), testCase.expectedError)
 				if errorMissing {
-					t.Fatalf(
+					subtest.Fatalf(
 						"Expected%sError, got: %v", testCase.expectedError, err,
 					)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("UnexpectedError: %v", err)
+				subtest.Fatalf("UnexpectedError: %v", err)
 			}
 			if len(trustedDirOwnerIds) != len(testCase.expectedUserIds) {
-				t.Errorf(
+				subtest.Errorf(
 					"SetSizeMismatch: expected %d, got %d",
 					len(testCase.expectedUserIds), len(trustedDirOwnerIds),
 				)
@@ -4917,20 +4917,20 @@ func TestTrustedDirOwnerIdSetResolver(t *testing.T) {
 			for _, expectedUserId := range testCase.expectedUserIds {
 				_, isTrusted := trustedDirOwnerIds[expectedUserId.Uint64()]
 				if !isTrusted {
-					t.Errorf("MissingTrustedOwnerId: %d", expectedUserId)
+					subtest.Errorf("MissingTrustedOwnerId: %d", expectedUserId)
 				}
 			}
 		})
 	}
 }
 
-func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
+func TestOpenRedirectProofDirChainTrustedOwnerSets(test *testing.T) {
 	if os.Geteuid() != 0 {
-		t.Skip("RootPrivilegesRequired")
+		test.Skip("RootPrivilegesRequired")
 	}
 
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	candidateAccountNames := []string{"nobody", "daemon", "bin", "mail", "games"}
 	ownerAccountNames := []string{}
@@ -4945,7 +4945,7 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 		}
 	}
 	if len(ownerAccountNames) < 3 {
-		t.Skip("ThreeOwnerAccountsRequired")
+		test.Skip("ThreeOwnerAccountsRequired")
 	}
 
 	ownerUserIds := make([]tkValueObject.UnixUserId, 0, len(ownerAccountNames))
@@ -4953,15 +4953,15 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 	for _, ownerAccountName := range ownerAccountNames {
 		ownerAccount, lookupErr := user.Lookup(ownerAccountName)
 		if lookupErr != nil {
-			t.Skipf("AccountMissing: %s: %v", ownerAccountName, lookupErr)
+			test.Skipf("AccountMissing: %s: %v", ownerAccountName, lookupErr)
 		}
 		ownerUid, uidParseErr := strconv.Atoi(ownerAccount.Uid)
 		if uidParseErr != nil {
-			t.Fatalf("UidParseFailed: %s: %v", ownerAccountName, uidParseErr)
+			test.Fatalf("UidParseFailed: %s: %v", ownerAccountName, uidParseErr)
 		}
 		ownerUserId, userIdErr := tkValueObject.NewUnixUserId(ownerUid)
 		if userIdErr != nil {
-			t.Fatalf("OwnerUserIdInvalid: %s: %v", ownerAccountName, userIdErr)
+			test.Fatalf("OwnerUserIdInvalid: %s: %v", ownerAccountName, userIdErr)
 		}
 		ownerUids = append(ownerUids, ownerUid)
 		ownerUserIds = append(ownerUserIds, ownerUserId)
@@ -4972,13 +4972,13 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 	thirdOwnerDir := filepath.Join(secondOwnerDir, "thirdOwner")
 	mkdirErr := os.MkdirAll(thirdOwnerDir, 0755)
 	if mkdirErr != nil {
-		t.Fatalf("MkdirFailed: %v", mkdirErr)
+		test.Fatalf("MkdirFailed: %v", mkdirErr)
 	}
 	ownedDirs := []string{firstOwnerDir, secondOwnerDir, thirdOwnerDir}
 	for dirIndex, ownedDir := range ownedDirs {
 		chownErr := os.Chown(ownedDir, ownerUids[dirIndex], -1)
 		if chownErr != nil {
-			t.Fatalf("ChownFailed: %s: %v", ownedDir, chownErr)
+			test.Fatalf("ChownFailed: %s: %v", ownedDir, chownErr)
 		}
 	}
 
@@ -4993,54 +4993,54 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 	}{
 		{
 			name:           "AcceptsChainWithEveryOwnerNamed",
-			walkPath:       absoluteFilePathForTest(t, thirdOwnerDir),
+			walkPath:       absoluteFilePathForTest(test, thirdOwnerDir),
 			trustedUserIds: ownerUserIds,
 		},
 		{
 			name:              "RefusesFirstOwnerWhenUnnamed",
-			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			walkPath:          absoluteFilePathForTest(test, thirdOwnerDir),
 			trustedUserIds:    ownerUserIds[1:],
 			expectedError:     ErrDirectoryOwnerInvalid,
 			expectedComponent: "firstOwner",
 		},
 		{
 			name:              "RefusesThirdOwnerWhenUnnamed",
-			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			walkPath:          absoluteFilePathForTest(test, thirdOwnerDir),
 			trustedUserIds:    ownerUserIds[:2],
 			expectedError:     ErrDirectoryOwnerInvalid,
 			expectedComponent: "thirdOwner",
 		},
 		{
 			name:              "RefusesChainWhenTrustedSetEmpty",
-			walkPath:          absoluteFilePathForTest(t, thirdOwnerDir),
+			walkPath:          absoluteFilePathForTest(test, thirdOwnerDir),
 			expectedError:     ErrDirectoryOwnerInvalid,
 			expectedComponent: "firstOwner",
 		},
 		{
 			name:           "AcceptsSingleOwnerChainWhenNamed",
-			walkPath:       absoluteFilePathForTest(t, firstOwnerDir),
+			walkPath:       absoluteFilePathForTest(test, firstOwnerDir),
 			trustedUserIds: ownerUserIds[:1],
 		},
 		{
 			name:              "RefusesSingleOwnerChainWhenUnnamed",
-			walkPath:          absoluteFilePathForTest(t, firstOwnerDir),
+			walkPath:          absoluteFilePathForTest(test, firstOwnerDir),
 			trustedUserIds:    ownerUserIds[1:2],
 			expectedError:     ErrDirectoryOwnerInvalid,
 			expectedComponent: "firstOwner",
 		},
 		{
 			name:           "AcceptsRootOwnedChainWithUnrelatedTrustedOwner",
-			walkPath:       absoluteFilePathForTest(t, tempDir),
+			walkPath:       absoluteFilePathForTest(test, tempDir),
 			trustedUserIds: ownerUserIds[:1],
 		},
 		{
 			name:     "AcceptsRootOwnedChainWithEmptySet",
-			walkPath: absoluteFilePathForTest(t, tempDir),
+			walkPath: absoluteFilePathForTest(test, tempDir),
 		},
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			trustedDirOwnerIds := trustedDirOwnerIdSet{}
 			for _, trustedUserId := range testCase.trustedUserIds {
 				trustedDirOwnerIds[trustedUserId.Uint64()] = struct{}{}
@@ -5051,10 +5051,10 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 			)
 			if testCase.expectedError != nil {
 				if !errors.Is(err, testCase.expectedError) {
-					t.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
+					subtest.Fatalf("Expected%v, got: %v", testCase.expectedError, err)
 				}
 				if !strings.Contains(err.Error(), testCase.expectedComponent) {
-					t.Errorf(
+					subtest.Errorf(
 						"ErrorDoesNotNameComponent: %s: %v",
 						testCase.expectedComponent, err,
 					)
@@ -5062,197 +5062,197 @@ func TestOpenRedirectProofDirChainTrustedOwnerSets(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("UnexpectedError: %v", err)
+				subtest.Fatalf("UnexpectedError: %v", err)
 			}
 			_ = unix.Close(dirHandle)
 		})
 	}
 }
 
-func TestUpsertFileTrustedDirOwners(t *testing.T) {
+func TestUpsertFileTrustedDirOwners(test *testing.T) {
 	if os.Geteuid() != 0 {
-		t.Skip("RootPrivilegesRequired")
+		test.Skip("RootPrivilegesRequired")
 	}
 
 	clerk := FileClerk{}
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	nobodyAccount, nobodyErr := user.Lookup("nobody")
 	if nobodyErr != nil {
-		t.Skipf("NobodyUserMissing: %v", nobodyErr)
+		test.Skipf("NobodyUserMissing: %v", nobodyErr)
 	}
 	daemonAccount, daemonErr := user.Lookup("daemon")
 	if daemonErr != nil {
-		t.Skipf("DaemonUserMissing: %v", daemonErr)
+		test.Skipf("DaemonUserMissing: %v", daemonErr)
 	}
 	nobodyUid, nobodyUidErr := strconv.Atoi(nobodyAccount.Uid)
 	if nobodyUidErr != nil {
-		t.Fatalf("NobodyUidParseFailed: %v", nobodyUidErr)
+		test.Fatalf("NobodyUidParseFailed: %v", nobodyUidErr)
 	}
 	daemonUid, daemonUidErr := strconv.Atoi(daemonAccount.Uid)
 	if daemonUidErr != nil {
-		t.Fatalf("DaemonUidParseFailed: %v", daemonUidErr)
+		test.Fatalf("DaemonUidParseFailed: %v", daemonUidErr)
 	}
 
 	nobodyUsername, usernameErr := tkValueObject.NewUnixUsername(
 		nobodyAccount.Username,
 	)
 	if usernameErr != nil {
-		t.Fatalf("NobodyUsernameInvalid: %v", usernameErr)
+		test.Fatalf("NobodyUsernameInvalid: %v", usernameErr)
 	}
 	daemonUserId, userIdErr := tkValueObject.NewUnixUserId(daemonUid)
 	if userIdErr != nil {
-		t.Fatalf("DaemonUserIdInvalid: %v", userIdErr)
+		test.Fatalf("DaemonUserIdInvalid: %v", userIdErr)
 	}
 
 	nobodyDir := filepath.Join(tempDir, "nobodyOwner")
 	daemonDir := filepath.Join(nobodyDir, "daemonOwner")
 	mkdirErr := os.MkdirAll(daemonDir, 0755)
 	if mkdirErr != nil {
-		t.Fatalf("MkdirFailed: %v", mkdirErr)
+		test.Fatalf("MkdirFailed: %v", mkdirErr)
 	}
 	nobodyChownErr := os.Chown(nobodyDir, nobodyUid, -1)
 	if nobodyChownErr != nil {
-		t.Fatalf("NobodyChownFailed: %v", nobodyChownErr)
+		test.Fatalf("NobodyChownFailed: %v", nobodyChownErr)
 	}
 	daemonChownErr := os.Chown(daemonDir, daemonUid, -1)
 	if daemonChownErr != nil {
-		t.Fatalf("DaemonChownFailed: %v", daemonChownErr)
+		test.Fatalf("DaemonChownFailed: %v", daemonChownErr)
 	}
 
-	t.Run("WritesThroughChainWithUsernameAndUserIdTrusted", func(t *testing.T) {
+	test.Run("WritesThroughChainWithUsernameAndUserIdTrusted", func(subtest *testing.T) {
 		target := filepath.Join(daemonDir, "php-webserver.conf")
 		fileContent := []byte("display_errors = On")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				nobodyUsername,
 			},
 			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{daemonUserId},
 		}, fileContent)
 		if err != nil {
-			t.Fatalf("UpsertFileFailed: %v", err)
+			subtest.Fatalf("UpsertFileFailed: %v", err)
 		}
 
 		writtenContent, readErr := os.ReadFile(target)
 		if readErr != nil {
-			t.Fatalf("ReadFileFailed: %v", readErr)
+			subtest.Fatalf("ReadFileFailed: %v", readErr)
 		}
 		if string(writtenContent) != string(fileContent) {
-			t.Errorf("ContentMismatch: %s", writtenContent)
+			subtest.Errorf("ContentMismatch: %s", writtenContent)
 		}
 	})
 
-	t.Run("RefusesChainWhenOneOwnerUnnamed", func(t *testing.T) {
+	test.Run("RefusesChainWhenOneOwnerUnnamed", func(subtest *testing.T) {
 		target := filepath.Join(daemonDir, "refused.conf")
 		err := clerk.UpsertFile(FileUpsertSettings{
-			FilePath: absoluteFilePathForTest(t, target),
+			FilePath: absoluteFilePathForTest(subtest, target),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				nobodyUsername,
 			},
 		}, []byte("display_errors = Off"))
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Fatalf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
+			subtest.Fatalf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
 		}
 		if !strings.Contains(err.Error(), "daemonOwner") {
-			t.Errorf("ErrorDoesNotNameOffendingComponent: %v", err)
+			subtest.Errorf("ErrorDoesNotNameOffendingComponent: %v", err)
 		}
 		if clerk.FileExists(target) {
-			t.Errorf("RefusedTargetWasCreated")
+			subtest.Errorf("RefusedTargetWasCreated")
 		}
 	})
 }
 
-func TestListDir(t *testing.T) {
+func TestListDir(test *testing.T) {
 	clerk := FileClerk{}
 
 	// Note: Setup/teardown are intentionally file-local — test independence
 	// requires each file to own its preconditions, even if it duplicates code.
 	listDirTestTreeFactory := func() string {
-		t.Helper()
+		test.Helper()
 
-		tempDir := t.TempDir()
+		tempDir := test.TempDir()
 		subDir := filepath.Join(tempDir, "sub")
 		elsewhereDir := filepath.Join(tempDir, "elsewhere")
 		mkdirErr := os.MkdirAll(subDir, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			test.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		mkdirErr = os.MkdirAll(elsewhereDir, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			test.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 
 		writeErr := os.WriteFile(
 			filepath.Join(tempDir, "a.txt"), []byte("hello"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(tempDir, "b.log"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(subDir, "inner.txt"), []byte("world"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(elsewhereDir, "hidden.txt"), []byte("!"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
-		symlinkTargetDir := t.TempDir()
+		symlinkTargetDir := test.TempDir()
 		writeErr = os.WriteFile(
 			filepath.Join(symlinkTargetDir, "symlinkTargetCanary.txt"),
 			[]byte("canary"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		symlinkErr := os.Symlink(
 			symlinkTargetDir, filepath.Join(subDir, "linkToOutside"),
 		)
 		if symlinkErr != nil {
-			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+			test.Fatalf("SymlinkFailed: %v", symlinkErr)
 		}
 
 		return tempDir
 	}
 	tempDir := listDirTestTreeFactory()
 
-	t.Run("ListsRootEntriesSortedByName", func(t *testing.T) {
+	test.Run("ListsRootEntriesSortedByName", func(subtest *testing.T) {
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, tempDir),
+			DirPath: absoluteFilePathForTest(subtest, tempDir),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 
 		expectedNames := []string{"a.txt", "b.log", "elsewhere", "sub"}
 		if len(unixFiles) != len(expectedNames) {
-			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 		for entryIndex, expectedName := range expectedNames {
 			actualName := unixFiles[entryIndex].Name.String()
 			if actualName != expectedName {
-				t.Errorf("UnexpectedEntryName: %s", actualName)
+				subtest.Errorf("UnexpectedEntryName: %s", actualName)
 			}
 		}
 	})
 
-	t.Run("ReadsEntryAttributes", func(t *testing.T) {
+	test.Run("ReadsEntryAttributes", func(subtest *testing.T) {
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, tempDir),
+			DirPath: absoluteFilePathForTest(subtest, tempDir),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 
 		for _, unixFile := range unixFiles {
@@ -5260,130 +5260,130 @@ func TestListDir(t *testing.T) {
 			case "a.txt":
 				expectedPath := filepath.Join(tempDir, "a.txt")
 				if unixFile.Path.String() != expectedPath {
-					t.Errorf("UnexpectedFilePath: %s", unixFile.Path.String())
+					subtest.Errorf("UnexpectedFilePath: %s", unixFile.Path.String())
 				}
 				if unixFile.MimeType.String() != "text/plain" {
-					t.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
+					subtest.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
 				}
 				if unixFile.Extension == nil ||
 					unixFile.Extension.String() != "txt" {
-					t.Errorf("UnexpectedExtension: %v", unixFile.Extension)
+					subtest.Errorf("UnexpectedExtension: %v", unixFile.Extension)
 				}
 				if unixFile.Size.Uint64() != 5 {
-					t.Errorf("UnexpectedSize: %d", unixFile.Size.Uint64())
+					subtest.Errorf("UnexpectedSize: %d", unixFile.Size.Uint64())
 				}
 				if unixFile.IsSymlink {
-					t.Errorf("RegularFileMarkedAsSymlink")
+					subtest.Errorf("RegularFileMarkedAsSymlink")
 				}
 			case "sub":
 				if unixFile.MimeType.String() != "directory" {
-					t.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
+					subtest.Errorf("UnexpectedMimeType: %s", unixFile.MimeType.String())
 				}
 				if unixFile.Extension != nil {
-					t.Errorf("DirectoryHasExtension: %s", unixFile.Extension.String())
+					subtest.Errorf("DirectoryHasExtension: %s", unixFile.Extension.String())
 				}
 				if unixFile.IsSymlink {
-					t.Errorf("DirectoryMarkedAsSymlink")
+					subtest.Errorf("DirectoryMarkedAsSymlink")
 				}
 			}
 		}
 	})
 
-	t.Run("RespectsMaxDepth", func(t *testing.T) {
+	test.Run("RespectsMaxDepth", func(subtest *testing.T) {
 		depthZeroFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, tempDir),
+			DirPath:  absoluteFilePathForTest(subtest, tempDir),
 			MaxDepth: 0,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(depthZeroFiles) != 4 {
-			t.Errorf("UnexpectedDepthZeroEntryCount: %d", len(depthZeroFiles))
+			subtest.Errorf("UnexpectedDepthZeroEntryCount: %d", len(depthZeroFiles))
 		}
 
 		depthOneFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, tempDir),
+			DirPath:  absoluteFilePathForTest(subtest, tempDir),
 			MaxDepth: 1,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(depthOneFiles) != 7 {
-			t.Errorf("UnexpectedDepthOneEntryCount: %d", len(depthOneFiles))
+			subtest.Errorf("UnexpectedDepthOneEntryCount: %d", len(depthOneFiles))
 		}
 	})
 
-	t.Run("CapsEntries", func(t *testing.T) {
+	test.Run("CapsEntries", func(subtest *testing.T) {
 		maxFiles := uint64(2)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, tempDir),
+			DirPath:  absoluteFilePathForTest(subtest, tempDir),
 			MaxFiles: &maxFiles,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 2 {
-			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("CapsEntriesAcrossSubdirectories", func(t *testing.T) {
-		nestedCapDirPath := t.TempDir()
+	test.Run("CapsEntriesAcrossSubdirectories", func(subtest *testing.T) {
+		nestedCapDirPath := subtest.TempDir()
 		for _, subDirName := range []string{"first", "second"} {
 			subDirPath := filepath.Join(nestedCapDirPath, subDirName)
 			mkdirErr := os.MkdirAll(subDirPath, 0755)
 			if mkdirErr != nil {
-				t.Fatalf("MkdirFailed: %v", mkdirErr)
+				subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 			}
 			for _, fileName := range []string{"one.txt", "two.txt"} {
 				writeErr := os.WriteFile(
 					filepath.Join(subDirPath, fileName), []byte("x"), 0644,
 				)
 				if writeErr != nil {
-					t.Fatalf("WriteFileFailed: %v", writeErr)
+					subtest.Fatalf("WriteFileFailed: %v", writeErr)
 				}
 			}
 		}
 
 		maxFiles := uint64(2)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, nestedCapDirPath),
+			DirPath:  absoluteFilePathForTest(subtest, nestedCapDirPath),
 			MaxFiles: &maxFiles,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != int(maxFiles) {
-			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
 	rootLinkPath := filepath.Join(tempDir, "rootLink")
 	symlinkErr := os.Symlink(tempDir, rootLinkPath)
 	if symlinkErr != nil {
-		t.Fatalf("SymlinkFailed: %v", symlinkErr)
+		test.Fatalf("SymlinkFailed: %v", symlinkErr)
 	}
 
-	t.Run("RefusesSymlinkedRootByDefault", func(t *testing.T) {
+	test.Run("RefusesSymlinkedRootByDefault", func(subtest *testing.T) {
 		_, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, rootLinkPath),
+			DirPath: absoluteFilePathForTest(subtest, rootLinkPath),
 		})
 		if !errors.Is(err, ErrSymlinkedPathInvalid) {
-			t.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
+			subtest.Fatalf("ExpectedErrSymlinkedPathInvalid, got: %v", err)
 		}
 	})
 
-	t.Run("ResolvesSymlinkedRootWithPolicy", func(t *testing.T) {
+	test.Run("ResolvesSymlinkedRootWithPolicy", func(subtest *testing.T) {
 		resolvePolicy := FileClerkSymlinkPolicyResolve
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:       absoluteFilePathForTest(t, rootLinkPath),
+			DirPath:       absoluteFilePathForTest(subtest, rootLinkPath),
 			SymlinkPolicy: &resolvePolicy,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 5 {
-			t.Errorf("UnexpectedResolvedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedResolvedEntryCount: %d", len(unixFiles))
 		}
 		for _, unixFile := range unixFiles {
 			if unixFile.Name.String() != "a.txt" {
@@ -5391,70 +5391,70 @@ func TestListDir(t *testing.T) {
 			}
 			expectedPath := filepath.Join(tempDir, "a.txt")
 			if unixFile.Path.String() != expectedPath {
-				t.Errorf("PathStillGoesThroughSymlink: %s", unixFile.Path.String())
+				subtest.Errorf("PathStillGoesThroughSymlink: %s", unixFile.Path.String())
 			}
 		}
 	})
 
-	t.Run("FailsOnMissingDir", func(t *testing.T) {
+	test.Run("FailsOnMissingDir", func(subtest *testing.T) {
 		missingDirPath := filepath.Join(tempDir, "missing")
 		_, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, missingDirPath),
+			DirPath: absoluteFilePathForTest(subtest, missingDirPath),
 		})
 		if !errors.Is(err, ErrDirMissing) {
-			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+			subtest.Fatalf("ExpectedErrDirMissing, got: %v", err)
 		}
 	})
 
-	t.Run("FailsOnEmptyDirPath", func(t *testing.T) {
+	test.Run("FailsOnEmptyDirPath", func(subtest *testing.T) {
 		_, err := clerk.ListDir(FileListDirSettings{})
 		if !errors.Is(err, ErrDirMissing) {
-			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+			subtest.Fatalf("ExpectedErrDirMissing, got: %v", err)
 		}
 	})
 
-	t.Run("SkipsEntriesWithRejectedNames", func(t *testing.T) {
+	test.Run("SkipsEntriesWithRejectedNames", func(subtest *testing.T) {
 		rejectedNamePath := filepath.Join(tempDir, "~")
 		writeErr := os.WriteFile(rejectedNamePath, []byte("x"), 0644)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, tempDir),
+			DirPath: absoluteFilePathForTest(subtest, tempDir),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		for _, unixFile := range unixFiles {
 			if unixFile.Name.String() == "~" {
-				t.Errorf("RejectedNameWasListed")
+				subtest.Errorf("RejectedNameWasListed")
 			}
 		}
 	})
 
-	t.Run("ListsEmptyDir", func(t *testing.T) {
+	test.Run("ListsEmptyDir", func(subtest *testing.T) {
 		emptyDirPath := filepath.Join(tempDir, "emptyDir")
 		mkdirErr := os.MkdirAll(emptyDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, emptyDirPath),
+			DirPath: absoluteFilePathForTest(subtest, emptyDirPath),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 0 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 	})
 
 	capTreeDirPath := filepath.Join(tempDir, "capTree")
 	capTreeMkdirErr := os.MkdirAll(capTreeDirPath, 0755)
 	if capTreeMkdirErr != nil {
-		t.Fatalf("MkdirFailed: %v", capTreeMkdirErr)
+		test.Fatalf("MkdirFailed: %v", capTreeMkdirErr)
 	}
 	expectedUncappedEntryCount := int(FileClerkDefaultMaxFiles) + 2
 	for fileIndex := range expectedUncappedEntryCount {
@@ -5463,163 +5463,163 @@ func TestListDir(t *testing.T) {
 			filepath.Join(capTreeDirPath, capTreeFileName), []byte("x"), 0644,
 		)
 		if capTreeWriteErr != nil {
-			t.Fatalf("WriteFileFailed: %v", capTreeWriteErr)
+			test.Fatalf("WriteFileFailed: %v", capTreeWriteErr)
 		}
 	}
 
-	t.Run("DefaultsToMaxFilesWhenUnset", func(t *testing.T) {
+	test.Run("DefaultsToMaxFilesWhenUnset", func(subtest *testing.T) {
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, capTreeDirPath),
+			DirPath: absoluteFilePathForTest(subtest, capTreeDirPath),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if uint64(len(unixFiles)) != FileClerkDefaultMaxFiles {
-			t.Errorf("UnexpectedDefaultCappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedDefaultCappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(t *testing.T) {
+	test.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(subtest *testing.T) {
 		zeroMaxFiles := uint64(0)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, capTreeDirPath),
+			DirPath:  absoluteFilePathForTest(subtest, capTreeDirPath),
 			MaxFiles: &zeroMaxFiles,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != expectedUncappedEntryCount {
-			t.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableDirChainWhenRequired", func(subtest *testing.T) {
 		writableDirPath := filepath.Join(tempDir, "writableListDir")
 		mkdirErr := os.MkdirAll(writableDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		chmodErr := os.Chmod(writableDirPath, 0o777)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
 
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, writableDirPath),
+			DirPath: absoluteFilePathForTest(subtest, writableDirPath),
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 0 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		_, err = clerk.ListDir(FileListDirSettings{
-			DirPath:        absoluteFilePathForTest(t, writableDirPath),
+			DirPath:        absoluteFilePathForTest(subtest, writableDirPath),
 			DirChainPolicy: &sharedWriteRefusedPolicy,
 		})
 		if !errors.Is(err, ErrDirectoryWritableByOthers) {
-			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
 		}
 	})
 
-	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+	test.Run("ReportsUnknownTrustedDirOwner", func(subtest *testing.T) {
 		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
 			"no-such-user-xyz-42",
 		)
 		if usernameErr != nil {
-			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+			subtest.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
 		}
 
 		_, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, tempDir),
+			DirPath: absoluteFilePathForTest(subtest, tempDir),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				unknownUsername,
 			},
 		})
 		if err == nil {
-			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+			subtest.Fatalf("MissingErrorForUnknownTrustedDirOwner")
 		}
 		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
-			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+			subtest.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 
-	t.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(t *testing.T) {
+	test.Run("AcceptsUnresolvableTrustedDirOwnerUserId", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
 
 		unresolvableUserId, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUnixUserIdFinder(t),
+			unresolvableUnixUserIdFinder(subtest),
 		)
 		if userIdErr != nil {
-			t.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("UnresolvableUserIdInvalid: %v", userIdErr)
 		}
 
 		_, err := clerk.ListDir(FileListDirSettings{
-			DirPath: absoluteFilePathForTest(t, tempDir),
+			DirPath: absoluteFilePathForTest(subtest, tempDir),
 			TrustedDirOwnerUserIds: []tkValueObject.UnixUserId{
 				unresolvableUserId,
 			},
 		})
 		if !errors.Is(err, ErrDirectoryOwnerInvalid) {
-			t.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryOwnerInvalid, got: %v", err)
 		}
 	})
 
-	t.Run("SkipsDescentWhenSubDirOpenFails", func(t *testing.T) {
+	test.Run("SkipsDescentWhenSubDirOpenFails", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
 
 		lockedParentDirPath := filepath.Join(tempDir, "lockedParent")
 		lockedDirPath := filepath.Join(lockedParentDirPath, "locked")
 		mkdirErr := os.MkdirAll(lockedDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		chmodErr := os.Chmod(lockedDirPath, 0o000)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
 
 		depthOne := uint16(1)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, lockedParentDirPath),
+			DirPath:  absoluteFilePathForTest(subtest, lockedParentDirPath),
 			MaxDepth: depthOne,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 1 {
-			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 		if unixFiles[0].Path.String() != lockedDirPath {
-			t.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
+			subtest.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
 		}
 	})
 
-	t.Run("SkipsEntryWhenDirEntryStatFails", func(t *testing.T) {
+	test.Run("SkipsEntryWhenDirEntryStatFails", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
 
 		unsearchableParentDirPath := filepath.Join(tempDir, "unsearchableParent")
 		unsearchableDirPath := filepath.Join(unsearchableParentDirPath, "unsearchable")
 		mkdirErr := os.MkdirAll(unsearchableDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		entryPath := filepath.Join(unsearchableDirPath, "entry.txt")
 		writeErr := os.WriteFile(entryPath, []byte("x"), 0644)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		chmodErr := os.Chmod(unsearchableDirPath, 0o444)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
 		defer func() {
 			_ = os.Chmod(unsearchableDirPath, 0o755)
@@ -5627,52 +5627,52 @@ func TestListDir(t *testing.T) {
 
 		depthOne := uint16(1)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, unsearchableParentDirPath),
+			DirPath:  absoluteFilePathForTest(subtest, unsearchableParentDirPath),
 			MaxDepth: depthOne,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 		if len(unixFiles) != 1 {
-			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 		if unixFiles[0].Path.String() != unsearchableDirPath {
-			t.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
+			subtest.Errorf("UnexpectedEntryPath: %s", unixFiles[0].Path.String())
 		}
 	})
 
-	t.Run("SortsDuplicateNamesByPath", func(t *testing.T) {
+	test.Run("SortsDuplicateNamesByPath", func(subtest *testing.T) {
 		dupRootDirPath := filepath.Join(tempDir, "dupRoot")
 		dupDirBPath := filepath.Join(dupRootDirPath, "dupB")
 		dupDirAPath := filepath.Join(dupRootDirPath, "dupA")
 		mkdirErr := os.MkdirAll(dupDirBPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		mkdirErr = os.MkdirAll(dupDirAPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		writeErr := os.WriteFile(
 			filepath.Join(dupDirBPath, "same.txt"), []byte("b"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(dupDirAPath, "same.txt"), []byte("a"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
 		depthOne := uint16(1)
 		unixFiles, err := clerk.ListDir(FileListDirSettings{
-			DirPath:  absoluteFilePathForTest(t, dupRootDirPath),
+			DirPath:  absoluteFilePathForTest(subtest, dupRootDirPath),
 			MaxDepth: depthOne,
 		})
 		if err != nil {
-			t.Fatalf("ListDirFailed: %v", err)
+			subtest.Fatalf("ListDirFailed: %v", err)
 		}
 
 		duplicatePaths := []string{}
@@ -5682,88 +5682,88 @@ func TestListDir(t *testing.T) {
 			}
 		}
 		if len(duplicatePaths) != 2 {
-			t.Fatalf("UnexpectedDuplicateCount: %d", len(duplicatePaths))
+			subtest.Fatalf("UnexpectedDuplicateCount: %d", len(duplicatePaths))
 		}
 		expectedFirstPath := filepath.Join(dupDirAPath, "same.txt")
 		if duplicatePaths[0] != expectedFirstPath {
-			t.Errorf("DuplicateNamesNotSortedByPath: %s", duplicatePaths[0])
+			subtest.Errorf("DuplicateNamesNotSortedByPath: %s", duplicatePaths[0])
 		}
 	})
 }
 
-func TestFind(t *testing.T) {
+func TestFind(test *testing.T) {
 	clerk := FileClerk{}
 
 	// Note: Setup/teardown are intentionally file-local — test independence
 	// requires each file to own its preconditions, even if it duplicates code.
 	findTestTreeFactory := func() string {
-		t.Helper()
+		test.Helper()
 
-		tempDir := t.TempDir()
+		tempDir := test.TempDir()
 		subDir := filepath.Join(tempDir, "sub")
 		elsewhereDir := filepath.Join(tempDir, "elsewhere")
 		mkdirErr := os.MkdirAll(subDir, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			test.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		mkdirErr = os.MkdirAll(elsewhereDir, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			test.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 
 		writeErr := os.WriteFile(
 			filepath.Join(tempDir, "a.txt"), []byte("hello"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(tempDir, "b.log"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(subDir, "inner.txt"), []byte("world"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(elsewhereDir, "hidden.txt"), []byte("!"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
-		symlinkTargetDir := t.TempDir()
+		symlinkTargetDir := test.TempDir()
 		writeErr = os.WriteFile(
 			filepath.Join(symlinkTargetDir, "symlinkTargetCanary.txt"),
 			[]byte("canary"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			test.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		symlinkErr := os.Symlink(
 			symlinkTargetDir, filepath.Join(subDir, "linkToOutside"),
 		)
 		if symlinkErr != nil {
-			t.Fatalf("SymlinkFailed: %v", symlinkErr)
+			test.Fatalf("SymlinkFailed: %v", symlinkErr)
 		}
 
 		return tempDir
 	}
 	tempDir := findTestTreeFactory()
 
-	t.Run("FiltersByNamePattern", func(t *testing.T) {
+	test.Run("FiltersByNamePattern", func(subtest *testing.T) {
 		namePattern := regexp.MustCompile(`\.txt$`)
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 			MaxDepth:            1,
 			NamePattern:         namePattern,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 
 		expectedPaths := []string{
@@ -5772,211 +5772,211 @@ func TestFind(t *testing.T) {
 			filepath.Join(tempDir, "sub", "inner.txt"),
 		}
 		if len(unixFiles) != len(expectedPaths) {
-			t.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
 		}
 		for matchIndex, expectedPath := range expectedPaths {
 			actualPath := unixFiles[matchIndex].Path.String()
 			if actualPath != expectedPath {
-				t.Errorf("UnexpectedMatchPath: %s", actualPath)
+				subtest.Errorf("UnexpectedMatchPath: %s", actualPath)
 			}
 		}
 	})
 
-	t.Run("MatchesEveryEntryWithoutPattern", func(t *testing.T) {
+	test.Run("MatchesEveryEntryWithoutPattern", func(subtest *testing.T) {
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 4 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("CapsMatchedEntries", func(t *testing.T) {
-		flatDir := t.TempDir()
+	test.Run("CapsMatchedEntries", func(subtest *testing.T) {
+		flatDir := subtest.TempDir()
 		for fileIndex := range 5 {
 			fileName := "file" + strconv.Itoa(fileIndex) + ".txt"
 			writeErr := os.WriteFile(
 				filepath.Join(flatDir, fileName), []byte("x"), 0644,
 			)
 			if writeErr != nil {
-				t.Fatalf("WriteFileFailed: %v", writeErr)
+				subtest.Fatalf("WriteFileFailed: %v", writeErr)
 			}
 		}
 
 		maxFiles := uint64(2)
 		namePattern := regexp.MustCompile(`\.txt$`)
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, flatDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, flatDir),
 			MaxFiles:            &maxFiles,
 			NamePattern:         namePattern,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 2 {
-			t.Errorf("UnexpectedCappedMatchCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedCappedMatchCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("NeverDescendsIntoSymlinkedDir", func(t *testing.T) {
+	test.Run("NeverDescendsIntoSymlinkedDir", func(subtest *testing.T) {
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 			MaxDepth:            2,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 
 		symlinkReported := false
 		for _, unixFile := range unixFiles {
 			if unixFile.Name.String() == "symlinkTargetCanary.txt" {
-				t.Errorf("SymlinkedDirWasDescended: %s", unixFile.Path.String())
+				subtest.Errorf("SymlinkedDirWasDescended: %s", unixFile.Path.String())
 			}
 			if unixFile.Name.String() == "linkToOutside" {
 				symlinkReported = true
 				if !unixFile.IsSymlink {
-					t.Errorf("SymlinkNotMarkedAsSymlink")
+					subtest.Errorf("SymlinkNotMarkedAsSymlink")
 				}
 			}
 		}
 		if !symlinkReported {
-			t.Errorf("SymlinkNotReported")
+			subtest.Errorf("SymlinkNotReported")
 		}
 	})
 
-	t.Run("FailsOnMissingRoot", func(t *testing.T) {
+	test.Run("FailsOnMissingRoot", func(subtest *testing.T) {
 		missingRootPath := filepath.Join(tempDir, "missing")
 		_, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, missingRootPath),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, missingRootPath),
 		})
 		if !errors.Is(err, ErrDirMissing) {
-			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+			subtest.Fatalf("ExpectedErrDirMissing, got: %v", err)
 		}
 	})
 
-	t.Run("WalksPlainStartingPath", func(t *testing.T) {
+	test.Run("WalksPlainStartingPath", func(subtest *testing.T) {
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPath: absoluteFilePathForTest(t, tempDir),
+			StartingPath: absoluteFilePathForTest(subtest, tempDir),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 4 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("FailsOnMissingStartingPath", func(t *testing.T) {
+	test.Run("FailsOnMissingStartingPath", func(subtest *testing.T) {
 		missingPath := filepath.Join(tempDir, "missingStartingPath")
 		_, err := clerk.Find(FileFindSettings{
-			StartingPath: absoluteFilePathForTest(t, missingPath),
+			StartingPath: absoluteFilePathForTest(subtest, missingPath),
 		})
 		if !errors.Is(err, ErrDirMissing) {
-			t.Fatalf("ExpectedErrDirMissing, got: %v", err)
+			subtest.Fatalf("ExpectedErrDirMissing, got: %v", err)
 		}
 	})
 
-	t.Run("FailsWhenBothStartingPathsSet", func(t *testing.T) {
+	test.Run("FailsWhenBothStartingPathsSet", func(subtest *testing.T) {
 		_, err := clerk.Find(FileFindSettings{
-			StartingPath:        absoluteFilePathForTest(t, tempDir),
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPath:        absoluteFilePathForTest(subtest, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 		})
 		if !errors.Is(err, ErrStartingPathConflict) {
-			t.Fatalf("ExpectedErrStartingPathConflict, got: %v", err)
+			subtest.Fatalf("ExpectedErrStartingPathConflict, got: %v", err)
 		}
 	})
 
-	t.Run("FailsWhenNoStartingPathSet", func(t *testing.T) {
+	test.Run("FailsWhenNoStartingPathSet", func(subtest *testing.T) {
 		_, err := clerk.Find(FileFindSettings{})
 		if !errors.Is(err, ErrStartingPathMissing) {
-			t.Fatalf("ExpectedErrStartingPathMissing, got: %v", err)
+			subtest.Fatalf("ExpectedErrStartingPathMissing, got: %v", err)
 		}
 	})
 
-	t.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(t *testing.T) {
+	test.Run("ReadsWithoutCapWhenMaxFilesIsZero", func(subtest *testing.T) {
 		zeroMaxFiles := uint64(0)
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 			MaxFiles:            &zeroMaxFiles,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 4 {
-			t.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedUncappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("RefusesWritableDirChainWhenRequired", func(t *testing.T) {
+	test.Run("RefusesWritableDirChainWhenRequired", func(subtest *testing.T) {
 		writableDirPath := filepath.Join(tempDir, "writableFindDir")
 		mkdirErr := os.MkdirAll(writableDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		chmodErr := os.Chmod(writableDirPath, 0o777)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		_, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, writableDirPath),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, writableDirPath),
 			DirChainPolicy:      &sharedWriteRefusedPolicy,
 		})
 		if !errors.Is(err, ErrDirectoryWritableByOthers) {
-			t.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
+			subtest.Errorf("ExpectedErrDirectoryWritableByOthers, got: %v", err)
 		}
 	})
 
-	t.Run("ReportsUnknownTrustedDirOwner", func(t *testing.T) {
+	test.Run("ReportsUnknownTrustedDirOwner", func(subtest *testing.T) {
 		unknownUsername, usernameErr := tkValueObject.NewUnixUsername(
 			"no-such-user-xyz-42",
 		)
 		if usernameErr != nil {
-			t.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
+			subtest.Fatalf("UnknownUsernameInvalid: %v", usernameErr)
 		}
 
 		_, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, tempDir),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, tempDir),
 			TrustedDirOwnerUsernames: []tkValueObject.UnixUsername{
 				unknownUsername,
 			},
 		})
 		if err == nil {
-			t.Fatalf("MissingErrorForUnknownTrustedDirOwner")
+			subtest.Fatalf("MissingErrorForUnknownTrustedDirOwner")
 		}
 		if !strings.Contains(err.Error(), "OwnerLookupFailed") {
-			t.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
+			subtest.Errorf("ErrorMissingOwnerLookupFailed: %v", err)
 		}
 	})
 
-	t.Run("ExpandsWildcardRootPattern", func(t *testing.T) {
-		patternRootDirPath := t.TempDir()
+	test.Run("ExpandsWildcardRootPattern", func(subtest *testing.T) {
+		patternRootDirPath := subtest.TempDir()
 		for _, accountName := range []string{"alpha", "beta"} {
 			docsDirPath := filepath.Join(patternRootDirPath, accountName, "docs")
 			mkdirErr := os.MkdirAll(docsDirPath, 0755)
 			if mkdirErr != nil {
-				t.Fatalf("MkdirFailed: %v", mkdirErr)
+				subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 			}
 			for _, fileName := range []string{"one.txt", "two.txt"} {
 				writeErr := os.WriteFile(
 					filepath.Join(docsDirPath, fileName), []byte("x"), 0644,
 				)
 				if writeErr != nil {
-					t.Fatalf("WriteFileFailed: %v", writeErr)
+					subtest.Fatalf("WriteFileFailed: %v", writeErr)
 				}
 			}
 		}
 
 		startingPathPattern := filepath.Join(patternRootDirPath, "*", "docs")
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, startingPathPattern),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, startingPathPattern),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 
 		expectedPaths := []string{
@@ -5986,43 +5986,43 @@ func TestFind(t *testing.T) {
 			filepath.Join(patternRootDirPath, "beta", "docs", "two.txt"),
 		}
 		if len(unixFiles) != len(expectedPaths) {
-			t.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedMatchCount: %d", len(unixFiles))
 		}
 		for matchIndex, expectedPath := range expectedPaths {
 			actualPath := unixFiles[matchIndex].Path.String()
 			if actualPath != expectedPath {
-				t.Errorf("UnexpectedMatchPath: %s", actualPath)
+				subtest.Errorf("UnexpectedMatchPath: %s", actualPath)
 			}
 		}
 	})
 
-	t.Run("ReturnsEmptyWhenWildcardMatchesNothing", func(t *testing.T) {
+	test.Run("ReturnsEmptyWhenWildcardMatchesNothing", func(subtest *testing.T) {
 		startingPathPattern := filepath.Join(tempDir, "*", "noSuchDir")
 		unixFiles, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, startingPathPattern),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, startingPathPattern),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 0 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("CapsEntriesAcrossWildcardRoots", func(t *testing.T) {
-		patternRootDirPath := t.TempDir()
+	test.Run("CapsEntriesAcrossWildcardRoots", func(subtest *testing.T) {
+		patternRootDirPath := subtest.TempDir()
 		for _, accountName := range []string{"alpha", "beta"} {
 			docsDirPath := filepath.Join(patternRootDirPath, accountName, "docs")
 			mkdirErr := os.MkdirAll(docsDirPath, 0755)
 			if mkdirErr != nil {
-				t.Fatalf("MkdirFailed: %v", mkdirErr)
+				subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 			}
 			for _, fileName := range []string{"one.txt", "two.txt"} {
 				writeErr := os.WriteFile(
 					filepath.Join(docsDirPath, fileName), []byte("x"), 0644,
 				)
 				if writeErr != nil {
-					t.Fatalf("WriteFileFailed: %v", writeErr)
+					subtest.Fatalf("WriteFileFailed: %v", writeErr)
 				}
 			}
 		}
@@ -6030,164 +6030,164 @@ func TestFind(t *testing.T) {
 		maxFiles := uint64(3)
 		unixFiles, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(
-				t, filepath.Join(patternRootDirPath, "*", "docs"),
+				subtest, filepath.Join(patternRootDirPath, "*", "docs"),
 			),
 			MaxFiles: &maxFiles,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != int(maxFiles) {
-			t.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedCappedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("SkipsNonDirectoryMatches", func(t *testing.T) {
-		patternRootDirPath := t.TempDir()
+	test.Run("SkipsNonDirectoryMatches", func(subtest *testing.T) {
+		patternRootDirPath := subtest.TempDir()
 		accountDirPath := filepath.Join(patternRootDirPath, "alpha")
 		mkdirErr := os.MkdirAll(accountDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		writeErr := os.WriteFile(
 			filepath.Join(accountDirPath, "one.txt"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		writeErr = os.WriteFile(
 			filepath.Join(patternRootDirPath, "stray.txt"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
 		unixFiles, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(
-				t, filepath.Join(patternRootDirPath, "*"),
+				subtest, filepath.Join(patternRootDirPath, "*"),
 			),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 1 {
-			t.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Errorf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 	})
 
-	t.Run("SkipsUnreadableWildcardRoots", func(t *testing.T) {
-		patternRootDirPath := t.TempDir()
+	test.Run("SkipsUnreadableWildcardRoots", func(subtest *testing.T) {
+		patternRootDirPath := subtest.TempDir()
 		alphaDirPath := filepath.Join(patternRootDirPath, "alpha")
 		mkdirErr := os.MkdirAll(alphaDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		writeErr := os.WriteFile(
 			filepath.Join(alphaDirPath, "one.txt"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 		betaDirPath := filepath.Join(patternRootDirPath, "beta")
 		mkdirErr = os.MkdirAll(betaDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		chmodErr := os.Chmod(betaDirPath, 0o777)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
 
 		sharedWriteRefusedPolicy := FileClerkDirChainPolicySharedWriteRefused
 		unixFiles, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(
-				t, filepath.Join(patternRootDirPath, "*"),
+				subtest, filepath.Join(patternRootDirPath, "*"),
 			),
 			DirChainPolicy: &sharedWriteRefusedPolicy,
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 1 {
-			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 		expectedPath := filepath.Join(alphaDirPath, "one.txt")
 		if unixFiles[0].Path.String() != expectedPath {
-			t.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
+			subtest.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
 		}
 	})
 
-	t.Run("SkipsUnstattableWildcardMatches", func(t *testing.T) {
+	test.Run("SkipsUnstattableWildcardMatches", func(subtest *testing.T) {
 		if os.Geteuid() == 0 {
-			t.Skip("NonRootRequired")
+			subtest.Skip("NonRootRequired")
 		}
-		patternRootDirPath := t.TempDir()
+		patternRootDirPath := subtest.TempDir()
 		goodDocsDirPath := filepath.Join(patternRootDirPath, "good", "docs")
 		mkdirErr := os.MkdirAll(goodDocsDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		writeErr := os.WriteFile(
 			filepath.Join(goodDocsDirPath, "one.txt"), []byte("x"), 0644,
 		)
 		if writeErr != nil {
-			t.Fatalf("WriteFileFailed: %v", writeErr)
+			subtest.Fatalf("WriteFileFailed: %v", writeErr)
 		}
 
 		unsearchableDirPath := filepath.Join(patternRootDirPath, "unsearchable")
 		innerDirPath := filepath.Join(unsearchableDirPath, "inner")
 		mkdirErr = os.MkdirAll(innerDirPath, 0755)
 		if mkdirErr != nil {
-			t.Fatalf("MkdirFailed: %v", mkdirErr)
+			subtest.Fatalf("MkdirFailed: %v", mkdirErr)
 		}
 		chmodErr := os.Chmod(unsearchableDirPath, 0o444)
 		if chmodErr != nil {
-			t.Fatalf("ChmodFailed: %v", chmodErr)
+			subtest.Fatalf("ChmodFailed: %v", chmodErr)
 		}
-		t.Cleanup(func() {
+		subtest.Cleanup(func() {
 			_ = os.Chmod(unsearchableDirPath, 0o755)
 		})
 
 		unixFiles, err := clerk.Find(FileFindSettings{
 			StartingPathPattern: absoluteGlobPathForTest(
-				t, filepath.Join(patternRootDirPath, "*", "*"),
+				subtest, filepath.Join(patternRootDirPath, "*", "*"),
 			),
 		})
 		if err != nil {
-			t.Fatalf("FindFailed: %v", err)
+			subtest.Fatalf("FindFailed: %v", err)
 		}
 		if len(unixFiles) != 1 {
-			t.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
+			subtest.Fatalf("UnexpectedEntryCount: %d", len(unixFiles))
 		}
 		expectedPath := filepath.Join(goodDocsDirPath, "one.txt")
 		if unixFiles[0].Path.String() != expectedPath {
-			t.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
+			subtest.Errorf("UnexpectedMatchPath: %s", unixFiles[0].Path.String())
 		}
 	})
 
-	t.Run("FailsOnMalformedWildcardPattern", func(t *testing.T) {
+	test.Run("FailsOnMalformedWildcardPattern", func(subtest *testing.T) {
 		_, err := clerk.Find(FileFindSettings{
-			StartingPathPattern: absoluteGlobPathForTest(t, filepath.Join(tempDir, "[")),
+			StartingPathPattern: absoluteGlobPathForTest(subtest, filepath.Join(tempDir, "[")),
 		})
 		if !errors.Is(err, ErrGlobPatternInvalid) {
-			t.Fatalf("ExpectedErrGlobPatternInvalid, got: %v", err)
+			subtest.Fatalf("ExpectedErrGlobPatternInvalid, got: %v", err)
 		}
 	})
 }
 
-func TestCachedOwnerNameResolvers(t *testing.T) {
+func TestCachedOwnerNameResolvers(test *testing.T) {
 	clerk := FileClerk{}
 
-	t.Run("ReturnsCachedUsernameWithoutLookup", func(t *testing.T) {
+	test.Run("ReturnsCachedUsernameWithoutLookup", func(subtest *testing.T) {
 		missingUserId, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUnixUserIdFinder(t),
+			unresolvableUnixUserIdFinder(subtest),
 		)
 		if userIdErr != nil {
-			t.Fatalf("UserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("UserIdInvalid: %v", userIdErr)
 		}
 		cachedUsername, usernameErr := tkValueObject.NewUnixUsername("ghost")
 		if usernameErr != nil {
-			t.Fatalf("UsernameInvalid: %v", usernameErr)
+			subtest.Fatalf("UsernameInvalid: %v", usernameErr)
 		}
 		ownerNames := &ownerNameCache{
 			usernames: map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{
@@ -6198,17 +6198,17 @@ func TestCachedOwnerNameResolvers(t *testing.T) {
 
 		username, err := clerk.cachedUsernameResolver(ownerNames, missingUserId)
 		if err != nil {
-			t.Fatalf("CachedUsernameLookupFailed: %v", err)
+			subtest.Fatalf("CachedUsernameLookupFailed: %v", err)
 		}
 		if username != cachedUsername {
-			t.Errorf("UnexpectedCachedUsername: %s", username)
+			subtest.Errorf("UnexpectedCachedUsername: %s", username)
 		}
 	})
 
-	t.Run("StoresLookupResultForLaterHits", func(t *testing.T) {
+	test.Run("StoresLookupResultForLaterHits", func(subtest *testing.T) {
 		processUserId, userIdErr := tkValueObject.NewUnixUserId(os.Geteuid())
 		if userIdErr != nil {
-			t.Fatalf("UserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("UserIdInvalid: %v", userIdErr)
 		}
 		ownerNames := &ownerNameCache{
 			usernames:  map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
@@ -6217,19 +6217,19 @@ func TestCachedOwnerNameResolvers(t *testing.T) {
 
 		_, err := clerk.cachedUsernameResolver(ownerNames, processUserId)
 		if err != nil {
-			t.Fatalf("UsernameLookupFailed: %v", err)
+			subtest.Fatalf("UsernameLookupFailed: %v", err)
 		}
 		if _, isCached := ownerNames.usernames[processUserId]; !isCached {
-			t.Errorf("UsernameNotCached")
+			subtest.Errorf("UsernameNotCached")
 		}
 	})
 
-	t.Run("CachesLookupErrorForLaterHits", func(t *testing.T) {
+	test.Run("CachesLookupErrorForLaterHits", func(subtest *testing.T) {
 		missingUserId, userIdErr := tkValueObject.NewUnixUserId(
-			unresolvableUnixUserIdFinder(t),
+			unresolvableUnixUserIdFinder(subtest),
 		)
 		if userIdErr != nil {
-			t.Fatalf("UserIdInvalid: %v", userIdErr)
+			subtest.Fatalf("UserIdInvalid: %v", userIdErr)
 		}
 		ownerNames := &ownerNameCache{
 			usernames:       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
@@ -6240,20 +6240,20 @@ func TestCachedOwnerNameResolvers(t *testing.T) {
 
 		_, firstErr := clerk.cachedUsernameResolver(ownerNames, missingUserId)
 		if firstErr == nil {
-			t.Fatalf("ExpectedUsernameLookupError")
+			subtest.Fatalf("ExpectedUsernameLookupError")
 		}
 		if _, isCached := ownerNames.usernameErrors[missingUserId]; !isCached {
-			t.Errorf("UsernameLookupErrorNotCached")
+			subtest.Errorf("UsernameLookupErrorNotCached")
 		}
 
 		_, secondErr := clerk.cachedUsernameResolver(ownerNames, missingUserId)
 		if secondErr != firstErr {
-			t.Errorf("CachedUsernameLookupErrorNotReturned: %v", secondErr)
+			subtest.Errorf("CachedUsernameLookupErrorNotReturned: %v", secondErr)
 		}
 	})
 }
 
-func TestUnixFilePermissionsFormatter(t *testing.T) {
+func TestUnixFilePermissionsFormatter(test *testing.T) {
 	clerk := FileClerk{}
 
 	testCases := []struct {
@@ -6270,15 +6270,15 @@ func TestUnixFilePermissionsFormatter(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			permissions, permissionsErr := clerk.unixFilePermissionsFormatter(
 				testCase.fileMode,
 			)
 			if permissionsErr != nil {
-				t.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
+				subtest.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
 			}
 			if permissions.String() != testCase.expectedPermissions {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedPermissions: got %s, expected %s",
 					permissions.String(), testCase.expectedPermissions,
 				)
@@ -6286,7 +6286,7 @@ func TestUnixFilePermissionsFormatter(t *testing.T) {
 		})
 	}
 
-	t.Run("RoundTripsThroughToFileMode", func(t *testing.T) {
+	test.Run("RoundTripsThroughToFileMode", func(subtest *testing.T) {
 		roundTripModes := []os.FileMode{
 			0,
 			0o644,
@@ -6302,14 +6302,14 @@ func TestUnixFilePermissionsFormatter(t *testing.T) {
 				fileMode,
 			)
 			if permissionsErr != nil {
-				t.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
+				subtest.Fatalf("PermissionsFormatFailed: %v", permissionsErr)
 			}
 			roundTrippedMode, modeErr := permissions.ToFileMode()
 			if modeErr != nil {
-				t.Fatalf("ToFileModeFailed: %v", modeErr)
+				subtest.Fatalf("ToFileModeFailed: %v", modeErr)
 			}
 			if roundTrippedMode != fileMode {
-				t.Errorf(
+				subtest.Errorf(
 					"RoundTripMismatch: got %v, expected %v",
 					roundTrippedMode, fileMode,
 				)

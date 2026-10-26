@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewActivityRecordLevel(t *testing.T) {
-	t.Run("ValidActivityRecordLevel", func(t *testing.T) {
+func TestNewActivityRecordLevel(test *testing.T) {
+	test.Run("ValidActivityRecordLevel", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -23,15 +23,15 @@ func TestNewActivityRecordLevel(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewActivityRecordLevel(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("InvalidActivityRecordLevel", func(t *testing.T) {
+	test.Run("InvalidActivityRecordLevel", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -47,10 +47,10 @@ func TestNewActivityRecordLevel(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewActivityRecordLevel(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})

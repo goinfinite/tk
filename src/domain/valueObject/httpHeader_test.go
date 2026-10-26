@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewHttpHeader(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestNewHttpHeader(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput HttpHeader
@@ -31,16 +31,16 @@ func TestNewHttpHeader(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewHttpHeader(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedError: '%s' [%v]",
 					conversionErr.Error(), testCase.inputValue,
 				)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -48,7 +48,7 @@ func TestNewHttpHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     HttpHeader
 			expectedOutput string
@@ -61,7 +61,7 @@ func TestNewHttpHeader(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)

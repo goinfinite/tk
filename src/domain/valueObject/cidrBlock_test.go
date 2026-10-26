@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestNewCidrBlock(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestNewCidrBlock(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput CidrBlock
@@ -37,18 +37,18 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewCidrBlock(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
 			expectedOutput string
@@ -60,12 +60,12 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsIpv4Method", func(t *testing.T) {
+	test.Run("IsIpv4Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
 			expectedOutput bool
@@ -83,12 +83,12 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsIpv4()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsIpv6Method", func(t *testing.T) {
+	test.Run("IsIpv6Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
 			expectedOutput bool
@@ -106,12 +106,12 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsIpv6()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsPrivateMethod", func(t *testing.T) {
+	test.Run("IsPrivateMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
 			expectedOutput bool
@@ -130,12 +130,12 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsPrivate()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ContainsMethod", func(t *testing.T) {
+	test.Run("ContainsMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			cidrBlock      CidrBlock
 			ipAddress      IpAddress
@@ -155,7 +155,7 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.cidrBlock.Contains(testCase.ipAddress)
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v contains %v]",
 					actualOutput, testCase.expectedOutput,
 					testCase.cidrBlock, testCase.ipAddress,
@@ -164,7 +164,7 @@ func TestNewCidrBlock(t *testing.T) {
 		}
 	})
 
-	t.Run("IsPublicMethod", func(t *testing.T) {
+	test.Run("IsPublicMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CidrBlock
 			expectedOutput bool
@@ -185,7 +185,7 @@ func TestNewCidrBlock(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsPublic()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

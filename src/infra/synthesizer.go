@@ -281,17 +281,21 @@ func (synth *Synthesizer) PrivateKeyPemFactory(
 
 	case *dsa.PrivateKey:
 		type dsaPrivateKeyAsn1 struct {
-			Version       int
-			P, Q, G, Y, X *big.Int
+			Version    int
+			Prime      *big.Int
+			Subprime   *big.Int
+			Generator  *big.Int
+			PublicKey  *big.Int
+			PrivateKey *big.Int
 		}
 
 		asn1Representation := dsaPrivateKeyAsn1{
-			Version: 0,
-			P:       generatedPrivateKey.P,
-			Q:       generatedPrivateKey.Q,
-			G:       generatedPrivateKey.G,
-			Y:       generatedPrivateKey.Y,
-			X:       generatedPrivateKey.X,
+			Version:    0,
+			Prime:      generatedPrivateKey.P,
+			Subprime:   generatedPrivateKey.Q,
+			Generator:  generatedPrivateKey.G,
+			PublicKey:  generatedPrivateKey.Y,
+			PrivateKey: generatedPrivateKey.X,
 		}
 		derEncodedBytes, err = asn1.Marshal(asn1Representation)
 		if err != nil {

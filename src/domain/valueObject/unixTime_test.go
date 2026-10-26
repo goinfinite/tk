@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func TestNewUnixTime(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestNewUnixTime(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput UnixTime
@@ -27,18 +27,18 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewUnixTime(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput UnixTime
@@ -65,18 +65,18 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewUnixTime(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput string
@@ -90,12 +90,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("Int64Method", func(t *testing.T) {
+	test.Run("Int64Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput int64
@@ -109,12 +109,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.Int64()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadRfcDateMethod", func(t *testing.T) {
+	test.Run("ReadRfcDateMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput string
@@ -127,12 +127,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadRfcDate()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadDateOnlyMethod", func(t *testing.T) {
+	test.Run("ReadDateOnlyMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput string
@@ -145,12 +145,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadDateOnly()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadTimeOnlyMethod", func(t *testing.T) {
+	test.Run("ReadTimeOnlyMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput string
@@ -163,12 +163,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadTimeOnly()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadDateTimeMethod", func(t *testing.T) {
+	test.Run("ReadDateTimeMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedOutput string
@@ -181,38 +181,38 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadDateTime()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsPastMethod", func(t *testing.T) {
+	test.Run("IsPastMethod", func(subtest *testing.T) {
 		pastTime := UnixTime(1234567890)   // 2009-02-13
 		futureTime := UnixTime(4102444800) // 2100-01-01
 
 		if !pastTime.IsPast() {
-			t.Errorf("UnexpectedOutputValue: expected true for past time [%v]", pastTime)
+			subtest.Errorf("UnexpectedOutputValue: expected true for past time [%v]", pastTime)
 		}
 
 		if futureTime.IsPast() {
-			t.Errorf("UnexpectedOutputValue: expected false for future time [%v]", futureTime)
+			subtest.Errorf("UnexpectedOutputValue: expected false for future time [%v]", futureTime)
 		}
 	})
 
-	t.Run("IsFutureMethod", func(t *testing.T) {
+	test.Run("IsFutureMethod", func(subtest *testing.T) {
 		pastTime := UnixTime(1234567890)   // 2009-02-13
 		futureTime := UnixTime(4102444800) // 2100-01-01
 
 		if pastTime.IsFuture() {
-			t.Errorf("UnexpectedOutputValue: expected false for past time [%v]", pastTime)
+			subtest.Errorf("UnexpectedOutputValue: expected false for past time [%v]", pastTime)
 		}
 
 		if !futureTime.IsFuture() {
-			t.Errorf("UnexpectedOutputValue: expected true for future time [%v]", futureTime)
+			subtest.Errorf("UnexpectedOutputValue: expected true for future time [%v]", futureTime)
 		}
 	})
 
-	t.Run("ReadAsGoTimeMethod", func(t *testing.T) {
+	test.Run("ReadAsGoTimeMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue    UnixTime
 			expectedYear  int
@@ -229,7 +229,7 @@ func TestNewUnixTime(t *testing.T) {
 			if actualOutput.Year() != testCase.expectedYear ||
 				int(actualOutput.Month()) != testCase.expectedMonth ||
 				actualOutput.Day() != testCase.expectedDay {
-				t.Errorf("UnexpectedOutputValue: expected %d-%02d-%02d, got %d-%02d-%02d [%v]",
+				subtest.Errorf("UnexpectedOutputValue: expected %d-%02d-%02d, got %d-%02d-%02d [%v]",
 					testCase.expectedYear, testCase.expectedMonth, testCase.expectedDay,
 					actualOutput.Year(), int(actualOutput.Month()), actualOutput.Day(),
 					testCase.inputValue)
@@ -237,7 +237,7 @@ func TestNewUnixTime(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadStartOfDayMethod", func(t *testing.T) {
+	test.Run("ReadStartOfDayMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedHour   int
@@ -253,7 +253,7 @@ func TestNewUnixTime(t *testing.T) {
 			if actualOutput.Hour() != testCase.expectedHour ||
 				actualOutput.Minute() != testCase.expectedMinute ||
 				actualOutput.Second() != testCase.expectedSecond {
-				t.Errorf("UnexpectedOutputValue: expected %02d:%02d:%02d, got %02d:%02d:%02d [%v]",
+				subtest.Errorf("UnexpectedOutputValue: expected %02d:%02d:%02d, got %02d:%02d:%02d [%v]",
 					testCase.expectedHour, testCase.expectedMinute, testCase.expectedSecond,
 					actualOutput.Hour(), actualOutput.Minute(), actualOutput.Second(),
 					testCase.inputValue)
@@ -261,7 +261,7 @@ func TestNewUnixTime(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadEndOfDayMethod", func(t *testing.T) {
+	test.Run("ReadEndOfDayMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			expectedHour   int
@@ -277,7 +277,7 @@ func TestNewUnixTime(t *testing.T) {
 			if actualOutput.Hour() != testCase.expectedHour ||
 				actualOutput.Minute() != testCase.expectedMinute ||
 				actualOutput.Second() != testCase.expectedSecond {
-				t.Errorf("UnexpectedOutputValue: expected %02d:%02d:%02d, got %02d:%02d:%02d [%v]",
+				subtest.Errorf("UnexpectedOutputValue: expected %02d:%02d:%02d, got %02d:%02d:%02d [%v]",
 					testCase.expectedHour, testCase.expectedMinute, testCase.expectedSecond,
 					actualOutput.Hour(), actualOutput.Minute(), actualOutput.Second(),
 					testCase.inputValue)
@@ -285,18 +285,18 @@ func TestNewUnixTime(t *testing.T) {
 		}
 	})
 
-	t.Run("NewUnixTimeNowFactory", func(t *testing.T) {
+	test.Run("NewUnixTimeNowFactory", func(subtest *testing.T) {
 		beforeTime := time.Now().Unix()
 		unixTimeNow := NewUnixTimeNow()
 		afterTime := time.Now().Unix()
 
 		actualTime := unixTimeNow.Int64()
 		if actualTime < beforeTime || actualTime > afterTime {
-			t.Errorf("UnexpectedOutputValue: time %d should be between %d and %d", actualTime, beforeTime, afterTime)
+			subtest.Errorf("UnexpectedOutputValue: time %d should be between %d and %d", actualTime, beforeTime, afterTime)
 		}
 	})
 
-	t.Run("NewUnixTimeBeforeNowFactory", func(t *testing.T) {
+	test.Run("NewUnixTimeBeforeNowFactory", func(subtest *testing.T) {
 		duration := time.Hour
 		beforeTime := time.Now().Add(-duration).Unix()
 		unixTimeBefore := NewUnixTimeBeforeNow(duration)
@@ -304,22 +304,22 @@ func TestNewUnixTime(t *testing.T) {
 
 		actualTime := unixTimeBefore.Int64()
 		if actualTime < beforeTime-1 || actualTime > afterTime+1 {
-			t.Errorf("UnexpectedOutputValue: time %d should be approximately %d", actualTime, beforeTime)
+			subtest.Errorf("UnexpectedOutputValue: time %d should be approximately %d", actualTime, beforeTime)
 		}
 	})
 
-	t.Run("NewUnixTimeBeforeNowMinDuration", func(t *testing.T) {
+	test.Run("NewUnixTimeBeforeNowMinDuration", func(subtest *testing.T) {
 		unixTimeBefore := NewUnixTimeBeforeNow(math.MinInt64)
 
 		if !unixTimeBefore.IsFuture() {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedOutputValue: expected future time, got %v",
 				unixTimeBefore,
 			)
 		}
 	})
 
-	t.Run("NewUnixTimeAfterNowFactory", func(t *testing.T) {
+	test.Run("NewUnixTimeAfterNowFactory", func(subtest *testing.T) {
 		duration := time.Hour
 		beforeTime := time.Now().Add(duration).Unix()
 		unixTimeAfter := NewUnixTimeAfterNow(duration)
@@ -327,11 +327,11 @@ func TestNewUnixTime(t *testing.T) {
 
 		actualTime := unixTimeAfter.Int64()
 		if actualTime < beforeTime-1 || actualTime > afterTime+1 {
-			t.Errorf("UnexpectedOutputValue: time %d should be approximately %d", actualTime, beforeTime)
+			subtest.Errorf("UnexpectedOutputValue: time %d should be approximately %d", actualTime, beforeTime)
 		}
 	})
 
-	t.Run("NewUnixTimeWithGoTimeFactory", func(t *testing.T) {
+	test.Run("NewUnixTimeWithGoTimeFactory", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputTime      time.Time
 			expectedOutput UnixTime
@@ -344,12 +344,12 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := NewUnixTimeWithGoTime(testCase.inputTime)
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputTime)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputTime)
 			}
 		}
 	})
 
-	t.Run("IsBetweenMethod", func(t *testing.T) {
+	test.Run("IsBetweenMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixTime
 			startDate      UnixTime
@@ -367,7 +367,7 @@ func TestNewUnixTime(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsBetween(testCase.startDate, testCase.endDate)
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)

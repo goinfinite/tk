@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-func selfSignedCertificatePemGenerator(t *testing.T) string {
-	t.Helper()
+func selfSignedCertificatePemGenerator(test *testing.T) string {
+	test.Helper()
 
 	rsaKeyCmd := exec.Command("openssl", "genrsa", "2048")
 	rsaKeyOutput, err := rsaKeyCmd.Output()
 	if err != nil {
-		t.Skipf("OpenSslNotAvailable: %s", err.Error())
+		test.Skipf("OpenSslNotAvailable: %s", err.Error())
 	}
 
 	// We're unable to use tkInfra.Synthesizer here due to circular dependency.
@@ -23,16 +23,16 @@ func selfSignedCertificatePemGenerator(t *testing.T) string {
 	certCmd.Stdin = strings.NewReader(string(rsaKeyOutput))
 	certOutput, err := certCmd.Output()
 	if err != nil {
-		t.Skipf("CertificateGenerationFailed: %s", err.Error())
+		test.Skipf("CertificateGenerationFailed: %s", err.Error())
 	}
 
 	return strings.TrimSpace(string(certOutput))
 }
 
-func TestNewX509EnvelopedCertificate(t *testing.T) {
-	validCert := selfSignedCertificatePemGenerator(t)
+func TestNewX509EnvelopedCertificate(test *testing.T) {
+	validCert := selfSignedCertificatePemGenerator(test)
 
-	t.Run("ValidEnvelopedCertificate", func(t *testing.T) {
+	test.Run("ValidEnvelopedCertificate", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509EnvelopedCertificate
@@ -96,16 +96,16 @@ func TestNewX509EnvelopedCertificate(t *testing.T) {
 			)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -113,7 +113,7 @@ func TestNewX509EnvelopedCertificate(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509EnvelopedCertificate
 			expectedOutput string
@@ -125,7 +125,7 @@ func TestNewX509EnvelopedCertificate(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)

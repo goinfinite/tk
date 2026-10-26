@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNamedGroupsExtractor(t *testing.T) {
-	t.Run("AllScenarios", func(t *testing.T) {
+func TestNamedGroupsExtractor(test *testing.T) {
+	test.Run("AllScenarios", func(subtest *testing.T) {
 		testCases := []struct {
 			caseName       string
 			regexPattern   string
@@ -55,7 +55,7 @@ func TestNamedGroupsExtractor(t *testing.T) {
 			compiledRegex := regexp.MustCompile(testCase.regexPattern)
 			namedGroupsValuesMap := NamedGroupsExtractor(compiledRegex, testCase.inputString)
 			if len(namedGroupsValuesMap) != len(testCase.expectedGroups) {
-				t.Errorf(
+				subtest.Errorf(
 					"[%s] UnexpectedOutputLength: '%d' vs '%d' [pattern: %s, input: %s, namedGroupsFound: %v]",
 					testCase.caseName, len(namedGroupsValuesMap), len(testCase.expectedGroups),
 					testCase.regexPattern, testCase.inputString, namedGroupsValuesMap,
@@ -64,13 +64,13 @@ func TestNamedGroupsExtractor(t *testing.T) {
 			for groupName, expectedValue := range testCase.expectedGroups {
 				actualValue, groupExists := namedGroupsValuesMap[groupName]
 				if !groupExists {
-					t.Errorf(
+					subtest.Errorf(
 						"[%s] MissingExpectedKey: '%s' [pattern: %s, input: %s]",
 						testCase.caseName, groupName, testCase.regexPattern, testCase.inputString,
 					)
 				}
 				if groupExists && actualValue != expectedValue {
-					t.Errorf(
+					subtest.Errorf(
 						"[%s] UnexpectedOutputValue: '%s' vs '%s' for key '%s' [pattern: %s, input: %s]",
 						testCase.caseName, actualValue, expectedValue, groupName, testCase.regexPattern,
 						testCase.inputString,

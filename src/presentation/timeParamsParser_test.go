@@ -7,8 +7,8 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestTimeParamsParser(t *testing.T) {
-	t.Run("SuccessWithAllValidFields", func(t *testing.T) {
+func TestTimeParamsParser(test *testing.T) {
+	test.Run("SuccessWithAllValidFields", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			timeParamNames []string
 			inputMap       map[string]any
@@ -43,13 +43,13 @@ func TestTimeParamsParser(t *testing.T) {
 				if (expectedValue == nil && actualValue != nil) ||
 					(expectedValue != nil && actualValue == nil) ||
 					(expectedValue != nil && actualValue != nil && *expectedValue != *actualValue) {
-					t.Errorf("Unexpected%s: expected '%v', got '%v'", paramName, expectedValue, actualValue)
+					subtest.Errorf("Unexpected%s: expected '%v', got '%v'", paramName, expectedValue, actualValue)
 				}
 			}
 		}
 	})
 
-	t.Run("SuccessWithPartialFields", func(t *testing.T) {
+	test.Run("SuccessWithPartialFields", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			timeParamNames []string
 			inputMap       map[string]any
@@ -93,25 +93,25 @@ func TestTimeParamsParser(t *testing.T) {
 				if (expectedValue == nil && actualValue != nil) ||
 					(expectedValue != nil && actualValue == nil) ||
 					(expectedValue != nil && actualValue != nil && *expectedValue != *actualValue) {
-					t.Errorf("Unexpected%s: expected '%v', got '%v'", paramName, expectedValue, actualValue)
+					subtest.Errorf("Unexpected%s: expected '%v', got '%v'", paramName, expectedValue, actualValue)
 				}
 			}
 		}
 	})
 
-	t.Run("SuccessWithNilInput", func(t *testing.T) {
+	test.Run("SuccessWithNilInput", func(subtest *testing.T) {
 		timeParamNames := []string{"createdAt", "updatedAt"}
 
 		actualOutput := TimeParamsParser(timeParamNames, nil)
 
 		for _, paramName := range timeParamNames {
 			if actualOutput[paramName] != nil {
-				t.Errorf("Unexpected%s: ShouldBeNil, got '%v'", paramName, actualOutput[paramName])
+				subtest.Errorf("Unexpected%s: ShouldBeNil, got '%v'", paramName, actualOutput[paramName])
 			}
 		}
 	})
 
-	t.Run("SuccessWithEmptyStringInput", func(t *testing.T) {
+	test.Run("SuccessWithEmptyStringInput", func(subtest *testing.T) {
 		timeParamNames := []string{"createdAt", "updatedAt"}
 		inputMap := map[string]any{
 			"createdAt": "",
@@ -121,14 +121,14 @@ func TestTimeParamsParser(t *testing.T) {
 		actualOutput := TimeParamsParser(timeParamNames, inputMap)
 
 		if actualOutput["createdAt"] != nil {
-			t.Errorf("UnexpectedCreatedAt: ShouldBeNil, got '%v'", actualOutput["createdAt"])
+			subtest.Errorf("UnexpectedCreatedAt: ShouldBeNil, got '%v'", actualOutput["createdAt"])
 		}
 		if actualOutput["updatedAt"] == nil {
-			t.Errorf("UnexpectedUpdatedAt: ShouldNotBeNil")
+			subtest.Errorf("UnexpectedUpdatedAt: ShouldNotBeNil")
 		}
 	})
 
-	t.Run("InvalidTimeParamSetsToNil", func(t *testing.T) {
+	test.Run("InvalidTimeParamSetsToNil", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			timeParamNames []string
 			inputMap       map[string]any
@@ -168,13 +168,13 @@ func TestTimeParamsParser(t *testing.T) {
 				isInvalidParam := slices.Contains(testCase.invalidParams, paramName)
 				if isInvalidParam {
 					if actualValue != nil {
-						t.Errorf("Unexpected%s: ShouldBeNil, got '%v'", paramName, actualValue)
+						subtest.Errorf("Unexpected%s: ShouldBeNil, got '%v'", paramName, actualValue)
 					}
 					continue
 				}
 
 				if actualValue == nil {
-					t.Errorf("Unexpected%s: ShouldNotBeNil", paramName)
+					subtest.Errorf("Unexpected%s: ShouldNotBeNil", paramName)
 				}
 			}
 		}

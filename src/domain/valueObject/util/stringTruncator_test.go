@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-func TestSafeTruncateString(t *testing.T) {
+func TestSafeTruncateString(test *testing.T) {
 	testCases := []struct {
 		input          string
 		maxBytes       int
@@ -28,14 +28,14 @@ func TestSafeTruncateString(t *testing.T) {
 		actualOutput := SafeTruncateString(testCase.input, testCase.maxBytes)
 
 		if actualOutput != testCase.expectedOutput {
-			t.Errorf(
+			test.Errorf(
 				"UnexpectedOutput: '%s' vs '%s' for input '%s'",
 				actualOutput, testCase.expectedOutput, testCase.input,
 			)
 		}
 
 		if !utf8.ValidString(actualOutput) {
-			t.Errorf("InvalidUtf8Output: '%s'", actualOutput)
+			test.Errorf("InvalidUtf8Output: '%s'", actualOutput)
 		}
 	}
 }

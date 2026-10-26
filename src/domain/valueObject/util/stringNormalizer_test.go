@@ -2,7 +2,7 @@ package tkVoUtil
 
 import "testing"
 
-func TestStripAccents(t *testing.T) {
+func TestStripAccents(test *testing.T) {
 	testCases := []struct {
 		input          string
 		expectedOutput string
@@ -27,14 +27,14 @@ func TestStripAccents(t *testing.T) {
 	for _, testCase := range testCases {
 		actualOutput, err := StripAccents(testCase.input)
 		if err != nil {
-			t.Fatalf(
+			test.Fatalf(
 				"UnexpectedError: '%s' for input '%s'",
 				err.Error(), testCase.input,
 			)
 		}
 
 		if actualOutput != testCase.expectedOutput {
-			t.Errorf(
+			test.Errorf(
 				"UnexpectedOutput: '%s' vs '%s' for input '%s'",
 				actualOutput, testCase.expectedOutput, testCase.input,
 			)
@@ -42,7 +42,7 @@ func TestStripAccents(t *testing.T) {
 	}
 }
 
-func TestStripHexSeparators(t *testing.T) {
+func TestStripHexSeparators(test *testing.T) {
 	testCases := []struct {
 		input          string
 		expectedOutput string
@@ -68,7 +68,7 @@ func TestStripHexSeparators(t *testing.T) {
 		actualOutput := StripHexSeparators(testCase.input)
 
 		if actualOutput != testCase.expectedOutput {
-			t.Errorf(
+			test.Errorf(
 				"UnexpectedOutput: '%s' vs '%s' for input '%s'",
 				actualOutput, testCase.expectedOutput, testCase.input,
 			)

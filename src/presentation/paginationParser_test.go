@@ -7,8 +7,8 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestPaginationParser(t *testing.T) {
-	t.Run("SuccessWithAllValidFields", func(t *testing.T) {
+func TestPaginationParser(test *testing.T) {
+	test.Run("SuccessWithAllValidFields", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap       map[string]any
 			expectedOutput tkDto.Pagination
@@ -61,38 +61,38 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 			if !testCase.expectError {
 				if actualOutput.PageNumber != testCase.expectedOutput.PageNumber {
-					t.Errorf("UnexpectedPageNumber: '%v' vs '%v'", actualOutput.PageNumber, testCase.expectedOutput.PageNumber)
+					subtest.Errorf("UnexpectedPageNumber: '%v' vs '%v'", actualOutput.PageNumber, testCase.expectedOutput.PageNumber)
 				}
 				if actualOutput.ItemsPerPage != testCase.expectedOutput.ItemsPerPage {
-					t.Errorf("UnexpectedItemsPerPage: '%v' vs '%v'", actualOutput.ItemsPerPage, testCase.expectedOutput.ItemsPerPage)
+					subtest.Errorf("UnexpectedItemsPerPage: '%v' vs '%v'", actualOutput.ItemsPerPage, testCase.expectedOutput.ItemsPerPage)
 				}
 				if (actualOutput.SortBy == nil && testCase.expectedOutput.SortBy != nil) ||
 					(actualOutput.SortBy != nil && testCase.expectedOutput.SortBy == nil) ||
 					(actualOutput.SortBy != nil && *actualOutput.SortBy != *testCase.expectedOutput.SortBy) {
-					t.Errorf("UnexpectedSortBy: '%v' vs '%v'", actualOutput.SortBy, testCase.expectedOutput.SortBy)
+					subtest.Errorf("UnexpectedSortBy: '%v' vs '%v'", actualOutput.SortBy, testCase.expectedOutput.SortBy)
 				}
 				if (actualOutput.SortDirection == nil && testCase.expectedOutput.SortDirection != nil) ||
 					(actualOutput.SortDirection != nil && testCase.expectedOutput.SortDirection == nil) ||
 					(actualOutput.SortDirection != nil && *actualOutput.SortDirection != *testCase.expectedOutput.SortDirection) {
-					t.Errorf("UnexpectedSortDirection: '%v' vs '%v'", actualOutput.SortDirection, testCase.expectedOutput.SortDirection)
+					subtest.Errorf("UnexpectedSortDirection: '%v' vs '%v'", actualOutput.SortDirection, testCase.expectedOutput.SortDirection)
 				}
 				if (actualOutput.LastSeenId == nil && testCase.expectedOutput.LastSeenId != nil) ||
 					(actualOutput.LastSeenId != nil && testCase.expectedOutput.LastSeenId == nil) ||
 					(actualOutput.LastSeenId != nil && *actualOutput.LastSeenId != *testCase.expectedOutput.LastSeenId) {
-					t.Errorf("UnexpectedLastSeenId: '%v' vs '%v'", actualOutput.LastSeenId, testCase.expectedOutput.LastSeenId)
+					subtest.Errorf("UnexpectedLastSeenId: '%v' vs '%v'", actualOutput.LastSeenId, testCase.expectedOutput.LastSeenId)
 				}
 			}
 		}
 	})
 
-	t.Run("SuccessWithPartialFields", func(t *testing.T) {
+	test.Run("SuccessWithPartialFields", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap       map[string]any
 			expectedOutput tkDto.Pagination
@@ -170,38 +170,38 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 			if !testCase.expectError {
 				if actualOutput.PageNumber != testCase.expectedOutput.PageNumber {
-					t.Errorf("UnexpectedPageNumber: '%v' vs '%v'", actualOutput.PageNumber, testCase.expectedOutput.PageNumber)
+					subtest.Errorf("UnexpectedPageNumber: '%v' vs '%v'", actualOutput.PageNumber, testCase.expectedOutput.PageNumber)
 				}
 				if actualOutput.ItemsPerPage != testCase.expectedOutput.ItemsPerPage {
-					t.Errorf("UnexpectedItemsPerPage: '%v' vs '%v'", actualOutput.ItemsPerPage, testCase.expectedOutput.ItemsPerPage)
+					subtest.Errorf("UnexpectedItemsPerPage: '%v' vs '%v'", actualOutput.ItemsPerPage, testCase.expectedOutput.ItemsPerPage)
 				}
 				if (actualOutput.SortBy == nil && testCase.expectedOutput.SortBy != nil) ||
 					(actualOutput.SortBy != nil && testCase.expectedOutput.SortBy == nil) ||
 					(actualOutput.SortBy != nil && *actualOutput.SortBy != *testCase.expectedOutput.SortBy) {
-					t.Errorf("UnexpectedSortBy: '%v' vs '%v'", actualOutput.SortBy, testCase.expectedOutput.SortBy)
+					subtest.Errorf("UnexpectedSortBy: '%v' vs '%v'", actualOutput.SortBy, testCase.expectedOutput.SortBy)
 				}
 				if (actualOutput.SortDirection == nil && testCase.expectedOutput.SortDirection != nil) ||
 					(actualOutput.SortDirection != nil && testCase.expectedOutput.SortDirection == nil) ||
 					(actualOutput.SortDirection != nil && *actualOutput.SortDirection != *testCase.expectedOutput.SortDirection) {
-					t.Errorf("UnexpectedSortDirection: '%v' vs '%v'", actualOutput.SortDirection, testCase.expectedOutput.SortDirection)
+					subtest.Errorf("UnexpectedSortDirection: '%v' vs '%v'", actualOutput.SortDirection, testCase.expectedOutput.SortDirection)
 				}
 				if (actualOutput.LastSeenId == nil && testCase.expectedOutput.LastSeenId != nil) ||
 					(actualOutput.LastSeenId != nil && testCase.expectedOutput.LastSeenId == nil) ||
 					(actualOutput.LastSeenId != nil && *actualOutput.LastSeenId != *testCase.expectedOutput.LastSeenId) {
-					t.Errorf("UnexpectedLastSeenId: '%v' vs '%v'", actualOutput.LastSeenId, testCase.expectedOutput.LastSeenId)
+					subtest.Errorf("UnexpectedLastSeenId: '%v' vs '%v'", actualOutput.LastSeenId, testCase.expectedOutput.LastSeenId)
 				}
 			}
 		}
 	})
 
-	t.Run("ErrorWithInvalidPageNumber", func(t *testing.T) {
+	test.Run("ErrorWithInvalidPageNumber", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap    map[string]any
 			expectError bool
@@ -240,18 +240,18 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 			if testCase.expectError && conversionErr != nil && conversionErr.Error() != "InvalidPageNumber" {
-				t.Errorf("UnexpectedErrorMessage: expected 'InvalidPageNumber', got '%s'", conversionErr.Error())
+				subtest.Errorf("UnexpectedErrorMessage: expected 'InvalidPageNumber', got '%s'", conversionErr.Error())
 			}
 		}
 	})
 
-	t.Run("ErrorWithInvalidItemsPerPage", func(t *testing.T) {
+	test.Run("ErrorWithInvalidItemsPerPage", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap    map[string]any
 			expectError bool
@@ -308,18 +308,18 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 			if testCase.expectError && conversionErr != nil && conversionErr.Error() != "InvalidItemsPerPage" {
-				t.Errorf("UnexpectedErrorMessage: expected 'InvalidItemsPerPage', got '%s'", conversionErr.Error())
+				subtest.Errorf("UnexpectedErrorMessage: expected 'InvalidItemsPerPage', got '%s'", conversionErr.Error())
 			}
 		}
 	})
 
-	t.Run("ErrorWithInvalidSortBy", func(t *testing.T) {
+	test.Run("ErrorWithInvalidSortBy", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap    map[string]any
 			expectError bool
@@ -352,15 +352,15 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 		}
 	})
 
-	t.Run("ErrorWithInvalidSortDirection", func(t *testing.T) {
+	test.Run("ErrorWithInvalidSortDirection", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap    map[string]any
 			expectError bool
@@ -393,15 +393,15 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 		}
 	})
 
-	t.Run("ErrorWithInvalidLastSeenId", func(t *testing.T) {
+	test.Run("ErrorWithInvalidLastSeenId", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap    map[string]any
 			expectError bool
@@ -434,15 +434,15 @@ func TestPaginationParser(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputMap)
 			}
 		}
 	})
 
-	t.Run("SuccessWithEmptyInput", func(t *testing.T) {
+	test.Run("SuccessWithEmptyInput", func(subtest *testing.T) {
 		defaultPagination := tkDto.Pagination{
 			PageNumber:   1,
 			ItemsPerPage: 10,
@@ -450,23 +450,23 @@ func TestPaginationParser(t *testing.T) {
 
 		actualOutput, conversionErr := PaginationParser(defaultPagination, nil)
 		if conversionErr != nil {
-			t.Errorf("UnexpectedError: '%s'", conversionErr.Error())
+			subtest.Errorf("UnexpectedError: '%s'", conversionErr.Error())
 		}
 
 		if actualOutput.PageNumber != 1 {
-			t.Errorf("UnexpectedPageNumber: '%v' vs '1'", actualOutput.PageNumber)
+			subtest.Errorf("UnexpectedPageNumber: '%v' vs '1'", actualOutput.PageNumber)
 		}
 		if actualOutput.ItemsPerPage != 10 {
-			t.Errorf("UnexpectedItemsPerPage: '%v' vs '10'", actualOutput.ItemsPerPage)
+			subtest.Errorf("UnexpectedItemsPerPage: '%v' vs '10'", actualOutput.ItemsPerPage)
 		}
 		if actualOutput.SortBy != nil {
-			t.Errorf("UnexpectedSortBy: ShouldBeNil")
+			subtest.Errorf("UnexpectedSortBy: ShouldBeNil")
 		}
 		if actualOutput.SortDirection != nil {
-			t.Errorf("UnexpectedSortDirection: ShouldBeNil")
+			subtest.Errorf("UnexpectedSortDirection: ShouldBeNil")
 		}
 		if actualOutput.LastSeenId != nil {
-			t.Errorf("UnexpectedLastSeenId: ShouldBeNil")
+			subtest.Errorf("UnexpectedLastSeenId: ShouldBeNil")
 		}
 	})
 }

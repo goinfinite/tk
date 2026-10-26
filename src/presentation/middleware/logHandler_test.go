@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func TestLogLevelParser(t *testing.T) {
+func TestLogLevelParser(test *testing.T) {
 	logHandler := LogHandler{}
 
 	testCases := []struct {
@@ -25,10 +25,10 @@ func TestLogLevelParser(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.configuredLevel, func(t *testing.T) {
+		test.Run(testCase.configuredLevel, func(subtest *testing.T) {
 			parsedLevel := logHandler.logLevelParser(testCase.configuredLevel)
 			if parsedLevel != testCase.expectedLevel {
-				t.Errorf(
+				subtest.Errorf(
 					"LevelMismatch: '%s' expected %d, got %d",
 					testCase.configuredLevel, testCase.expectedLevel, parsedLevel,
 				)

@@ -9,23 +9,23 @@ import (
 // Note: Setup/teardown are intentionally inline — test independence
 // requires each file to own its preconditions, even if it duplicates code.
 
-func TestNewTransientDatabaseService(t *testing.T) {
+func TestNewTransientDatabaseService(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("UnexpectedError: '%s'", err.Error())
+		test.Fatalf("UnexpectedError: '%s'", err.Error())
 	}
 	if dbSvc == nil {
-		t.Fatal("ServiceIsNil")
+		test.Fatal("ServiceIsNil")
 	}
 	if dbSvc.Handler == nil {
-		t.Fatal("HandlerIsNil")
+		test.Fatal("HandlerIsNil")
 	}
 }
 
-func TestTransientDatabaseServiceSet(t *testing.T) {
+func TestTransientDatabaseServiceSet(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("SetupFailed: '%s'", err.Error())
+		test.Fatalf("SetupFailed: '%s'", err.Error())
 	}
 
 	presetValue := "presetValue"
@@ -59,25 +59,25 @@ func TestTransientDatabaseServiceSet(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			if testCase.presetValuePtr != nil {
 				err := dbSvc.Set(testCase.key, *testCase.presetValuePtr, nil)
 				if err != nil {
-					t.Fatalf("PresetFailed: '%s'", err.Error())
+					subtest.Fatalf("PresetFailed: '%s'", err.Error())
 				}
 			}
 
 			err := dbSvc.Set(testCase.key, testCase.valueToSet, nil)
 			if err != nil {
-				t.Fatalf("SetFailed: '%s'", err.Error())
+				subtest.Fatalf("SetFailed: '%s'", err.Error())
 			}
 
 			readValue, err := dbSvc.Read(testCase.key)
 			if err != nil {
-				t.Fatalf("ReadFailed: '%s'", err.Error())
+				subtest.Fatalf("ReadFailed: '%s'", err.Error())
 			}
 			if readValue != testCase.expectedReadValue {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedValue: '%s' vs '%s'",
 					readValue, testCase.expectedReadValue,
 				)
@@ -86,16 +86,16 @@ func TestTransientDatabaseServiceSet(t *testing.T) {
 	}
 }
 
-func TestTransientDatabaseServiceRead(t *testing.T) {
+func TestTransientDatabaseServiceRead(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("SetupFailed: '%s'", err.Error())
+		test.Fatalf("SetupFailed: '%s'", err.Error())
 	}
 
 	existingKey := "readExistingKey"
 	err = dbSvc.Set(existingKey, "existingValue", nil)
 	if err != nil {
-		t.Fatalf("SetupSetFailed: '%s'", err.Error())
+		test.Fatalf("SetupSetFailed: '%s'", err.Error())
 	}
 
 	testCases := []struct {
@@ -117,11 +117,11 @@ func TestTransientDatabaseServiceRead(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			readValue, err := dbSvc.Read(testCase.key)
 			if testCase.expectedError != nil {
 				if !errors.Is(err, testCase.expectedError) {
-					t.Fatalf(
+					subtest.Fatalf(
 						"ExpectedError: '%s', got: '%v'",
 						testCase.expectedError.Error(), err,
 					)
@@ -130,10 +130,10 @@ func TestTransientDatabaseServiceRead(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("UnexpectedError: '%s'", err.Error())
+				subtest.Fatalf("UnexpectedError: '%s'", err.Error())
 			}
 			if readValue != testCase.expectedValue {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedValue: '%s' vs '%s'",
 					readValue, testCase.expectedValue,
 				)
@@ -142,16 +142,16 @@ func TestTransientDatabaseServiceRead(t *testing.T) {
 	}
 }
 
-func TestTransientDatabaseServiceHas(t *testing.T) {
+func TestTransientDatabaseServiceHas(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("SetupFailed: '%s'", err.Error())
+		test.Fatalf("SetupFailed: '%s'", err.Error())
 	}
 
 	existingKey := "hasExistingKey"
 	err = dbSvc.Set(existingKey, "existingValue", nil)
 	if err != nil {
-		t.Fatalf("SetupSetFailed: '%s'", err.Error())
+		test.Fatalf("SetupSetFailed: '%s'", err.Error())
 	}
 
 	testCases := []struct {
@@ -172,19 +172,19 @@ func TestTransientDatabaseServiceHas(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			hasKey := dbSvc.Has(testCase.key)
 			if hasKey != testCase.expectedValue {
-				t.Fatalf("UnexpectedResult: '%t' vs '%t'", hasKey, testCase.expectedValue)
+				subtest.Fatalf("UnexpectedResult: '%t' vs '%t'", hasKey, testCase.expectedValue)
 			}
 		})
 	}
 }
 
-func TestTransientDatabaseServiceExpiration(t *testing.T) {
+func TestTransientDatabaseServiceExpiration(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("SetupFailed: '%s'", err.Error())
+		test.Fatalf("SetupFailed: '%s'", err.Error())
 	}
 
 	expiredTtl := -time.Minute
@@ -225,15 +225,15 @@ func TestTransientDatabaseServiceExpiration(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			err := dbSvc.Set(testCase.key, testCase.valueToSet, testCase.ttlPtr)
 			if err != nil {
-				t.Fatalf("SetFailed: '%s'", err.Error())
+				subtest.Fatalf("SetFailed: '%s'", err.Error())
 			}
 
 			hasKey := dbSvc.Has(testCase.key)
 			if hasKey != testCase.expectedHasKey {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedHasResult: '%t' vs '%t'",
 					hasKey, testCase.expectedHasKey,
 				)
@@ -242,7 +242,7 @@ func TestTransientDatabaseServiceExpiration(t *testing.T) {
 			readValue, err := dbSvc.Read(testCase.key)
 			if testCase.expectedError != nil {
 				if !errors.Is(err, testCase.expectedError) {
-					t.Fatalf(
+					subtest.Fatalf(
 						"ExpectedError: '%s', got: '%v'",
 						testCase.expectedError.Error(), err,
 					)
@@ -251,10 +251,10 @@ func TestTransientDatabaseServiceExpiration(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("ReadFailed: '%s'", err.Error())
+				subtest.Fatalf("ReadFailed: '%s'", err.Error())
 			}
 			if readValue != testCase.expectedReadValue {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedValue: '%s' vs '%s'",
 					readValue, testCase.expectedReadValue,
 				)
@@ -263,50 +263,50 @@ func TestTransientDatabaseServiceExpiration(t *testing.T) {
 	}
 }
 
-func TestTransientDatabaseServiceSetOverwritesTtl(t *testing.T) {
+func TestTransientDatabaseServiceSetOverwritesTtl(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {
-		t.Fatalf("SetupFailed: '%s'", err.Error())
+		test.Fatalf("SetupFailed: '%s'", err.Error())
 	}
 
 	expiredTtl := -time.Minute
 
-	t.Run("SetWithoutTtlClearsPreviousTtl", func(t *testing.T) {
+	test.Run("SetWithoutTtlClearsPreviousTtl", func(subtest *testing.T) {
 		key := "overwriteTtlClearedKey"
 		err := dbSvc.Set(key, "expiredValue", &expiredTtl)
 		if err != nil {
-			t.Fatalf("PresetFailed: '%s'", err.Error())
+			subtest.Fatalf("PresetFailed: '%s'", err.Error())
 		}
 
 		err = dbSvc.Set(key, "persistentValue", nil)
 		if err != nil {
-			t.Fatalf("OverwriteFailed: '%s'", err.Error())
+			subtest.Fatalf("OverwriteFailed: '%s'", err.Error())
 		}
 
 		readValue, err := dbSvc.Read(key)
 		if err != nil {
-			t.Fatalf("ReadFailed: '%s'", err.Error())
+			subtest.Fatalf("ReadFailed: '%s'", err.Error())
 		}
 		if readValue != "persistentValue" {
-			t.Fatalf("UnexpectedValue: '%s' vs 'persistentValue'", readValue)
+			subtest.Fatalf("UnexpectedValue: '%s' vs 'persistentValue'", readValue)
 		}
 	})
 
-	t.Run("SetWithTtlExpiresPreviousValue", func(t *testing.T) {
+	test.Run("SetWithTtlExpiresPreviousValue", func(subtest *testing.T) {
 		key := "overwriteTtlAppliedKey"
 		err := dbSvc.Set(key, "persistentValue", nil)
 		if err != nil {
-			t.Fatalf("PresetFailed: '%s'", err.Error())
+			subtest.Fatalf("PresetFailed: '%s'", err.Error())
 		}
 
 		err = dbSvc.Set(key, "expiredValue", &expiredTtl)
 		if err != nil {
-			t.Fatalf("OverwriteFailed: '%s'", err.Error())
+			subtest.Fatalf("OverwriteFailed: '%s'", err.Error())
 		}
 
 		_, err = dbSvc.Read(key)
 		if !errors.Is(err, ErrKeyNotFound) {
-			t.Fatalf("ExpectedError: '%s', got: '%v'", ErrKeyNotFound.Error(), err)
+			subtest.Fatalf("ExpectedError: '%s', got: '%v'", ErrKeyNotFound.Error(), err)
 		}
 	})
 }
