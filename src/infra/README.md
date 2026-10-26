@@ -240,7 +240,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   )
   ```
 
-- **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`.
+- **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`. The same list drives peer trust in `RequesterIpExtractor` and operator trust in `PanicHandler`, so a listed proxy address is also a trusted operator when it becomes the resolved requester IP.
 
   ```go
   trustedCidrBlocks, trustedCidrsReadingErr := TrustedCidrsReader()

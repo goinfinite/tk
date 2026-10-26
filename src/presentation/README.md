@@ -50,6 +50,8 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
 
   > **Security:** The headers are read only from trusted peers: loopback, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`. A client on an untrusted network cannot choose the reported address. Right-to-left traversal skips values a client prepends when a trusted proxy appends the real client last. A proxy with a public address must be listed in `TRUSTED_CIDRS`, or the extractor reports the proxy address. Over-broad `TRUSTED_CIDRS` is the risk: the extractor would trust a range that includes untrusted clients. Behind an L4 proxy that cannot overwrite headers, set `IP_EXTRACT_CONFIRMATION_HEADERS` so requests that bypass the edge fail closed. Presence alone is forgeable; use `HeaderName=secret` when the origin is directly reachable.
 
+  > **Proxy entries:** Do not add a private/internal proxy range to `TRUSTED_IPS` or `TRUSTED_CIDRS` unless you intend that proxy to be a trusted panic operator. The extractor already trusts loopback, private, and link-local peers, so the entry does not change header trust. It does make `PanicHandler` trust the proxy address: when the confirmation gate fails, `Execute` returns the proxy's `RemoteAddr`, and a listed proxy then unlocks full panic details. A public proxy must be listed for header extraction. If you also configure the confirmation gate, make sure it passes on that path, or a failed gate will return the proxy address and treat it as a trusted operator.
+
   ```go
   extractor := NewRequesterIpExtractor()
 

@@ -7,6 +7,7 @@ feat: RequesterIpExtractor accepts IP_EXTRACT_CONFIRMATION_HEADERS. When set, fo
 feat: add HttpHeaderValue validation for RFC 9110 field values and HttpHeader.ReadAsLowerCase for case-insensitive header lookup.
 breaking: remove the exported IpExtractHeaderReader helper. Callers must use NewRequesterIpExtractor and Execute.
 docs: document the confirmation gate and activity record indexes in the layer READMEs, context files, and feature map.
+docs: warn that private/internal proxy ranges must not be added to TRUSTED_IPS or TRUSTED_CIDRS because the same list grants panic-operator trust. When the confirmation gate is configured, a public proxy must pass it on that path.
 
 0.4.2 - 2026/10/21
 feat: InterfaceToBool accepts yes, y, s, and sim as true and no and n as false, ignoring case and surrounding whitespace. on, off, and every strconv.ParseBool value keep their current behavior.
