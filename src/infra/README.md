@@ -290,7 +290,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   pagesTotal, pagesTotalErr := PaginationPagesTotalResolver(250, 20)
   ```
 
-- **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable.
+- **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable. Migration creates indexes for time-range, operator audit, code-plus-IP audit, and affected-resource queries.
 
   ```go
   os.Setenv("TRAIL_DATABASE_FILE_PATH", "/path/to/trail.db")

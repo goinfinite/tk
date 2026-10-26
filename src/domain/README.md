@@ -155,7 +155,6 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
       activityRecordQueryRepo tkRepository.ActivityRecordQueryRepo,
       operatorIpAddress tkValueObject.IpAddress,
   ) (attemptsCount uint64, err error) {
-      recordLevel := tkValueObject.ActivityRecordLevelSecurity
       recordCode, _ := tkValueObject.NewActivityRecordCode(
           "CreateSessionTokenFailed",
       )
@@ -164,7 +163,6 @@ Infinite Toolkit _(TK)_ provides a comprehensive activity record management syst
       )
 
       return activityRecordQueryRepo.Count(tkDto.ReadActivityRecordsRequest{
-          RecordLevel:       &recordLevel,
           RecordCode:        &recordCode,
           OperatorIpAddress: &operatorIpAddress,
           CreatedAfterAt:    &failedAttemptsIntervalStartsAt,
