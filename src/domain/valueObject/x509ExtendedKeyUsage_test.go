@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewX509ExtendedKeyUsage(t *testing.T) {
-	t.Run("ValidExtendedKeyUsage", func(t *testing.T) {
+func TestNewX509ExtendedKeyUsage(test *testing.T) {
+	test.Run("ValidExtendedKeyUsage", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509ExtendedKeyUsage
@@ -30,16 +30,16 @@ func TestNewX509ExtendedKeyUsage(t *testing.T) {
 			actualOutput, err := NewX509ExtendedKeyUsage(testCase.inputValue)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -47,7 +47,7 @@ func TestNewX509ExtendedKeyUsage(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509ExtendedKeyUsage
 			expectedOutput string
@@ -61,7 +61,7 @@ func TestNewX509ExtendedKeyUsage(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v'", actualOutput, testCase.expectedOutput)
 			}
 		}
 	})

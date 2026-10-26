@@ -14,10 +14,7 @@ import (
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
-func TestIsOperatorTrustworthy(t *testing.T) {
-	originalEnv := os.Getenv(tkInfra.TrustedIpsEnvVarName)
-	defer os.Setenv(tkInfra.TrustedIpsEnvVarName, originalEnv)
-
+func TestIsOperatorTrustworthy(test *testing.T) {
 	testCaseStructs := []struct {
 		name                string
 		trustedIpsEnv       string
@@ -57,8 +54,8 @@ func TestIsOperatorTrustworthy(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.name, func(t *testing.T) {
-			os.Setenv(tkInfra.TrustedIpsEnvVarName, testCase.trustedIpsEnv)
+		test.Run(testCase.name, func(subtest *testing.T) {
+			subtest.Setenv(tkInfra.TrustedIpsEnvVarName, testCase.trustedIpsEnv)
 
 			echoInstance := echo.New()
 			httpRequest := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -68,7 +65,7 @@ func TestIsOperatorTrustworthy(t *testing.T) {
 
 			isOperatorTrustworthy := isOperatorTrustworthy(echoContext)
 			if isOperatorTrustworthy != testCase.shouldBeTrustworthy {
-				t.Errorf(
+				subtest.Errorf(
 					"OperatorTrustworthinessMismatch: Expected=%v, Actual=%v",
 					testCase.shouldBeTrustworthy, isOperatorTrustworthy,
 				)
@@ -77,11 +74,9 @@ func TestIsOperatorTrustworthy(t *testing.T) {
 	}
 }
 
-func TestLogPanic(t *testing.T) {
-	tempDir := t.TempDir()
-	originalWorkingDir, _ := os.Getwd()
-	defer os.Chdir(originalWorkingDir)
-	os.Chdir(tempDir)
+func TestLogPanic(test *testing.T) {
+	tempDir := test.TempDir()
+	test.Chdir(tempDir)
 
 	fileClerk := tkInfra.FileClerk{}
 	panicReport := &PanicReport{
@@ -94,34 +89,31 @@ func TestLogPanic(t *testing.T) {
 
 	logFilePath := filepath.Join("logs", "panic.log")
 	if !fileClerk.FileExists(logFilePath) {
-		t.Errorf("LogFileCreationFailed: %s", logFilePath)
+		test.Errorf("LogFileCreationFailed: %s", logFilePath)
 		return
 	}
 
 	logFileContent, err := fileClerk.ReadFileContent(logFilePath, nil)
 	if err != nil {
-		t.Errorf("LogFileReadFailed: %v", err)
+		test.Errorf("LogFileReadFailed: %v", err)
 		return
 	}
 
 	if !strings.Contains(logFileContent, "test stack trace") {
-		t.Errorf("StackTraceNotLogged: ExpectedContainTestStackTrace")
+		test.Errorf("StackTraceNotLogged: ExpectedContainTestStackTrace")
 	}
 	if !strings.Contains(logFileContent, "/test") {
-		t.Errorf("RequestUriNotLogged: ExpectedContainTestUri")
+		test.Errorf("RequestUriNotLogged: ExpectedContainTestUri")
 	}
 	if !strings.Contains(logFileContent, "192.168.1.1") {
-		t.Errorf("OperatorIpAddressNotLogged: ExpectedContainOperatorIp")
+		test.Errorf("OperatorIpAddressNotLogged: ExpectedContainOperatorIp")
 	}
 	if !strings.Contains(logFileContent, "UnknownError") {
-		t.Errorf("ErrorMessageNotLogged: ExpectedContainUnknownError")
+		test.Errorf("ErrorMessageNotLogged: ExpectedContainUnknownError")
 	}
 }
 
-func TestApiHandlePanic(t *testing.T) {
-	originalEnv := os.Getenv(tkInfra.TrustedIpsEnvVarName)
-	defer os.Setenv(tkInfra.TrustedIpsEnvVarName, originalEnv)
-
+func TestApiHandlePanic(test *testing.T) {
 	testCaseStructs := []struct {
 		name                    string
 		panicValue              any
@@ -163,8 +155,8 @@ func TestApiHandlePanic(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.name, func(t *testing.T) {
-			os.Setenv(tkInfra.TrustedIpsEnvVarName, testCase.trustedIpsEnv)
+		test.Run(testCase.name, func(subtest *testing.T) {
+			subtest.Setenv(tkInfra.TrustedIpsEnvVarName, testCase.trustedIpsEnv)
 
 			echoInstance := echo.New()
 			httpRequest := httptest.NewRequest(http.MethodGet, testCase.requestUri, nil)
@@ -181,7 +173,7 @@ func TestApiHandlePanic(t *testing.T) {
 			}()
 
 			if httpRecorder.Code != testCase.expectedStatus {
-				t.Errorf(
+				subtest.Errorf(
 					"HttpStatusMismatch: Expected=%d, Actual=%d",
 					testCase.expectedStatus, httpRecorder.Code,
 				)
@@ -191,12 +183,12 @@ func TestApiHandlePanic(t *testing.T) {
 			var apiResponse map[string]any
 			err := json.Unmarshal(httpRecorder.Body.Bytes(), &apiResponse)
 			if err != nil {
-				t.Errorf("ResponseBodyUnmarshalFailed: %v", err)
+				subtest.Errorf("ResponseBodyUnmarshalFailed: %v", err)
 				return
 			}
 
 			if apiResponse["readableMessage"] != "SomethingWentWrong" {
-				t.Errorf(
+				subtest.Errorf(
 					"ReadableMessageMismatch: Expected='SomethingWentWrong', Actual='%v'",
 					apiResponse["readableMessage"],
 				)
@@ -204,72 +196,72 @@ func TestApiHandlePanic(t *testing.T) {
 
 			responseBody, ok := apiResponse["body"].(map[string]any)
 			if !ok {
-				t.Errorf("ResponseBodyInvalidFormat: ExpectedMap")
+				subtest.Errorf("ResponseBodyInvalidFormat: ExpectedMap")
 				return
 			}
 
 			if testCase.shouldExpectFullDetails {
 				if responseBody["uri"] != testCase.requestUri {
-					t.Errorf(
+					subtest.Errorf(
 						"RequestUriMismatch: Expected='%s', Actual='%v'",
 						testCase.requestUri, responseBody["uri"],
 					)
 				}
 				if responseBody["exceptionTrace"] == nil {
-					t.Errorf("ExceptionTraceMissing: ExpectedNonNil")
+					subtest.Errorf("ExceptionTraceMissing: ExpectedNonNil")
 				}
 			}
 			if !testCase.shouldExpectFullDetails {
 				if responseBody["exceptionCode"] == nil {
-					t.Errorf("ExceptionCodeMissing: ExpectedNonNil")
+					subtest.Errorf("ExceptionCodeMissing: ExpectedNonNil")
 				}
 				if len(responseBody["exceptionCode"].(string)) > panicHandlerMaxErrorLength {
-					t.Errorf("ExceptionCodeTooLong: ExpectedTruncated")
+					subtest.Errorf("ExceptionCodeTooLong: ExpectedTruncated")
 				}
 				if responseBody["uri"] != nil {
-					t.Errorf("RequestUriLeaked: ExpectedRedacted")
+					subtest.Errorf("RequestUriLeaked: ExpectedRedacted")
 				}
 				if responseBody["queryParams"] != nil {
-					t.Errorf("QueryParamsLeaked: ExpectedRedacted")
+					subtest.Errorf("QueryParamsLeaked: ExpectedRedacted")
 				}
 				if responseBody["exceptionTrace"] != nil {
-					t.Errorf("ExceptionTraceLeaked: ExpectedRedacted")
+					subtest.Errorf("ExceptionTraceLeaked: ExpectedRedacted")
 				}
 			}
 		})
 	}
 }
 
-func TestApiPanicHandler(t *testing.T) {
-	os.Setenv(tkInfra.TrustedIpsEnvVarName, "")
+func TestApiPanicHandler(test *testing.T) {
+	test.Setenv(tkInfra.TrustedIpsEnvVarName, "")
 
 	echoInstance := echo.New()
 	httpRequest := httptest.NewRequest(http.MethodGet, "/test", nil)
 	httpRecorder := httptest.NewRecorder()
 	echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-	panicHandler := ApiPanicHandler(func(c echo.Context) error {
+	panicHandler := ApiPanicHandler(func(_ echo.Context) error {
 		panic("test panic")
 	})
 
 	err := panicHandler(echoContext)
 	if err != nil {
-		t.Errorf("PanicHandlerErrorUnexpected: %v", err)
+		test.Errorf("PanicHandlerErrorUnexpected: %v", err)
 	}
 
 	if httpRecorder.Code != http.StatusInternalServerError {
-		t.Errorf(
+		test.Errorf(
 			"HttpStatusMismatch: Expected=%d, Actual=%d",
 			http.StatusInternalServerError, httpRecorder.Code,
 		)
 	}
 }
 
-func TestCliPanicHandlerExitCode(t *testing.T) {
-	tempDir := t.TempDir()
+func TestCliPanicHandlerExitCode(test *testing.T) {
+	tempDir := test.TempDir()
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
-		t.Errorf("WorkingDirectoryResolutionFailed: %v", err)
+		test.Errorf("WorkingDirectoryResolutionFailed: %v", err)
 		return
 	}
 
@@ -282,7 +274,7 @@ require github.com/goinfinite/tk v0.1.2
 	fileClerk := tkInfra.FileClerk{}
 	err = os.WriteFile(workingDir+"/go.mod", []byte(goModContent), 0644)
 	if err != nil {
-		t.Errorf("GoModFileCreationFailed: %v", err)
+		test.Errorf("GoModFileCreationFailed: %v", err)
 		return
 	}
 
@@ -299,7 +291,7 @@ func main() {
 	programFilePath := tempDir + "/testCliPanicHandler.go"
 	err = os.WriteFile(programFilePath, []byte(mainContent), 0644)
 	if err != nil {
-		t.Errorf("TestProgramFileCreationFailed: %v", err)
+		test.Errorf("TestProgramFileCreationFailed: %v", err)
 		return
 	}
 
@@ -311,7 +303,7 @@ func main() {
 		})
 		_, err = goModShell.Run()
 		if err != nil {
-			t.Errorf("GoModTidyFailed: %v", err)
+			test.Errorf("GoModTidyFailed: %v", err)
 			return
 		}
 	}
@@ -328,15 +320,15 @@ func main() {
 	case *tkInfra.ShellError:
 		exitCode = shellErr.ExitCode
 	case nil:
-		t.Errorf("ProgramExitUnexpected: ExpectedExitWithCode1")
+		test.Errorf("ProgramExitUnexpected: ExpectedExitWithCode1")
 		return
 	default:
-		t.Errorf("CommandExecutionFailed: %v", err)
+		test.Errorf("CommandExecutionFailed: %v", err)
 		return
 	}
 
 	if exitCode != 1 {
-		t.Errorf(
+		test.Errorf(
 			"ExitCodeMismatch: Expected=1, Actual=%d",
 			exitCode,
 		)

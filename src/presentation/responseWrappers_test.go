@@ -14,7 +14,7 @@ import (
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
-func TestNewApiResponseWrapper(t *testing.T) {
+func TestNewApiResponseWrapper(test *testing.T) {
 	testCases := []struct {
 		name                    string
 		status                  int
@@ -54,7 +54,7 @@ func TestNewApiResponseWrapper(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			result := NewApiResponseWrapper(
 				testCase.status,
 				testCase.body,
@@ -62,14 +62,14 @@ func TestNewApiResponseWrapper(t *testing.T) {
 			)
 
 			if result.Status != testCase.expectedStatus {
-				t.Errorf(
+				subtest.Errorf(
 					"StatusMismatch: expected %d, got %d",
 					testCase.expectedStatus, result.Status,
 				)
 			}
 
 			if result.ReadableMessage != testCase.expectedReadableMessage {
-				t.Errorf(
+				subtest.Errorf(
 					"ReadableMessageMismatch: expected %s, got %s",
 					testCase.expectedReadableMessage, result.ReadableMessage,
 				)
@@ -77,16 +77,16 @@ func TestNewApiResponseWrapper(t *testing.T) {
 
 			actualJson, err := json.Marshal(result.Body)
 			if err != nil {
-				t.Fatalf("ActualJsonMarshalingFailed: %v", err)
+				subtest.Fatalf("ActualJsonMarshalingFailed: %v", err)
 			}
 
 			expectedJson, err := json.Marshal(testCase.expectedBody)
 			if err != nil {
-				t.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
+				subtest.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
 			}
 
 			if string(actualJson) != string(expectedJson) {
-				t.Errorf(
+				subtest.Errorf(
 					"BodyMismatch: expected '%s', got '%s'",
 					string(expectedJson), string(actualJson),
 				)
@@ -95,7 +95,7 @@ func TestNewApiResponseWrapper(t *testing.T) {
 	}
 }
 
-func TestLiaisonApiResponseEmitter(t *testing.T) {
+func TestLiaisonApiResponseEmitter(test *testing.T) {
 	testCases := []struct {
 		name                 string
 		liaisonStatus        LiaisonResponseStatus
@@ -239,7 +239,7 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			echoInstance := echo.New()
 			httpRequest := httptest.NewRequest(http.MethodGet, "/", nil)
 			httpRecorder := httptest.NewRecorder()
@@ -251,11 +251,11 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 
 			err := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
 			if err != nil {
-				t.Fatalf("LiaisonApiResponseEmitterFailed: %v", err)
+				subtest.Fatalf("LiaisonApiResponseEmitterFailed: %v", err)
 			}
 
 			if httpRecorder.Code != testCase.expectedHttpStatus {
-				t.Errorf(
+				subtest.Errorf(
 					"HttpStatusMismatch: expected %d, got %d",
 					testCase.expectedHttpStatus, httpRecorder.Code,
 				)
@@ -264,18 +264,18 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 			var actualResponseBody ApiResponseWrapper
 			err = json.Unmarshal(httpRecorder.Body.Bytes(), &actualResponseBody)
 			if err != nil {
-				t.Fatalf("ResponseBodyUnmarshalFailed: %v", err)
+				subtest.Fatalf("ResponseBodyUnmarshalFailed: %v", err)
 			}
 
 			if actualResponseBody.Status != testCase.expectedResponseBody.Status {
-				t.Errorf(
+				subtest.Errorf(
 					"ResponseStatusMismatch: expected %d, got %d",
 					testCase.expectedResponseBody.Status, actualResponseBody.Status,
 				)
 			}
 
 			if actualResponseBody.ReadableMessage != testCase.expectedResponseBody.ReadableMessage {
-				t.Errorf(
+				subtest.Errorf(
 					"ResponseReadableMessageMismatch: expected %s, got %s",
 					testCase.expectedResponseBody.ReadableMessage, actualResponseBody.ReadableMessage,
 				)
@@ -283,16 +283,16 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 
 			actualBodyJson, err := json.Marshal(actualResponseBody.Body)
 			if err != nil {
-				t.Fatalf("ActualBodyMarshalFailed: %v", err)
+				subtest.Fatalf("ActualBodyMarshalFailed: %v", err)
 			}
 
 			expectedBodyJson, err := json.Marshal(testCase.expectedResponseBody.Body)
 			if err != nil {
-				t.Fatalf("ExpectedBodyMarshalFailed: %v", err)
+				subtest.Fatalf("ExpectedBodyMarshalFailed: %v", err)
 			}
 
 			if string(actualBodyJson) != string(expectedBodyJson) {
-				t.Errorf(
+				subtest.Errorf(
 					"ResponseBodyMismatch: expected %s, got %s",
 					string(expectedBodyJson), string(actualBodyJson),
 				)
@@ -301,7 +301,7 @@ func TestLiaisonApiResponseEmitter(t *testing.T) {
 	}
 }
 
-func TestNewLiaisonResponse(t *testing.T) {
+func TestNewLiaisonResponse(test *testing.T) {
 	testCases := []struct {
 		name                    string
 		status                  LiaisonResponseStatus
@@ -341,7 +341,7 @@ func TestNewLiaisonResponse(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			result := NewLiaisonResponse(
 				testCase.status,
 				testCase.body,
@@ -349,14 +349,14 @@ func TestNewLiaisonResponse(t *testing.T) {
 			)
 
 			if result.Status != testCase.expectedStatus {
-				t.Errorf(
+				subtest.Errorf(
 					"StatusMismatch: expected %s, got %s",
 					testCase.expectedStatus, result.Status,
 				)
 			}
 
 			if result.ReadableMessage != testCase.expectedReadableMessage {
-				t.Errorf(
+				subtest.Errorf(
 					"ReadableMessageMismatch: expected %s, got %s",
 					testCase.expectedReadableMessage, result.ReadableMessage,
 				)
@@ -364,16 +364,16 @@ func TestNewLiaisonResponse(t *testing.T) {
 
 			actualJson, err := json.Marshal(result.Body)
 			if err != nil {
-				t.Fatalf("ActualJsonMarshalingFailed: %v", err)
+				subtest.Fatalf("ActualJsonMarshalingFailed: %v", err)
 			}
 
 			expectedJson, err := json.Marshal(testCase.expectedBody)
 			if err != nil {
-				t.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
+				subtest.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
 			}
 
 			if string(actualJson) != string(expectedJson) {
-				t.Errorf(
+				subtest.Errorf(
 					"BodyMismatch: expected '%s', got '%s'",
 					string(expectedJson), string(actualJson),
 				)
@@ -382,7 +382,7 @@ func TestNewLiaisonResponse(t *testing.T) {
 	}
 }
 
-func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
+func TestLiaisonCliResponseRendererExitCodes(test *testing.T) {
 	testCases := []struct {
 		name             string
 		status           LiaisonResponseStatus
@@ -477,11 +477,11 @@ func TestLiaisonCliResponseRendererExitCodes(t *testing.T) {
 
 	// Since LiaisonCliResponseRenderer calls os.Exit, we test the exit code logic
 	// by creating a test program that we compile and run in a subprocess.
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	projectRoot, err := filepath.Abs("../../")
 	if err != nil {
-		t.Fatalf("ResolveProjectRootFailed: %v", err)
+		test.Fatalf("ResolveProjectRootFailed: %v", err)
 	}
 
 	testProgramGoMod := `module testLiaisonCliResponseRenderer
@@ -494,20 +494,20 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 `
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
-		t.Fatalf("ResolveWorkingDirectoryFailed: %v", err)
+		test.Fatalf("ResolveWorkingDirectoryFailed: %v", err)
 	}
 
 	fileClerk := tkInfra.FileClerk{}
 	err = os.WriteFile(workingDir+"/go.mod", []byte(testProgramGoMod), 0644)
 	if err != nil {
-		t.Fatalf("WriteGoModFailed: %v", err)
+		test.Fatalf("WriteGoModFailed: %v", err)
 	}
 
 	testFile := tempDir + "/testLiaisonCliResponseRenderer.go"
 	binaryPath := tempDir + "/testLiaisonCliResponseRenderer"
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			testProgramMain := `package main
 
 import tkPresentation "github.com/goinfinite/tk/src/presentation"
@@ -523,7 +523,7 @@ func main() {
 
 			err = os.WriteFile(testFile, []byte(testProgramMain), 0644)
 			if err != nil {
-				t.Fatalf("WriteTestProgramFailed: %v", err)
+				subtest.Fatalf("WriteTestProgramFailed: %v", err)
 			}
 
 			if !fileClerk.FileExists(workingDir + "/go.sum") {
@@ -534,7 +534,7 @@ func main() {
 				})
 				_, err = goModShell.Run()
 				if err != nil {
-					t.Fatalf("RunGoModTidyFailed: %v", err)
+					subtest.Fatalf("RunGoModTidyFailed: %v", err)
 				}
 			}
 
@@ -545,7 +545,7 @@ func main() {
 			})
 			_, err = goBuildShell.Run()
 			if err != nil {
-				t.Fatalf("GoBuildFailed: %v", err)
+				subtest.Fatalf("GoBuildFailed: %v", err)
 			}
 
 			runShell := tkInfra.NewShell(tkInfra.ShellSettings{
@@ -563,18 +563,18 @@ func main() {
 			case nil:
 				exitCode = 0
 			default:
-				t.Fatalf("CommandExecutionFailed: %v", err)
+				subtest.Fatalf("CommandExecutionFailed: %v", err)
 			}
 
 			if exitCode != testCase.expectedExitCode {
-				t.Errorf(
+				subtest.Errorf(
 					"ExitCodeMismatch: expected '%d', got '%d'. StdOut: '%s' // StdErr: '%s'",
 					testCase.expectedExitCode, exitCode, stdOut, stdErr,
 				)
 			}
 
 			if !strings.Contains(stdOut, testCase.readableMessage) {
-				t.Errorf(
+				subtest.Errorf(
 					"MessageMismatch: expected '%s' to be in '%s'",
 					testCase.readableMessage, stdOut,
 				)
@@ -583,7 +583,7 @@ func main() {
 	}
 }
 
-func TestSimpleCliResponseRendererExitCodes(t *testing.T) {
+func TestSimpleCliResponseRendererExitCodes(test *testing.T) {
 	testCases := []struct {
 		name             string
 		isSuccess        bool
@@ -604,11 +604,11 @@ func TestSimpleCliResponseRendererExitCodes(t *testing.T) {
 		},
 	}
 
-	tempDir := t.TempDir()
+	tempDir := test.TempDir()
 
 	projectRoot, err := filepath.Abs("../../")
 	if err != nil {
-		t.Fatalf("ResolveProjectRootFailed: %v", err)
+		test.Fatalf("ResolveProjectRootFailed: %v", err)
 	}
 
 	testProgramGoMod := `module testSimpleCliResponseRenderer
@@ -621,7 +621,7 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 `
 	workingDir, err := filepath.Abs(tempDir)
 	if err != nil {
-		t.Fatalf("ResolveWorkingDirectoryFailed: %v", err)
+		test.Fatalf("ResolveWorkingDirectoryFailed: %v", err)
 	}
 
 	fileClerk := tkInfra.FileClerk{}
@@ -629,14 +629,14 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 		workingDir+"/go.mod", []byte(testProgramGoMod), 0644,
 	)
 	if err != nil {
-		t.Fatalf("WriteGoModFailed: %v", err)
+		test.Fatalf("WriteGoModFailed: %v", err)
 	}
 
 	testFile := tempDir + "/testSimpleCliResponseRenderer.go"
 	binaryPath := tempDir + "/testSimpleCliResponseRenderer"
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			isSuccessLiteral := "false"
 			if testCase.isSuccess {
 				isSuccessLiteral = "true"
@@ -656,7 +656,7 @@ func main() {
 				testFile, []byte(testProgramMain), 0644,
 			)
 			if err != nil {
-				t.Fatalf("WriteTestProgramFailed: %v", err)
+				subtest.Fatalf("WriteTestProgramFailed: %v", err)
 			}
 
 			if !fileClerk.FileExists(workingDir + "/go.sum") {
@@ -667,7 +667,7 @@ func main() {
 				})
 				_, err = goModShell.Run()
 				if err != nil {
-					t.Fatalf("RunGoModTidyFailed: %v", err)
+					subtest.Fatalf("RunGoModTidyFailed: %v", err)
 				}
 			}
 
@@ -678,7 +678,7 @@ func main() {
 			})
 			_, err = goBuildShell.Run()
 			if err != nil {
-				t.Fatalf("GoBuildFailed: %v", err)
+				subtest.Fatalf("GoBuildFailed: %v", err)
 			}
 
 			runShell := tkInfra.NewShell(tkInfra.ShellSettings{
@@ -696,11 +696,11 @@ func main() {
 			case nil:
 				exitCode = 0
 			default:
-				t.Fatalf("CommandExecutionFailed: %v", err)
+				subtest.Fatalf("CommandExecutionFailed: %v", err)
 			}
 
 			if exitCode != testCase.expectedExitCode {
-				t.Errorf(
+				subtest.Errorf(
 					"ExitCodeMismatch: expected '%d', got '%d'."+
 						" StdOut: '%s' // StdErr: '%s'",
 					testCase.expectedExitCode, exitCode,
@@ -709,7 +709,7 @@ func main() {
 			}
 
 			if !strings.Contains(stdOut, testCase.message) {
-				t.Errorf(
+				subtest.Errorf(
 					"MessageMismatch: expected '%s'"+
 						" to be in '%s'",
 					testCase.message, stdOut,

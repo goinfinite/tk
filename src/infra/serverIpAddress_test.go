@@ -10,32 +10,32 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestServerIpAddress(t *testing.T) {
-	t.Run("FunctionalTest", func(t *testing.T) {
-		t.Setenv(ServerPublicIpAddressEnvVarName, "")
+func TestServerIpAddress(test *testing.T) {
+	test.Run("FunctionalTest", func(subtest *testing.T) {
+		subtest.Setenv(ServerPublicIpAddressEnvVarName, "")
 
 		_, err := ReadServerPrivateIpAddress()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
 		_, err = ReadServerPublicIpAddress()
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 	})
 
-	t.Run("PublicIpAddressEnvVarTakesPriority", func(t *testing.T) {
+	test.Run("PublicIpAddressEnvVarTakesPriority", func(subtest *testing.T) {
 		rawEnvIpAddress := "203.0.113.42"
-		t.Setenv(ServerPublicIpAddressEnvVarName, rawEnvIpAddress)
+		subtest.Setenv(ServerPublicIpAddressEnvVarName, rawEnvIpAddress)
 
 		ipAddress, err := ReadServerPublicIpAddress()
 		if err != nil {
-			t.Fatalf("UnexpectedError: '%s'", err.Error())
+			subtest.Fatalf("UnexpectedError: '%s'", err.Error())
 		}
 
 		if ipAddress.String() != rawEnvIpAddress {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedIpFromEnvVar '%s', got '%s'",
 				rawEnvIpAddress, ipAddress.String(),
 			)
@@ -48,7 +48,7 @@ type publicIpResolverResponseStub struct {
 	body       string
 }
 
-func TestPublicIpAddressResolver(t *testing.T) {
+func TestPublicIpAddressResolver(test *testing.T) {
 	testCaseStructs := []struct {
 		description                   string
 		publicIpResolverResponseStubs []publicIpResolverResponseStub
@@ -106,7 +106,7 @@ func TestPublicIpAddressResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.description, func(t *testing.T) {
+		test.Run(testCase.description, func(subtest *testing.T) {
 			var resolverUrls []tkValueObject.Url
 			for _, responseStub := range testCase.publicIpResolverResponseStubs {
 				testServer := httptest.NewServer(http.HandlerFunc(
@@ -133,10 +133,10 @@ func TestPublicIpAddressResolver(t *testing.T) {
 
 			if testCase.expectError {
 				if err == nil {
-					t.Fatalf("ExpectedErrorButGotNone")
+					subtest.Fatalf("ExpectedErrorButGotNone")
 				}
 				if !strings.Contains(err.Error(), testCase.expectedErrorIn) {
-					t.Errorf(
+					subtest.Errorf(
 						"ExpectedErrorToContain '%s', got '%s'",
 						testCase.expectedErrorIn, err.Error(),
 					)
@@ -145,10 +145,10 @@ func TestPublicIpAddressResolver(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("UnexpectedError: '%s'", err.Error())
+				subtest.Fatalf("UnexpectedError: '%s'", err.Error())
 			}
 			if ipAddress.String() != testCase.expectedIpAddress {
-				t.Errorf(
+				subtest.Errorf(
 					"ExpectedIp '%s', got '%s'",
 					testCase.expectedIpAddress, ipAddress.String(),
 				)
@@ -156,7 +156,7 @@ func TestPublicIpAddressResolver(t *testing.T) {
 		})
 	}
 
-	t.Run("SpreadsLoadAcrossEndpoints", func(t *testing.T) {
+	test.Run("SpreadsLoadAcrossEndpoints", func(subtest *testing.T) {
 		ipAddressesByServer := []string{
 			"203.0.113.1",
 			"203.0.113.2",
@@ -189,14 +189,14 @@ func TestPublicIpAddressResolver(t *testing.T) {
 		for callIndex := 0; callIndex < 60; callIndex++ {
 			ipAddress, err := resolver.Resolve()
 			if err != nil {
-				t.Fatalf("UnexpectedError: '%s'", err.Error())
+				subtest.Fatalf("UnexpectedError: '%s'", err.Error())
 			}
 			seenIpAddresses[ipAddress.String()] = true
 		}
 
 		for _, expectedIpAddress := range ipAddressesByServer {
 			if !seenIpAddresses[expectedIpAddress] {
-				t.Errorf(
+				subtest.Errorf(
 					"ExpectedIpAddressSeenAtLeastOnce '%s'",
 					expectedIpAddress,
 				)
@@ -204,17 +204,17 @@ func TestPublicIpAddressResolver(t *testing.T) {
 		}
 	})
 
-	t.Run("AvailableResolverUrlsAreUsedByPublicConstructor", func(t *testing.T) {
+	test.Run("AvailableResolverUrlsAreUsedByPublicConstructor", func(subtest *testing.T) {
 		resolver := NewPublicIpAddressResolver()
 		if len(resolver.resolverUrls) != len(publicIpResolverAvailableUrls) {
-			t.Errorf(
+			subtest.Errorf(
 				"ExpectedAvailableResolverUrlsCount %d, got %d",
 				len(publicIpResolverAvailableUrls), len(resolver.resolverUrls),
 			)
 		}
 		for index, expectedUrl := range publicIpResolverAvailableUrls {
 			if resolver.resolverUrls[index] != expectedUrl {
-				t.Errorf(
+				subtest.Errorf(
 					"ExpectedResolverUrlAtIndex %d to be '%s', got '%s'",
 					index, expectedUrl.String(),
 					resolver.resolverUrls[index].String(),

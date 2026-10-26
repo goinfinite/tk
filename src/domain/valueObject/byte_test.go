@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewByte(t *testing.T) {
-	t.Run("NewByte", func(t *testing.T) {
+func TestNewByte(test *testing.T) {
+	test.Run("NewByte", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput Byte
@@ -27,18 +27,18 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewByte(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewKibibyte", func(t *testing.T) {
+	test.Run("NewKibibyte", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput Byte
@@ -61,18 +61,18 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewKibibyte(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewMebibyte", func(t *testing.T) {
+	test.Run("NewMebibyte", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput Byte
@@ -95,18 +95,18 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewMebibyte(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewGibibyte", func(t *testing.T) {
+	test.Run("NewGibibyte", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput Byte
@@ -129,18 +129,18 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewGibibyte(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewTebibyte", func(t *testing.T) {
+	test.Run("NewTebibyte", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput Byte
@@ -163,18 +163,18 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewTebibyte(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("Int64Method", func(t *testing.T) {
+	test.Run("Int64Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput int64
@@ -189,12 +189,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.Int64()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("Uint64Method", func(t *testing.T) {
+	test.Run("Uint64Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput uint64
@@ -207,12 +207,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.Uint64()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("Float64Method", func(t *testing.T) {
+	test.Run("Float64Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput float64
@@ -225,12 +225,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.Float64()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ToKiBMethod", func(t *testing.T) {
+	test.Run("ToKiBMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput uint64
@@ -244,12 +244,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ToKiB()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ToMiBMethod", func(t *testing.T) {
+	test.Run("ToMiBMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput uint64
@@ -263,12 +263,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ToMiB()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ToGiBMethod", func(t *testing.T) {
+	test.Run("ToGiBMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput uint64
@@ -282,12 +282,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ToGiB()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ToTiBMethod", func(t *testing.T) {
+	test.Run("ToTiBMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput uint64
@@ -301,12 +301,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ToTiB()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput string
@@ -320,12 +320,12 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringWithSuffixMethod", func(t *testing.T) {
+	test.Run("StringWithSuffixMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     Byte
 			expectedOutput string
@@ -342,7 +342,7 @@ func TestNewByte(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.StringWithSuffix()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

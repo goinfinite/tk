@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestNewSystemResourceId(t *testing.T) {
-	t.Run("ValidSystemResourceId", func(t *testing.T) {
+func TestNewSystemResourceId(test *testing.T) {
+	test.Run("ValidSystemResourceId", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -29,15 +29,15 @@ func TestNewSystemResourceId(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceId(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("InvalidSystemResourceId", func(t *testing.T) {
+	test.Run("InvalidSystemResourceId", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -54,15 +54,15 @@ func TestNewSystemResourceId(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceId(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     SystemResourceId
 			expectedOutput string
@@ -76,7 +76,7 @@ func TestNewSystemResourceId(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)

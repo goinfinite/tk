@@ -6,26 +6,26 @@ import (
 	"testing"
 )
 
-func TestInterfaceToBool(t *testing.T) {
-	t.Run("BoolInput", func(t *testing.T) {
+func TestInterfaceToBool(test *testing.T) {
+	test.Run("BoolInput", func(subtest *testing.T) {
 		actualOutput, conversionErr := InterfaceToBool(true)
 		if conversionErr != nil {
-			t.Errorf("UnexpectedError: '%s'", conversionErr.Error())
+			subtest.Errorf("UnexpectedError: '%s'", conversionErr.Error())
 		}
 		if actualOutput != true {
-			t.Errorf("UnexpectedOutputValue: '%v' vs 'true'", actualOutput)
+			subtest.Errorf("UnexpectedOutputValue: '%v' vs 'true'", actualOutput)
 		}
 
 		actualOutput, conversionErr = InterfaceToBool(false)
 		if conversionErr != nil {
-			t.Errorf("UnexpectedError: '%s'", conversionErr.Error())
+			subtest.Errorf("UnexpectedError: '%s'", conversionErr.Error())
 		}
 		if actualOutput != false {
-			t.Errorf("UnexpectedOutputValue: '%v' vs 'false'", actualOutput)
+			subtest.Errorf("UnexpectedOutputValue: '%v' vs 'false'", actualOutput)
 		}
 	})
 
-	t.Run("StringInput", func(t *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput bool
@@ -59,10 +59,10 @@ func TestInterfaceToBool(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToBool(testCase.inputString)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 
@@ -70,12 +70,12 @@ func TestInterfaceToBool(t *testing.T) {
 		for _, invalidString := range invalidInputStrings {
 			_, conversionErr := InterfaceToBool(invalidString)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", invalidString)
+				subtest.Errorf("MissingExpectedError: [%s]", invalidString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		integerInputs := []any{
 			int(1), int8(1), int16(1), int32(1), int64(1),
 			int(0), int8(0), int16(0), int32(0), int64(0),
@@ -97,10 +97,10 @@ func TestInterfaceToBool(t *testing.T) {
 			}
 			actualOutput, conversionErr := InterfaceToBool(numericInput)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
 			}
 			if actualOutput != expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
 			}
 		}
 
@@ -124,10 +124,10 @@ func TestInterfaceToBool(t *testing.T) {
 			}
 			actualOutput, conversionErr := InterfaceToBool(numericInput)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
 			}
 			if actualOutput != expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
 			}
 		}
 
@@ -146,15 +146,15 @@ func TestInterfaceToBool(t *testing.T) {
 			}
 			actualOutput, conversionErr := InterfaceToBool(numericInput)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), numericInput)
 			}
 			if actualOutput != expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, expectedOutput, numericInput)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -164,14 +164,14 @@ func TestInterfaceToBool(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToBool(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToString(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToString(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput string
@@ -185,15 +185,15 @@ func TestInterfaceToString(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToString(testCase.inputString)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%s' vs '%s' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%s' vs '%s' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput string
@@ -218,15 +218,15 @@ func TestInterfaceToString(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToString(testCase.inputValue)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%s' vs '%s' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%s' vs '%s' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -236,14 +236,14 @@ func TestInterfaceToString(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToString(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToInt(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToInt(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput int
@@ -260,18 +260,18 @@ func TestInterfaceToInt(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int
@@ -304,18 +304,18 @@ func TestInterfaceToInt(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -327,14 +327,14 @@ func TestInterfaceToInt(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToInt8(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToInt8(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput int8
@@ -353,18 +353,18 @@ func TestInterfaceToInt8(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt8(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int8
@@ -394,18 +394,18 @@ func TestInterfaceToInt8(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt8(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -417,14 +417,14 @@ func TestInterfaceToInt8(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt8(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToInt16(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToInt16(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput int16
@@ -443,18 +443,18 @@ func TestInterfaceToInt16(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt16(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int16
@@ -484,18 +484,18 @@ func TestInterfaceToInt16(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt16(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -507,14 +507,14 @@ func TestInterfaceToInt16(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt16(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToInt32(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToInt32(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput int32
@@ -533,18 +533,18 @@ func TestInterfaceToInt32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt32(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int32
@@ -574,18 +574,18 @@ func TestInterfaceToInt32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt32(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -597,14 +597,14 @@ func TestInterfaceToInt32(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt32(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToInt64(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToInt64(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput int64
@@ -621,18 +621,18 @@ func TestInterfaceToInt64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt64(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput int64
@@ -669,18 +669,18 @@ func TestInterfaceToInt64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToInt64(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -692,17 +692,17 @@ func TestInterfaceToInt64(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToInt64(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToUint(t *testing.T) {
+func TestInterfaceToUint(test *testing.T) {
 	aboveMaxUint32 := uint64(1) << 32
 	uintIs32Bit := strconv.IntSize == 32
 
-	t.Run("StringInput", func(t *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput uint
@@ -721,18 +721,18 @@ func TestInterfaceToUint(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput uint
@@ -766,20 +766,20 @@ func TestInterfaceToUint(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NativeUintBoundary", func(t *testing.T) {
+	test.Run("NativeUintBoundary", func(subtest *testing.T) {
 		if strconv.IntSize != 64 {
-			t.Skip("native uint is 32-bit on this target")
+			subtest.Skip("native uint is 32-bit on this target")
 		}
 
 		testCaseStructs := []struct {
@@ -795,18 +795,18 @@ func TestInterfaceToUint(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -818,14 +818,14 @@ func TestInterfaceToUint(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToUint(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToUint8(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToUint8(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput uint8
@@ -843,18 +843,18 @@ func TestInterfaceToUint8(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint8(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput uint8
@@ -889,18 +889,18 @@ func TestInterfaceToUint8(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint8(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -912,14 +912,14 @@ func TestInterfaceToUint8(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToUint8(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToUint16(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToUint16(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput uint16
@@ -937,18 +937,18 @@ func TestInterfaceToUint16(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint16(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput uint16
@@ -981,18 +981,18 @@ func TestInterfaceToUint16(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint16(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -1004,14 +1004,14 @@ func TestInterfaceToUint16(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToUint16(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToUint32(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToUint32(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput uint32
@@ -1029,18 +1029,18 @@ func TestInterfaceToUint32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint32(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput uint32
@@ -1071,18 +1071,18 @@ func TestInterfaceToUint32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint32(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -1094,14 +1094,14 @@ func TestInterfaceToUint32(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToUint32(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToUint64(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToUint64(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput uint64
@@ -1118,18 +1118,18 @@ func TestInterfaceToUint64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint64(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput uint64
@@ -1165,18 +1165,18 @@ func TestInterfaceToUint64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToUint64(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%d' vs '%d' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -1188,14 +1188,14 @@ func TestInterfaceToUint64(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToUint64(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToFloat32(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToFloat32(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput float32
@@ -1212,18 +1212,18 @@ func TestInterfaceToFloat32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToFloat32(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput float32
@@ -1245,16 +1245,16 @@ func TestInterfaceToFloat32(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToFloat32(testCase.inputValue)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			// Use a small epsilon for floating point comparison
 			if math.Abs(float64(actualOutput-testCase.expectedOutput)) > 0.0001 {
-				t.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -1266,14 +1266,14 @@ func TestInterfaceToFloat32(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToFloat32(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestInterfaceToFloat64(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestInterfaceToFloat64(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    string
 			expectedOutput float64
@@ -1290,18 +1290,18 @@ func TestInterfaceToFloat64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToFloat64(testCase.inputString)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputString)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputString)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", conversionErr.Error(), testCase.inputString)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
+				subtest.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%s]", actualOutput, testCase.expectedOutput, testCase.inputString)
 			}
 		}
 	})
 
-	t.Run("NumericInput", func(t *testing.T) {
+	test.Run("NumericInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput float64
@@ -1324,16 +1324,16 @@ func TestInterfaceToFloat64(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := InterfaceToFloat64(testCase.inputValue)
 			if conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			// Use a small epsilon for floating point comparison
 			if math.Abs(actualOutput-testCase.expectedOutput) > 0.0001 {
-				t.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%f' vs '%f' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("UnsupportedInput", func(t *testing.T) {
+	test.Run("UnsupportedInput", func(subtest *testing.T) {
 		unsupportedInputs := []any{
 			[]int{1, 2, 3},
 			map[string]int{"key": 1},
@@ -1345,13 +1345,13 @@ func TestInterfaceToFloat64(t *testing.T) {
 		for _, invalidInput := range unsupportedInputs {
 			_, conversionErr := InterfaceToFloat64(invalidInput)
 			if conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", invalidInput)
+				subtest.Errorf("MissingExpectedError: [%v]", invalidInput)
 			}
 		}
 	})
 }
 
-func TestIsFractionalFloat(t *testing.T) {
+func TestIsFractionalFloat(test *testing.T) {
 	testCaseStructs := []struct {
 		inputValue     any
 		expectedOutput bool
@@ -1371,12 +1371,12 @@ func TestIsFractionalFloat(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		actualOutput := IsFractionalFloat(testCase.inputValue)
 		if actualOutput != testCase.expectedOutput {
-			t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			test.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 		}
 	}
 }
 
-func TestTruncateFloat(t *testing.T) {
+func TestTruncateFloat(test *testing.T) {
 	testCaseStructs := []struct {
 		inputValue     any
 		expectedOutput any
@@ -1395,7 +1395,7 @@ func TestTruncateFloat(t *testing.T) {
 	for _, testCase := range testCaseStructs {
 		actualOutput := TruncateFloat(testCase.inputValue)
 		if actualOutput != testCase.expectedOutput {
-			t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+			test.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 		}
 	}
 }

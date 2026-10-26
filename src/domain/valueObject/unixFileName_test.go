@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewUnixFileName(t *testing.T) {
-	t.Run("StringInputStrict", func(t *testing.T) {
+func TestNewUnixFileName(test *testing.T) {
+	test.Run("StringInputStrict", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput UnixFileName
@@ -94,18 +94,18 @@ func TestNewUnixFileName(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewUnixFileName(testCase.inputValue, false)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringInputUnsafe", func(t *testing.T) {
+	test.Run("StringInputUnsafe", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput UnixFileName
@@ -185,18 +185,18 @@ func TestNewUnixFileName(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewUnixFileName(testCase.inputValue, true)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixFileName
 			expectedOutput string
@@ -209,7 +209,7 @@ func TestNewUnixFileName(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

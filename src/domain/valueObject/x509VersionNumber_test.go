@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewX509VersionNumber(t *testing.T) {
-	t.Run("ValidVersionNumber", func(t *testing.T) {
+func TestNewX509VersionNumber(test *testing.T) {
+	test.Run("ValidVersionNumber", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509VersionNumber
@@ -33,14 +33,14 @@ func TestNewX509VersionNumber(t *testing.T) {
 			actualOutput, err := NewX509VersionNumber(testCase.inputValue)
 
 			if testCase.expectError && err == nil {
-				t.Errorf(
+				subtest.Errorf(
 					"MissingExpectedError: [%v]",
 					testCase.inputValue,
 				)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf(
+				subtest.Fatalf(
 					"UnexpectedError: '%s' [%v]",
 					err.Error(), testCase.inputValue,
 				)
@@ -48,7 +48,7 @@ func TestNewX509VersionNumber(t *testing.T) {
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -56,7 +56,7 @@ func TestNewX509VersionNumber(t *testing.T) {
 		}
 	})
 
-	t.Run("Uint8Method", func(t *testing.T) {
+	test.Run("Uint8Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509VersionNumber
 			expectedOutput uint8
@@ -70,7 +70,7 @@ func TestNewX509VersionNumber(t *testing.T) {
 			actualOutput := testCase.inputValue.Uint8()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)
@@ -78,7 +78,7 @@ func TestNewX509VersionNumber(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509VersionNumber
 			expectedOutput string
@@ -92,7 +92,7 @@ func TestNewX509VersionNumber(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)

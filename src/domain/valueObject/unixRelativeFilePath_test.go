@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestNewUnixRelativeFilePath(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestNewUnixRelativeFilePath(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput UnixRelativeFilePath
@@ -52,18 +52,18 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewUnixRelativeFilePath(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput string
@@ -78,12 +78,12 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadWithoutExtensionMethod", func(t *testing.T) {
+	test.Run("ReadWithoutExtensionMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixRelativeFilePath
@@ -108,12 +108,12 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadWithoutExtension()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadFileNameMethod", func(t *testing.T) {
+	test.Run("ReadFileNameMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileName
@@ -131,18 +131,18 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadFileName()
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadFileExtensionMethod", func(t *testing.T) {
+	test.Run("ReadFileExtensionMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileExtension
@@ -172,31 +172,31 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadFileExtension()
 			if testCase.expectedError == nil && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 			if testCase.expectedError != nil && !errors.Is(err, testCase.expectedError) {
-				t.Errorf(
+				subtest.Errorf(
 					"ExpectedError: '%v' vs '%v' [%v]",
 					testCase.expectedError, err, testCase.inputValue,
 				)
 			}
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadFileExtensionMethodPathError", func(t *testing.T) {
+	test.Run("ReadFileExtensionMethodPathError", func(subtest *testing.T) {
 		_, err := UnixRelativeFilePath("./dir/.").ReadFileExtension()
 		if err == nil {
-			t.Fatal("MissingExpectedError")
+			subtest.Fatal("MissingExpectedError")
 		}
 		if errors.Is(err, ErrInvalidFileExtension) {
-			t.Errorf("PathErrorWrappedAsInvalidFileExtension: '%v'", err)
+			subtest.Errorf("PathErrorWrappedAsInvalidFileExtension: '%v'", err)
 		}
 	})
 
-	t.Run("ReadCompoundFileExtensionMethod", func(t *testing.T) {
+	test.Run("ReadCompoundFileExtensionMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileExtension
@@ -222,18 +222,18 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadCompoundFileExtension()
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadFileNameWithoutExtensionMethod", func(t *testing.T) {
+	test.Run("ReadFileNameWithoutExtensionMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixFileName
@@ -261,18 +261,18 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, err := testCase.inputValue.ReadFileNameWithoutExtension()
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadFileDirMethod", func(t *testing.T) {
+	test.Run("ReadFileDirMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     UnixRelativeFilePath
 			expectedOutput UnixRelativeFilePath
@@ -290,7 +290,7 @@ func TestNewUnixRelativeFilePath(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ReadFileDir()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewActivityRecordMessage(t *testing.T) {
-	t.Run("ValidActivityRecordMessage", func(t *testing.T) {
+func TestNewActivityRecordMessage(test *testing.T) {
+	test.Run("ValidActivityRecordMessage", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -17,15 +17,15 @@ func TestNewActivityRecordMessage(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewActivityRecordMessage(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("InvalidActivityRecordMessage", func(t *testing.T) {
+	test.Run("InvalidActivityRecordMessage", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -38,10 +38,10 @@ func TestNewActivityRecordMessage(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewActivityRecordMessage(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})

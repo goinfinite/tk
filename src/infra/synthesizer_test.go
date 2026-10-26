@@ -13,10 +13,10 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestRandomIntegerGenerator(t *testing.T) {
+func TestRandomIntegerGenerator(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("ValuesStayWithinInclusiveBounds", func(t *testing.T) {
+	test.Run("ValuesStayWithinInclusiveBounds", func(subtest *testing.T) {
 		testCases := []struct {
 			lowestValue  int
 			highestValue int
@@ -38,7 +38,7 @@ func TestRandomIntegerGenerator(t *testing.T) {
 				valueIsInRange := randomValue >= testCase.lowestValue &&
 					randomValue <= testCase.highestValue
 				if !valueIsInRange {
-					t.Errorf(
+					subtest.Errorf(
 						"ValueOutsideBounds: %d [%d, %d]",
 						randomValue, testCase.lowestValue,
 						testCase.highestValue,
@@ -48,7 +48,7 @@ func TestRandomIntegerGenerator(t *testing.T) {
 		}
 	})
 
-	t.Run("EveryValueInSmallRangeIsReachable", func(t *testing.T) {
+	test.Run("EveryValueInSmallRangeIsReachable", func(subtest *testing.T) {
 		lowestValue := 3
 		highestValue := 7
 
@@ -61,7 +61,7 @@ func TestRandomIntegerGenerator(t *testing.T) {
 
 		for expectedValue := lowestValue; expectedValue <= highestValue; expectedValue++ {
 			if !seenValues[expectedValue] {
-				t.Errorf(
+				subtest.Errorf(
 					"UnreachedValue: %d [%d, %d]",
 					expectedValue, lowestValue, highestValue,
 				)
@@ -69,14 +69,14 @@ func TestRandomIntegerGenerator(t *testing.T) {
 		}
 	})
 
-	t.Run("InvertedRangePanics", func(t *testing.T) {
+	test.Run("InvertedRangePanics", func(subtest *testing.T) {
 		defer func() {
 			recoveredValue := recover()
 			if recoveredValue == nil {
-				t.Fatal("ExpectedPanicForInvertedRange")
+				subtest.Fatal("ExpectedPanicForInvertedRange")
 			}
 			if recoveredValue != "RandomIntegerRangeInvalid" {
-				t.Errorf("UnexpectedPanicValue: %v", recoveredValue)
+				subtest.Errorf("UnexpectedPanicValue: %v", recoveredValue)
 			}
 		}()
 
@@ -84,10 +84,10 @@ func TestRandomIntegerGenerator(t *testing.T) {
 	})
 }
 
-func TestCharsetPresenceGuarantor(t *testing.T) {
+func TestCharsetPresenceGuarantor(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("CharsetAlreadyPresent", func(t *testing.T) {
+	test.Run("CharsetAlreadyPresent", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString    []byte
 			charset        string
@@ -102,7 +102,7 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := synth.CharsetPresenceGuarantor(testCase.inputString, testCase.charset)
 			if string(actualOutput) != string(testCase.expectedOutput) {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%s' vs '%s' [%s, %s]",
 					string(actualOutput), string(testCase.expectedOutput), string(testCase.inputString),
 					testCase.charset,
@@ -111,7 +111,7 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 		}
 	})
 
-	t.Run("CharsetNotPresent", func(t *testing.T) {
+	test.Run("CharsetNotPresent", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputString []byte
 			charset     string
@@ -128,27 +128,27 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 			actualOutput := synth.CharsetPresenceGuarantor(inputCopy, testCase.charset)
 
 			if string(actualOutput) == string(testCase.inputString) {
-				t.Errorf(
+				subtest.Errorf(
 					"OutputUnchanged: Expected modification to include charset '%s' in '%s'",
 					testCase.charset, string(testCase.inputString),
 				)
 			}
 
 			if !strings.ContainsAny(string(actualOutput), testCase.charset) {
-				t.Errorf(
+				subtest.Errorf(
 					"CharsetNotAdded: Output '%s' does not contain any character from charset '%s'",
 					string(actualOutput), testCase.charset,
 				)
 			}
 
 			differentChars := 0
-			for i := 0; i < len(testCase.inputString); i++ {
-				if actualOutput[i] != testCase.inputString[i] {
+			for charIndex := 0; charIndex < len(testCase.inputString); charIndex++ {
+				if actualOutput[charIndex] != testCase.inputString[charIndex] {
 					differentChars++
 				}
 			}
 			if differentChars != 1 {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedModificationCount: %d characters modified instead of 1 [%s, %s]",
 					differentChars, string(testCase.inputString), testCase.charset,
 				)
@@ -156,12 +156,12 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 		}
 	})
 
-	t.Run("EdgeCases", func(t *testing.T) {
+	test.Run("EdgeCases", func(subtest *testing.T) {
 		singleChar := []byte("a")
 		charset := "b"
 		actualOutput := synth.CharsetPresenceGuarantor(singleChar, charset)
 		if string(actualOutput) != "b" {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedOutputValue: '%s' vs 'b' [single character case]",
 				string(actualOutput),
 			)
@@ -171,26 +171,26 @@ func TestCharsetPresenceGuarantor(t *testing.T) {
 		charset = "c"
 		actualOutput = synth.CharsetPresenceGuarantor(twoChars, charset)
 		if !strings.ContainsAny(string(actualOutput), charset) {
-			t.Errorf(
+			subtest.Errorf(
 				"CharsetNotAdded: Output '%s' does not contain any character from charset '%s'",
 				string(actualOutput), charset,
 			)
 		}
 	})
 
-	t.Run("InputLargerThanOneByteRange", func(t *testing.T) {
+	test.Run("InputLargerThanOneByteRange", func(subtest *testing.T) {
 		longInput := []byte(strings.Repeat("a", 300))
 		actualOutput := synth.CharsetPresenceGuarantor(longInput, "9")
 		if !strings.ContainsAny(string(actualOutput), "9") {
-			t.Errorf("CharsetNotAddedTo300ByteInput")
+			subtest.Errorf("CharsetNotAddedTo300ByteInput")
 		}
 	})
 }
 
-func TestPasswordFactory(t *testing.T) {
+func TestPasswordFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("PasswordLength", func(t *testing.T) {
+	test.Run("PasswordLength", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			desiredLength        int
 			shouldIncludeSymbols bool
@@ -209,7 +209,7 @@ func TestPasswordFactory(t *testing.T) {
 				testCase.desiredLength, testCase.shouldIncludeSymbols,
 			)
 			if len(password) != testCase.desiredLength {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedPasswordLength: '%d' vs '%d' [desired: %d, includeSymbols: %t]",
 					len(password), testCase.desiredLength, testCase.desiredLength,
 					testCase.shouldIncludeSymbols,
@@ -218,58 +218,58 @@ func TestPasswordFactory(t *testing.T) {
 		}
 	})
 
-	t.Run("PasswordCharacteristics", func(t *testing.T) {
+	test.Run("PasswordCharacteristics", func(subtest *testing.T) {
 		password := synth.PasswordFactory(12, false)
 		if !strings.ContainsAny(password, CharsetLowercaseLetters) {
-			t.Errorf("MissingLowercaseLetters: '%s'", password)
+			subtest.Errorf("MissingLowercaseLetters: '%s'", password)
 		}
 
 		if !strings.ContainsAny(password, CharsetUppercaseLetters) {
-			t.Errorf("MissingUppercaseLetters: '%s'", password)
+			subtest.Errorf("MissingUppercaseLetters: '%s'", password)
 		}
 
 		if !strings.ContainsAny(password, CharsetNumbers) {
-			t.Errorf("MissingNumbers: '%s'", password)
+			subtest.Errorf("MissingNumbers: '%s'", password)
 		}
 
 		if len(password) != 12 {
-			t.Errorf("UnexpectedPasswordLength: '%d' vs '12'", len(password))
+			subtest.Errorf("UnexpectedPasswordLength: '%d' vs '12'", len(password))
 		}
 
 		passwordWithSymbols := synth.PasswordFactory(12, true)
 		if !strings.ContainsAny(passwordWithSymbols, CharsetSymbols) {
-			t.Errorf("MissingSymbols: '%s'", passwordWithSymbols)
+			subtest.Errorf("MissingSymbols: '%s'", passwordWithSymbols)
 		}
 
 		if len(passwordWithSymbols) != 12 {
-			t.Errorf("UnexpectedPasswordLength: '%d' vs '12'", len(passwordWithSymbols))
+			subtest.Errorf("UnexpectedPasswordLength: '%d' vs '12'", len(passwordWithSymbols))
 		}
 	})
 
-	t.Run("ShortPasswordCharacteristics", func(t *testing.T) {
+	test.Run("ShortPasswordCharacteristics", func(subtest *testing.T) {
 		shortPassword := synth.PasswordFactory(4, false)
 		if len(shortPassword) != 4 {
-			t.Errorf("UnexpectedPasswordLength: '%d' vs '4'", len(shortPassword))
+			subtest.Errorf("UnexpectedPasswordLength: '%d' vs '4'", len(shortPassword))
 		}
 
 		veryShortPassword := synth.PasswordFactory(3, true)
 		if len(veryShortPassword) != 3 {
-			t.Errorf("UnexpectedPasswordLength: '%d' vs '3'", len(veryShortPassword))
+			subtest.Errorf("UnexpectedPasswordLength: '%d' vs '3'", len(veryShortPassword))
 		}
 	})
 }
 
-func TestUsernameFactory(t *testing.T) {
+func TestUsernameFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("UsernameGeneration", func(t *testing.T) {
+	test.Run("UsernameGeneration", func(subtest *testing.T) {
 		usernamesRegex := `^\w{1,256}$`
 		re := regexp.MustCompile(usernamesRegex)
 
 		for range 5 {
 			username := synth.UsernameFactory()
 			if !re.MatchString(username) {
-				t.Errorf(
+				subtest.Errorf(
 					"InvalidUsernameFormat: '%s' does not match regex '%s'",
 					username, usernamesRegex,
 				)
@@ -278,18 +278,18 @@ func TestUsernameFactory(t *testing.T) {
 	})
 }
 
-func TestMailAddressFactory(t *testing.T) {
+func TestMailAddressFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("WithNilUsername", func(t *testing.T) {
+	test.Run("WithNilUsername", func(subtest *testing.T) {
 		rawMailAddress := synth.MailAddressFactory(nil)
 		_, err := tkValueObject.NewMailAddress(rawMailAddress)
 		if err != nil {
-			t.Errorf("InvalidMailAddress: '%s' is not a valid email address", rawMailAddress)
+			subtest.Errorf("InvalidMailAddress: '%s' is not a valid email address", rawMailAddress)
 		}
 	})
 
-	t.Run("WithProvidedUsername", func(t *testing.T) {
+	test.Run("WithProvidedUsername", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			username string
 		}{
@@ -303,88 +303,88 @@ func TestMailAddressFactory(t *testing.T) {
 			rawMailAddress := synth.MailAddressFactory(&username)
 			mailAddress, err := tkValueObject.NewMailAddress(rawMailAddress)
 			if err != nil {
-				t.Errorf("InvalidMailAddress: '%s' is not a valid email address", rawMailAddress)
+				subtest.Errorf("InvalidMailAddress: '%s' is not a valid email address", rawMailAddress)
 			}
 
 			if !strings.HasPrefix(mailAddress.String(), username) {
-				t.Errorf("MissingUsername: '%s' does not start with '%s'", mailAddress, username)
+				subtest.Errorf("MissingUsername: '%s' does not start with '%s'", mailAddress, username)
 			}
 		}
 	})
 }
 
-func TestSelfSignedCertificatePairFactory(t *testing.T) {
+func TestSelfSignedCertificatePairFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("WithNilCommonNameAndEmptyAltNames", func(t *testing.T) {
+	test.Run("WithNilCommonNameAndEmptyAltNames", func(subtest *testing.T) {
 		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 		}
 
 		if certPair.Leaf == nil {
-			t.Error("CertificateLeafIsNil")
+			subtest.Error("CertificateLeafIsNil")
 		}
 
 		if certPair.Leaf.Subject.CommonName != "localhost" {
-			t.Errorf("UnexpectedCommonName: '%s' vs 'localhost'", certPair.Leaf.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: '%s' vs 'localhost'", certPair.Leaf.Subject.CommonName)
 		}
 
 		if len(certPair.Leaf.DNSNames) != 0 {
-			t.Errorf("UnexpectedAltNames: %v", certPair.Leaf.DNSNames)
+			subtest.Errorf("UnexpectedAltNames: %v", certPair.Leaf.DNSNames)
 		}
 
 		if certPair.Leaf.Subject.Organization[0] != "Daystrom Institute" {
-			t.Errorf("UnexpectedOrganization: '%s' vs 'Daystrom Institute'", certPair.Leaf.Subject.Organization[0])
+			subtest.Errorf("UnexpectedOrganization: '%s' vs 'Daystrom Institute'", certPair.Leaf.Subject.Organization[0])
 		}
 
 		if certPair.Leaf.SerialNumber == nil || certPair.Leaf.SerialNumber.Sign() <= 0 {
-			t.Error("InvalidSerialNumber")
+			subtest.Error("InvalidSerialNumber")
 		}
 
 		validFrom := certPair.Leaf.NotBefore
 		validUntil := certPair.Leaf.NotAfter
 		if validUntil.Sub(validFrom) != 365*24*time.Hour {
-			t.Errorf("UnexpectedValidityPeriod: %v", validUntil.Sub(validFrom))
+			subtest.Errorf("UnexpectedValidityPeriod: %v", validUntil.Sub(validFrom))
 		}
 	})
 
-	t.Run("WithProvidedCommonName", func(t *testing.T) {
+	test.Run("WithProvidedCommonName", func(subtest *testing.T) {
 		commonName, err := tkValueObject.NewFqdn("example.com")
 		if err != nil {
-			t.Fatalf("CreateFqdnFailed: %v", err)
+			subtest.Fatalf("CreateFqdnFailed: %v", err)
 		}
 
 		certPair, err := synth.SelfSignedCertificatePairFactory(&commonName, []tkValueObject.Fqdn{})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 		}
 
 		if certPair.Leaf.Subject.CommonName != "example.com" {
-			t.Errorf("UnexpectedCommonName: '%s' vs 'example.com'", certPair.Leaf.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: '%s' vs 'example.com'", certPair.Leaf.Subject.CommonName)
 		}
 	})
 
-	t.Run("WithAltNames", func(t *testing.T) {
+	test.Run("WithAltNames", func(subtest *testing.T) {
 		altName1, err := tkValueObject.NewFqdn("alt1.example.com")
 		if err != nil {
-			t.Fatalf("CreateFqdnFailed: %v", err)
+			subtest.Fatalf("CreateFqdnFailed: %v", err)
 		}
 		altName2, err := tkValueObject.NewFqdn("alt2.example.com")
 		if err != nil {
-			t.Fatalf("CreateFqdnFailed: %v", err)
+			subtest.Fatalf("CreateFqdnFailed: %v", err)
 		}
 
 		altNames := []tkValueObject.Fqdn{altName1, altName2}
 
 		certPair, err := synth.SelfSignedCertificatePairFactory(nil, altNames)
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 		}
 
 		expectedAltNames := []string{"alt1.example.com", "alt2.example.com"}
 		if len(certPair.Leaf.DNSNames) != len(expectedAltNames) {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedAltNamesCount: %d vs %d",
 				len(certPair.Leaf.DNSNames), len(expectedAltNames),
 			)
@@ -392,7 +392,7 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 
 		for altNameIndex, expectedAltName := range expectedAltNames {
 			if altNameIndex >= len(certPair.Leaf.DNSNames) {
-				t.Errorf(
+				subtest.Errorf(
 					"MissingDNSNameAtIndex: %d (expected '%s')",
 					altNameIndex, expectedAltName,
 				)
@@ -400,7 +400,7 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 			}
 
 			if certPair.Leaf.DNSNames[altNameIndex] != expectedAltName {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedDNSName: '%s' vs '%s'",
 					certPair.Leaf.DNSNames[altNameIndex], expectedAltName,
 				)
@@ -408,24 +408,24 @@ func TestSelfSignedCertificatePairFactory(t *testing.T) {
 		}
 	})
 
-	t.Run("CertificateUsage", func(t *testing.T) {
+	test.Run("CertificateUsage", func(subtest *testing.T) {
 		certPair, err := synth.SelfSignedCertificatePairFactory(nil, []tkValueObject.Fqdn{})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 		}
 
 		expectedKeyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
 		if certPair.Leaf.KeyUsage != expectedKeyUsage {
-			t.Errorf("UnexpectedKeyUsage: %v vs %v", certPair.Leaf.KeyUsage, expectedKeyUsage)
+			subtest.Errorf("UnexpectedKeyUsage: %v vs %v", certPair.Leaf.KeyUsage, expectedKeyUsage)
 		}
 
 		if len(certPair.Leaf.ExtKeyUsage) != 1 || certPair.Leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
-			t.Errorf("UnexpectedExtKeyUsage: %v", certPair.Leaf.ExtKeyUsage)
+			subtest.Errorf("UnexpectedExtKeyUsage: %v", certPair.Leaf.ExtKeyUsage)
 		}
 	})
 }
 
-func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
+func TestSelfSignedCertificatePairPemFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
 	commonNameExample, _ := tkValueObject.NewFqdn("test.example.com")
@@ -463,49 +463,49 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			certPem, keyPem, err := synth.SelfSignedCertificatePairPemFactory(testCase.commonNamePtr, testCase.altNames)
 			if err != nil {
-				t.Errorf("SelfSignedCertificatePairPemFactoryError: %v", err)
+				subtest.Errorf("SelfSignedCertificatePairPemFactoryError: %v", err)
 			}
 
 			if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
-				t.Error("CertPemHeaderInvalid")
+				subtest.Error("CertPemHeaderInvalid")
 			}
 			if !strings.HasSuffix(certPem, "-----END CERTIFICATE-----\n") {
-				t.Error("CertPemFooterInvalid")
+				subtest.Error("CertPemFooterInvalid")
 			}
 
 			if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
-				t.Error("KeyPemHeaderInvalid")
+				subtest.Error("KeyPemHeaderInvalid")
 			}
 			if !strings.HasSuffix(keyPem, "-----END EC PRIVATE KEY-----\n") {
-				t.Error("KeyPemFooterInvalid")
+				subtest.Error("KeyPemFooterInvalid")
 			}
 
 			certificatePemBlock, _ := pem.Decode([]byte(certPem))
 			if certificatePemBlock == nil || certificatePemBlock.Type != "CERTIFICATE" {
-				t.Error("CertPemBlockDecodeFail")
+				subtest.Error("CertPemBlockDecodeFail")
 			}
 			parsedCert, err := x509.ParseCertificate(certificatePemBlock.Bytes)
 			if err != nil {
-				t.Errorf("CertParseFail: %v", err)
+				subtest.Errorf("CertParseFail: %v", err)
 			}
 			if parsedCert.Subject.CommonName != testCase.expectedCommonName {
-				t.Errorf(
+				subtest.Errorf(
 					"CommonNameMismatch: Expected '%s', Got '%s'",
 					testCase.expectedCommonName, parsedCert.Subject.CommonName,
 				)
 			}
 			if len(parsedCert.DNSNames) != len(testCase.expectedAltNames) {
-				t.Errorf(
+				subtest.Errorf(
 					"AltNamesCountMismatch: Expected %d, Got %d",
 					len(testCase.expectedAltNames), len(parsedCert.DNSNames),
 				)
 			}
 			for altNameIndex, expectedAltName := range testCase.expectedAltNames {
 				if altNameIndex >= len(parsedCert.DNSNames) {
-					t.Errorf(
+					subtest.Errorf(
 						"AltNameMissing: Expected '%s' at index %d",
 						expectedAltName, altNameIndex,
 					)
@@ -513,7 +513,7 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 				}
 
 				if parsedCert.DNSNames[altNameIndex] != expectedAltName {
-					t.Errorf(
+					subtest.Errorf(
 						"AltNameMismatch: Expected '%s', Got '%s'",
 						expectedAltName, parsedCert.DNSNames[altNameIndex],
 					)
@@ -521,19 +521,19 @@ func TestSelfSignedCertificatePairPemFactory(t *testing.T) {
 			}
 
 			if len(certPem) == 0 {
-				t.Error("CertPemEmpty")
+				subtest.Error("CertPemEmpty")
 			}
 			if len(keyPem) == 0 {
-				t.Error("KeyPemEmpty")
+				subtest.Error("KeyPemEmpty")
 			}
 		})
 	}
 }
 
-func TestPrivateKeyPemFactory(t *testing.T) {
+func TestPrivateKeyPemFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("RSAPrivateKey", func(t *testing.T) {
+	test.Run("RSAPrivateKey", func(subtest *testing.T) {
 		testCases := []struct {
 			bitSize         int
 			expectedBitSize int
@@ -549,26 +549,26 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 				BitSize:   testCase.bitSize,
 			})
 			if err != nil {
-				t.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
+				subtest.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
 				continue
 			}
 
 			if !strings.HasPrefix(keyPem, "-----BEGIN RSA PRIVATE KEY-----") {
-				t.Errorf("InvalidRSAKeyHeader: %s", keyPem[:min(50, len(keyPem))])
+				subtest.Errorf("InvalidRSAKeyHeader: %s", keyPem[:min(50, len(keyPem))])
 			}
 			if !strings.HasSuffix(keyPem, "-----END RSA PRIVATE KEY-----\n") {
-				t.Errorf("InvalidRSAKeyFooter")
+				subtest.Errorf("InvalidRSAKeyFooter")
 			}
 
 			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 			if decodedPemBlock == nil || decodedPemBlock.Type != "RSA PRIVATE KEY" {
-				t.Errorf("DecodePEMFailed")
+				subtest.Errorf("DecodePEMFailed")
 				continue
 			}
 
 			parsedRsaKey, err := x509.ParsePKCS1PrivateKey(decodedPemBlock.Bytes)
 			if err != nil {
-				t.Fatalf(
+				subtest.Fatalf(
 					"FailedToParseRSAKey: %v [bitSize: %d]",
 					err, testCase.bitSize,
 				)
@@ -576,7 +576,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 			actualBitSize := parsedRsaKey.N.BitLen()
 			if actualBitSize != testCase.expectedBitSize {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedBitSize: %d vs %d [requested: %d]",
 					actualBitSize, testCase.expectedBitSize, testCase.bitSize,
 				)
@@ -584,7 +584,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 		}
 	})
 
-	t.Run("ECDSAPrivateKey", func(t *testing.T) {
+	test.Run("ECDSAPrivateKey", func(subtest *testing.T) {
 		testCases := []struct {
 			bitSize       int
 			expectedCurve string
@@ -601,26 +601,26 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 				BitSize:   testCase.bitSize,
 			})
 			if err != nil {
-				t.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
+				subtest.Errorf("UnexpectedError: %v [bitSize: %d]", err, testCase.bitSize)
 				continue
 			}
 
 			if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
-				t.Errorf("InvalidECKeyHeader")
+				subtest.Errorf("InvalidECKeyHeader")
 			}
 			if !strings.HasSuffix(keyPem, "-----END EC PRIVATE KEY-----\n") {
-				t.Errorf("InvalidECKeyFooter")
+				subtest.Errorf("InvalidECKeyFooter")
 			}
 
 			decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 			if decodedPemBlock == nil || decodedPemBlock.Type != "EC PRIVATE KEY" {
-				t.Errorf("DecodePEMFailed")
+				subtest.Errorf("DecodePEMFailed")
 				continue
 			}
 
 			parsedEcdsaKey, err := x509.ParseECPrivateKey(decodedPemBlock.Bytes)
 			if err != nil {
-				t.Fatalf(
+				subtest.Fatalf(
 					"ParseECDSAKeyFailed: %v [bitSize: %d]",
 					err, testCase.bitSize,
 				)
@@ -628,7 +628,7 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 
 			actualCurveName := parsedEcdsaKey.Curve.Params().Name
 			if actualCurveName != testCase.expectedCurve {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedCurve: %s vs %s [requested bitSize: %d]",
 					actualCurveName, testCase.expectedCurve, testCase.bitSize,
 				)
@@ -636,76 +636,76 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 		}
 	})
 
-	t.Run("DSAPrivateKey", func(t *testing.T) {
+	test.Run("DSAPrivateKey", func(subtest *testing.T) {
 		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
 			Algorithm: tkValueObject.PrivateKeyAlgorithmDSA,
 		})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 			return
 		}
 
 		if !strings.HasPrefix(keyPem, "-----BEGIN DSA PRIVATE KEY-----") {
-			t.Errorf("InvalidDSAKeyHeader")
+			subtest.Errorf("InvalidDSAKeyHeader")
 		}
 		if !strings.HasSuffix(keyPem, "-----END DSA PRIVATE KEY-----\n") {
-			t.Errorf("InvalidDSAKeyFooter")
+			subtest.Errorf("InvalidDSAKeyFooter")
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "DSA PRIVATE KEY" {
-			t.Errorf("DecodePEMFailed")
+			subtest.Errorf("DecodePEMFailed")
 		}
 	})
 
-	t.Run("Ed25519PrivateKey", func(t *testing.T) {
+	test.Run("Ed25519PrivateKey", func(subtest *testing.T) {
 		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
 			Algorithm: tkValueObject.PrivateKeyAlgorithmEd25519,
 		})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 			return
 		}
 
 		if !strings.HasPrefix(keyPem, "-----BEGIN PRIVATE KEY-----") {
-			t.Errorf("InvalidEd25519KeyHeader")
+			subtest.Errorf("InvalidEd25519KeyHeader")
 		}
 		if !strings.HasSuffix(keyPem, "-----END PRIVATE KEY-----\n") {
-			t.Errorf("InvalidEd25519KeyFooter")
+			subtest.Errorf("InvalidEd25519KeyFooter")
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(keyPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "PRIVATE KEY" {
-			t.Errorf("DecodePEMFailed")
+			subtest.Errorf("DecodePEMFailed")
 		}
 	})
 
-	t.Run("DefaultAlgorithm", func(t *testing.T) {
+	test.Run("DefaultAlgorithm", func(subtest *testing.T) {
 		keyPem, err := synth.PrivateKeyPemFactory(PrivateKeySettings{})
 		if err != nil {
-			t.Errorf("UnexpectedError: %v", err)
+			subtest.Errorf("UnexpectedError: %v", err)
 			return
 		}
 
 		// Default should be ECDSA
 		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
-			t.Errorf("DefaultShouldBeECDSA")
+			subtest.Errorf("DefaultShouldBeECDSA")
 		}
 	})
 
-	t.Run("UnsupportedAlgorithm", func(t *testing.T) {
+	test.Run("UnsupportedAlgorithm", func(subtest *testing.T) {
 		_, err := synth.PrivateKeyPemFactory(PrivateKeySettings{
 			Algorithm: "INVALID",
 		})
 		if err == nil {
-			t.Errorf("MissingExpectedError: unsupported algorithm should fail")
+			subtest.Errorf("MissingExpectedError: unsupported algorithm should fail")
 		}
 		if err.Error() != "UnsupportedPrivateKeyAlgorithm" {
-			t.Errorf("UnexpectedErrorMessage: %s", err.Error())
+			subtest.Errorf("UnexpectedErrorMessage: %s", err.Error())
 		}
 	})
 
-	t.Run("InvalidECDSABitSize", func(t *testing.T) {
+	test.Run("InvalidECDSABitSize", func(subtest *testing.T) {
 		invalidBitSizes := []int{128, 192, 224, 512, 1024}
 
 		for _, bitSize := range invalidBitSizes {
@@ -714,13 +714,13 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 				BitSize:   bitSize,
 			})
 			if err == nil {
-				t.Errorf(
+				subtest.Errorf(
 					"MissingExpectedError: invalid ECDSA bitSize %d should fail",
 					bitSize,
 				)
 			}
 			if err != nil && err.Error() != "InvalidECDSABitSize" {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedErrorMessage for bitSize %d: %s",
 					bitSize, err.Error(),
 				)
@@ -729,65 +729,65 @@ func TestPrivateKeyPemFactory(t *testing.T) {
 	})
 }
 
-func TestCertificatePemFactory(t *testing.T) {
+func TestCertificatePemFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("DefaultCertificate", func(t *testing.T) {
+	test.Run("DefaultCertificate", func(subtest *testing.T) {
 		certPem, keyPem, err := synth.CertificatePemFactory(CertificateSettings{})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
-			t.Error("InvalidCertHeader")
+			subtest.Error("InvalidCertHeader")
 		}
 		if !strings.HasSuffix(certPem, "-----END CERTIFICATE-----\n") {
-			t.Error("InvalidCertFooter")
+			subtest.Error("InvalidCertFooter")
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		if decodedPemBlock == nil || decodedPemBlock.Type != "CERTIFICATE" {
-			t.Error("DecodeCertPEMFailed")
+			subtest.Error("DecodeCertPEMFailed")
 		}
 
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.Subject.CommonName != "localhost" {
-			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
 		}
 		if cert.IsCA {
-			t.Error("DefaultCertShouldNotBeCA")
+			subtest.Error("DefaultCertShouldNotBeCA")
 		}
 
 		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
-			t.Error("InvalidKeyHeader")
+			subtest.Error("InvalidKeyHeader")
 		}
 	})
 
-	t.Run("WithCommonName", func(t *testing.T) {
+	test.Run("WithCommonName", func(subtest *testing.T) {
 		commonName, _ := tkValueObject.NewFqdn("test.example.com")
 		certPem, _, err := synth.CertificatePemFactory(CertificateSettings{
 			CommonName: &commonName,
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.Subject.CommonName != "test.example.com" {
-			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
 		}
 	})
 
-	t.Run("WithAltNames", func(t *testing.T) {
+	test.Run("WithAltNames", func(subtest *testing.T) {
 		altName1, _ := tkValueObject.NewFqdn("alt1.example.com")
 		altName2, _ := tkValueObject.NewFqdn("alt2.example.com")
 
@@ -795,147 +795,147 @@ func TestCertificatePemFactory(t *testing.T) {
 			AltNames: []tkValueObject.Fqdn{altName1, altName2},
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if len(cert.DNSNames) != 2 {
-			t.Errorf("UnexpectedAltNamesCount: %d", len(cert.DNSNames))
+			subtest.Errorf("UnexpectedAltNamesCount: %d", len(cert.DNSNames))
 		}
 		if cert.DNSNames[0] != "alt1.example.com" || cert.DNSNames[1] != "alt2.example.com" {
-			t.Errorf("UnexpectedAltNames: %v", cert.DNSNames)
+			subtest.Errorf("UnexpectedAltNames: %v", cert.DNSNames)
 		}
 	})
 }
 
-func TestCACertificatePemFactory(t *testing.T) {
+func TestCACertificatePemFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("DefaultCACertificate", func(t *testing.T) {
+	test.Run("DefaultCACertificate", func(subtest *testing.T) {
 		certPem, keyPem, err := synth.CACertificatePemFactory(CertificateSettings{})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		if !strings.HasPrefix(certPem, "-----BEGIN CERTIFICATE-----") {
-			t.Error("InvalidCertHeader")
+			subtest.Error("InvalidCertHeader")
 		}
 		if !strings.HasPrefix(keyPem, "-----BEGIN EC PRIVATE KEY-----") {
-			t.Error("InvalidKeyHeader")
+			subtest.Error("InvalidKeyHeader")
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if !cert.IsCA {
-			t.Error("CertShouldBeCA")
+			subtest.Error("CertShouldBeCA")
 		}
 		if cert.Subject.CommonName != "Test CA" {
-			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
 		}
 
 		expectedKeyUsage := x509.KeyUsageCertSign | x509.KeyUsageCRLSign
 		if cert.KeyUsage != expectedKeyUsage {
-			t.Errorf("UnexpectedKeyUsage: %v", cert.KeyUsage)
+			subtest.Errorf("UnexpectedKeyUsage: %v", cert.KeyUsage)
 		}
 	})
 
-	t.Run("CACertificateWithMaxPathLen", func(t *testing.T) {
+	test.Run("CACertificateWithMaxPathLen", func(subtest *testing.T) {
 		maxPathLen := 2
 		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
 			MaxPathLengthPtr: &maxPathLen,
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.MaxPathLen != 2 {
-			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
+			subtest.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
 		}
 	})
 
-	t.Run("CACertificateWithMaxPathLenZero", func(t *testing.T) {
+	test.Run("CACertificateWithMaxPathLenZero", func(subtest *testing.T) {
 		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
 			HasMaxPathLengthZero: true,
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.MaxPathLen != 0 {
-			t.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
+			subtest.Errorf("UnexpectedMaxPathLen: %d", cert.MaxPathLen)
 		}
 		if !cert.MaxPathLenZero {
-			t.Error("MaxPathLenZeroShouldBeTrue")
+			subtest.Error("MaxPathLenZeroShouldBeTrue")
 		}
 	})
 
-	t.Run("CACertificateWithCustomCommonName", func(t *testing.T) {
+	test.Run("CACertificateWithCustomCommonName", func(subtest *testing.T) {
 		commonName, _ := tkValueObject.NewFqdn("custom-ca.example.com")
 		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
 			CommonName: &commonName,
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if cert.Subject.CommonName != "custom-ca.example.com" {
-			t.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
+			subtest.Errorf("UnexpectedCommonName: %s", cert.Subject.CommonName)
 		}
 	})
 
-	t.Run("CACertificateSetsIsCATrue", func(t *testing.T) {
+	test.Run("CACertificateSetsIsCATrue", func(subtest *testing.T) {
 		// Test that CACertificatePemFactory always sets IsCA=true
 		// even if the settings have IsCA=false
 		certPem, _, err := synth.CACertificatePemFactory(CertificateSettings{
 			IsCA: false, // This should be overridden
 		})
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		decodedPemBlock, _ := pem.Decode([]byte(certPem))
 		cert, err := x509.ParseCertificate(decodedPemBlock.Bytes)
 		if err != nil {
-			t.Fatalf("ParseCertificateFailed: %v", err)
+			subtest.Fatalf("ParseCertificateFailed: %v", err)
 		}
 
 		if !cert.IsCA {
-			t.Error("CACertificatePemFactoryShouldAlwaysSetIsCATrue")
+			subtest.Error("CACertificatePemFactoryShouldAlwaysSetIsCATrue")
 		}
 	})
 }
 
-func TestRandomStringFactory(t *testing.T) {
+func TestRandomStringFactory(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("LengthAndCharsetMembership", func(t *testing.T) {
+	test.Run("LengthAndCharsetMembership", func(subtest *testing.T) {
 		testCases := []struct {
 			length  int
 			charset string
@@ -953,7 +953,7 @@ func TestRandomStringFactory(t *testing.T) {
 			)
 
 			if len(generated) != testCase.length {
-				t.Errorf(
+				subtest.Errorf(
 					"LengthMismatch: expected %d, got %d",
 					testCase.length, len(generated),
 				)
@@ -964,7 +964,7 @@ func TestRandomStringFactory(t *testing.T) {
 					testCase.charset, generatedChar,
 				)
 				if !charsetContainsChar {
-					t.Errorf(
+					subtest.Errorf(
 						"CharOutsideCharset: '%c' not in %s",
 						generatedChar, testCase.charset,
 					)
@@ -973,26 +973,26 @@ func TestRandomStringFactory(t *testing.T) {
 		}
 	})
 
-	t.Run("NonPositiveLength", func(t *testing.T) {
+	test.Run("NonPositiveLength", func(subtest *testing.T) {
 		for _, invalidLength := range []int{0, -1, -128} {
 			generated := synth.randomStringFactory(
 				invalidLength,
 				CharsetLowercaseLetters,
 			)
 			if generated != "" {
-				t.Errorf("UnexpectedValueForLength %d: '%s'", invalidLength, generated)
+				subtest.Errorf("UnexpectedValueForLength %d: '%s'", invalidLength, generated)
 			}
 		}
 	})
 
-	t.Run("EmptyCharsetYieldsEmptyString", func(t *testing.T) {
+	test.Run("EmptyCharsetYieldsEmptyString", func(subtest *testing.T) {
 		generated := synth.randomStringFactory(8, "")
 		if generated != "" {
-			t.Errorf("UnexpectedValueForEmptyCharset: '%s'", generated)
+			subtest.Errorf("UnexpectedValueForEmptyCharset: '%s'", generated)
 		}
 	})
 
-	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+	test.Run("DistinctAcrossCalls", func(subtest *testing.T) {
 		alphanumeric := CharsetLowercaseLetters +
 			CharsetUppercaseLetters + CharsetNumbers
 
@@ -1000,11 +1000,11 @@ func TestRandomStringFactory(t *testing.T) {
 		second := synth.randomStringFactory(32, alphanumeric)
 
 		if first == second {
-			t.Errorf("IdenticalValuesAcrossCalls: %s", first)
+			subtest.Errorf("IdenticalValuesAcrossCalls: %s", first)
 		}
 	})
 
-	t.Run("NoPerCharacterBias", func(t *testing.T) {
+	test.Run("NoPerCharacterBias", func(subtest *testing.T) {
 		charset := "abcd"
 		samplesTotal := 400
 		sampleLength := 250
@@ -1025,7 +1025,7 @@ func TestRandomStringFactory(t *testing.T) {
 			countInsideTolerance := charCount >= expectedPerChar-tolerance &&
 				charCount <= expectedPerChar+tolerance
 			if !countInsideTolerance {
-				t.Errorf(
+				subtest.Errorf(
 					"CharacterCountOutsideTolerance: '%c' got %d, expected %d±%d",
 					charsetChar, charCount, expectedPerChar, tolerance,
 				)
@@ -1034,15 +1034,15 @@ func TestRandomStringFactory(t *testing.T) {
 	})
 }
 
-func TestShuffledIndicesGenerator(t *testing.T) {
+func TestShuffledIndicesGenerator(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("ContainsEveryIndexExactlyOnce", func(t *testing.T) {
+	test.Run("ContainsEveryIndexExactlyOnce", func(subtest *testing.T) {
 		for _, size := range []int{0, 1, 2, 3, 8, 64} {
 			shuffledIndices := synth.shuffledIndicesGenerator(size)
 
 			if len(shuffledIndices) != size {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedIndicesCount: expected %d, got %d",
 					size, len(shuffledIndices),
 				)
@@ -1053,35 +1053,35 @@ func TestShuffledIndicesGenerator(t *testing.T) {
 			for _, index := range shuffledIndices {
 				indexIsInRange := index >= 0 && index < size
 				if !indexIsInRange {
-					t.Errorf("IndexOutsideRange: %d [size %d]", index, size)
+					subtest.Errorf("IndexOutsideRange: %d [size %d]", index, size)
 				}
 				if seenIndices[index] {
-					t.Errorf("RepeatedIndex: %d [size %d]", index, size)
+					subtest.Errorf("RepeatedIndex: %d [size %d]", index, size)
 				}
 				seenIndices[index] = true
 			}
 		}
 	})
 
-	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+	test.Run("DistinctAcrossCalls", func(subtest *testing.T) {
 		size := 16
 		first := synth.shuffledIndicesGenerator(size)
 		second := synth.shuffledIndicesGenerator(size)
 		if slices.Equal(first, second) {
-			t.Errorf("IdenticalOrderingsAcrossCalls: %v", first)
+			subtest.Errorf("IdenticalOrderingsAcrossCalls: %v", first)
 		}
 	})
 }
 
-func TestPasswordFactoryClassGuarantees(t *testing.T) {
+func TestPasswordFactoryClassGuarantees(test *testing.T) {
 	synth := &Synthesizer{}
 
-	t.Run("EveryClassPresentAboveMinimumLength", func(t *testing.T) {
+	test.Run("EveryClassPresentAboveMinimumLength", func(subtest *testing.T) {
 		for range 20 {
 			password := synth.PasswordFactory(16, true)
 
 			if len(password) != 16 {
-				t.Errorf("UnexpectedPasswordLength: %d", len(password))
+				subtest.Errorf("UnexpectedPasswordLength: %d", len(password))
 			}
 			for _, requiredCharset := range []string{
 				CharsetLowercaseLetters,
@@ -1090,38 +1090,38 @@ func TestPasswordFactoryClassGuarantees(t *testing.T) {
 				CharsetSymbols,
 			} {
 				if !strings.ContainsAny(password, requiredCharset) {
-					t.Errorf("RequiredCharsetMissing: %s from %s", requiredCharset, password)
+					subtest.Errorf("RequiredCharsetMissing: %s from %s", requiredCharset, password)
 				}
 			}
 		}
 	})
 
-	t.Run("AlphanumericOnlyWhenSymbolsExcluded", func(t *testing.T) {
+	test.Run("AlphanumericOnlyWhenSymbolsExcluded", func(subtest *testing.T) {
 		alphanumeric := CharsetLowercaseLetters +
 			CharsetUppercaseLetters + CharsetNumbers
 		for range 20 {
 			password := synth.PasswordFactory(12, false)
 			if strings.ContainsAny(password, CharsetSymbols) {
-				t.Errorf("UnexpectedSymbol: %s", password)
+				subtest.Errorf("UnexpectedSymbol: %s", password)
 			}
 			if !strings.ContainsAny(password, alphanumeric) {
-				t.Errorf("UnexpectedCharacter: %s", password)
+				subtest.Errorf("UnexpectedCharacter: %s", password)
 			}
 		}
 	})
 
-	t.Run("DistinctAcrossCalls", func(t *testing.T) {
+	test.Run("DistinctAcrossCalls", func(subtest *testing.T) {
 		first := synth.PasswordFactory(16, true)
 		second := synth.PasswordFactory(16, true)
 		if first == second {
-			t.Errorf("IdenticalPasswordsAcrossCalls")
+			subtest.Errorf("IdenticalPasswordsAcrossCalls")
 		}
 	})
 
-	t.Run("LengthAboveOneByteRange", func(t *testing.T) {
+	test.Run("LengthAboveOneByteRange", func(subtest *testing.T) {
 		password := synth.PasswordFactory(257, true)
 		if len(password) != 257 {
-			t.Errorf("UnexpectedPasswordLength: %d", len(password))
+			subtest.Errorf("UnexpectedPasswordLength: %d", len(password))
 		}
 		for _, requiredCharset := range []string{
 			CharsetLowercaseLetters,
@@ -1130,7 +1130,7 @@ func TestPasswordFactoryClassGuarantees(t *testing.T) {
 			CharsetSymbols,
 		} {
 			if !strings.ContainsAny(password, requiredCharset) {
-				t.Errorf(
+				subtest.Errorf(
 					"RequiredCharsetMissing: %s from 257-char password",
 					requiredCharset,
 				)

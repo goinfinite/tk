@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestShellEscape(t *testing.T) {
+func TestShellEscape(test *testing.T) {
 	shellEscape := ShellEscape{}
 
-	t.Run("Quote", func(t *testing.T) {
+	test.Run("Quote", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			input          string
 			expectedOutput string
@@ -49,7 +49,7 @@ func TestShellEscape(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := shellEscape.Quote(testCase.input)
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"QuoteMismatch: input='%s', expected='%s', actual='%s'",
 					testCase.input, testCase.expectedOutput, actualOutput,
 				)
@@ -57,7 +57,7 @@ func TestShellEscape(t *testing.T) {
 		}
 	})
 
-	t.Run("StripUnsafe", func(t *testing.T) {
+	test.Run("StripUnsafe", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			input          string
 			expectedOutput string
@@ -95,7 +95,7 @@ func TestShellEscape(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := shellEscape.StripUnsafe(testCase.input)
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"StripUnsafeMismatch: input='%s', expected='%s', actual='%s'",
 					testCase.input, testCase.expectedOutput, actualOutput,
 				)

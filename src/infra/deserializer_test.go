@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestStringDeserializer(t *testing.T) {
-	t.Run("JsonFormat", func(t *testing.T) {
+func TestStringDeserializer(test *testing.T) {
+	test.Run("JsonFormat", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputJson     string
 			expectedMap   map[string]any
@@ -43,24 +43,24 @@ func TestStringDeserializer(t *testing.T) {
 			actualMap, err := StringDeserializer(testCase.inputJson, SerializationFormatJson)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputJson)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputJson)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.inputJson)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.inputJson)
 			}
 			if testCase.expectError && err != nil && !strings.Contains(err.Error(), testCase.errorContains) {
-				t.Errorf(
+				subtest.Errorf(
 					"ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]",
 					err.Error(), testCase.errorContains, testCase.inputJson,
 				)
 			}
 			if !testCase.expectError {
-				assertMapsEqual(t, actualMap, testCase.expectedMap)
+				assertMapsEqual(subtest, actualMap, testCase.expectedMap)
 			}
 		}
 	})
 
-	t.Run("YamlFormat", func(t *testing.T) {
+	test.Run("YamlFormat", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputYaml     string
 			expectedMap   map[string]any
@@ -94,29 +94,29 @@ func TestStringDeserializer(t *testing.T) {
 			actualMap, err := StringDeserializer(testCase.inputYaml, SerializationFormatYaml)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%s]", testCase.inputYaml)
+				subtest.Errorf("MissingExpectedError: [%s]", testCase.inputYaml)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.inputYaml)
+				subtest.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.inputYaml)
 			}
 			if testCase.expectError && err != nil && !strings.Contains(err.Error(), testCase.errorContains) {
-				t.Errorf(
+				subtest.Errorf(
 					"ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]",
 					err.Error(), testCase.errorContains, testCase.inputYaml,
 				)
 			}
 			if !testCase.expectError {
-				assertMapsEqual(t, actualMap, testCase.expectedMap)
+				assertMapsEqual(subtest, actualMap, testCase.expectedMap)
 			}
 		}
 	})
 }
 
-func TestFileDeserializer(t *testing.T) {
-	t.Run("JsonFile", func(t *testing.T) {
+func TestFileDeserializer(test *testing.T) {
+	test.Run("JsonFile", func(subtest *testing.T) {
 		jsonContent := `{"name": "test", "value": 123, "nested": {"key": "value"}}`
-		jsonFile := createTempFile(t, "test.json", jsonContent)
-		defer os.Remove(jsonFile)
+		jsonFile := createTempFile(subtest, "test.json", jsonContent)
+		defer func() { _ = os.Remove(jsonFile) }()
 
 		expectedMap := map[string]any{
 			"name":   "test",
@@ -126,34 +126,34 @@ func TestFileDeserializer(t *testing.T) {
 
 		actualMap, err := FileDeserializer(jsonFile)
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		}
 
-		assertMapsEqual(t, actualMap, expectedMap)
+		assertMapsEqual(subtest, actualMap, expectedMap)
 	})
 
-	t.Run("NonExistentFile", func(t *testing.T) {
+	test.Run("NonExistentFile", func(subtest *testing.T) {
 		_, err := FileDeserializer("non_existent_file.json")
 		if err == nil {
-			t.Errorf("MissingExpectedError: FileNotFound")
+			subtest.Errorf("MissingExpectedError: FileNotFound")
 		}
 	})
 
-	t.Run("InvalidJsonFile", func(t *testing.T) {
+	test.Run("InvalidJsonFile", func(subtest *testing.T) {
 		invalidContent := "invalid json content"
-		invalidFile := createTempFile(t, "invalid.json", invalidContent)
-		defer os.Remove(invalidFile)
+		invalidFile := createTempFile(subtest, "invalid.json", invalidContent)
+		defer func() { _ = os.Remove(invalidFile) }()
 
 		_, err := FileDeserializer(invalidFile)
 		if err == nil {
-			t.Errorf("MissingExpectedError: InvalidJsonFormat")
+			subtest.Errorf("MissingExpectedError: InvalidJsonFormat")
 		}
 	})
 
-	t.Run("YamlFile", func(t *testing.T) {
+	test.Run("YamlFile", func(subtest *testing.T) {
 		yamlContent := "name: test\nvalue: 123\nnested:\n  key: value"
-		yamlFile := createTempFile(t, "test.yaml", yamlContent)
-		defer os.Remove(yamlFile)
+		yamlFile := createTempFile(subtest, "test.yaml", yamlContent)
+		defer func() { _ = os.Remove(yamlFile) }()
 
 		expectedMap := map[string]any{
 			"name":   "test",
@@ -163,60 +163,60 @@ func TestFileDeserializer(t *testing.T) {
 
 		actualMap, err := FileDeserializer(yamlFile)
 		if err != nil {
-			t.Errorf("UnexpectedError: '%s'", err.Error())
+			subtest.Errorf("UnexpectedError: '%s'", err.Error())
 		} else {
-			assertMapsEqual(t, actualMap, expectedMap)
+			assertMapsEqual(subtest, actualMap, expectedMap)
 		}
 	})
 }
 
 func createTempFile(
-	t *testing.T,
+	test *testing.T,
 	filename, content string,
 ) string {
-	t.Helper()
-	tempDir := t.TempDir()
+	test.Helper()
+	tempDir := test.TempDir()
 	filePath := filepath.Join(tempDir, filename)
 
 	err := os.WriteFile(filePath, []byte(content), 0644)
 	if err != nil {
-		t.Fatalf("CreateTempFileFailed: %v", err)
+		test.Fatalf("CreateTempFileFailed: %v", err)
 	}
 
 	return filePath
 }
 
 func assertMapsEqual(
-	t *testing.T,
+	test *testing.T,
 	actual, expected map[string]any,
 ) {
-	t.Helper()
+	test.Helper()
 	if actual == nil && expected == nil {
 		return
 	}
 	if actual == nil && expected != nil {
-		t.Errorf("ActualMapIsNil")
+		test.Errorf("ActualMapIsNil")
 		return
 	}
 	if actual != nil && expected == nil {
-		t.Errorf("ExpectedMapIsNil")
+		test.Errorf("ExpectedMapIsNil")
 		return
 	}
 
 	actualJson, err := json.Marshal(actual)
 	if err != nil {
-		t.Errorf("MarshalActualMapFailed: %v", err)
+		test.Errorf("MarshalActualMapFailed: %v", err)
 		return
 	}
 
 	expectedJson, err := json.Marshal(expected)
 	if err != nil {
-		t.Errorf("MarshalExpectedMapFailed: %v", err)
+		test.Errorf("MarshalExpectedMapFailed: %v", err)
 		return
 	}
 
 	if string(actualJson) != string(expectedJson) {
-		t.Errorf(
+		test.Errorf(
 			"MapMismatch\nExpected JSON: %s\nActual JSON: %s",
 			string(expectedJson), string(actualJson),
 		)

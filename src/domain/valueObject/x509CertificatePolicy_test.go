@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewX509CertificatePolicy(t *testing.T) {
-	t.Run("ValidCertificatePolicy", func(t *testing.T) {
+func TestNewX509CertificatePolicy(test *testing.T) {
+	test.Run("ValidCertificatePolicy", func(subtest *testing.T) {
 		oid, _ := NewX509PolicyOID("2.5.29.32.0")
 		policyName, _ := NewX509PolicyName("Extended Validation")
 		qualifier1, _ := NewX509PolicyQualifier("cps")
@@ -28,23 +28,23 @@ func TestNewX509CertificatePolicy(t *testing.T) {
 			)
 
 			if result.PolicyIdentifier != testCase.policyIdentifier {
-				t.Errorf("UnexpectedPolicyIdentifier")
+				subtest.Errorf("UnexpectedPolicyIdentifier")
 			}
 
 			if testCase.policyName != nil &&
 				result.PolicyName != testCase.policyName {
-				t.Errorf("UnexpectedPolicyName")
+				subtest.Errorf("UnexpectedPolicyName")
 			}
 
 			if testCase.policyQualifiers != nil {
 				if len(result.PolicyQualifiers) != len(testCase.policyQualifiers) {
-					t.Errorf("UnexpectedPolicyQualifiersLength")
+					subtest.Errorf("UnexpectedPolicyQualifiersLength")
 				}
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		oid, _ := NewX509PolicyOID("2.5.29.32.0")
 		policyName, _ := NewX509PolicyName("Extended Validation")
 
@@ -65,7 +65,7 @@ func TestNewX509CertificatePolicy(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)

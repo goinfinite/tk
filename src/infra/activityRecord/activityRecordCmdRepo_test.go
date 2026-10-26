@@ -2,7 +2,6 @@ package tkInfraActivityRecord
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,13 +14,13 @@ import (
 	tkInfraDb "github.com/goinfinite/tk/src/infra/db"
 )
 
-func TestActivityRecordCmdRepoCreate(t *testing.T) {
-	dbSvc := SetupTestTrailDatabaseService(t)
+func TestActivityRecordCmdRepoCreate(test *testing.T) {
+	dbSvc := SetupTestTrailDatabaseService(test)
 
-	t.Run("CreateBasicRecord", func(t *testing.T) {
+	test.Run("CreateBasicRecord", func(subtest *testing.T) {
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("CREATE_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -32,30 +31,30 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Errorf("CreateBasicRecordFailed: %v", err)
+			subtest.Errorf("CreateBasicRecordFailed: %v", err)
 		}
 	})
 
-	t.Run("CreateRecordWithAllFields", func(t *testing.T) {
+	test.Run("CreateRecordWithAllFields", func(subtest *testing.T) {
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("FULL_CREATE_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		testSri, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/test-resource")
 		if err != nil {
-			t.Fatalf("CreateResourceVoFailed: %v", err)
+			subtest.Fatalf("CreateResourceVoFailed: %v", err)
 		}
 
 		accountId, err := tkValueObject.NewAccountId(123)
 		if err != nil {
-			t.Fatalf("CreateAccountIdVoFailed: %v", err)
+			subtest.Fatalf("CreateAccountIdVoFailed: %v", err)
 		}
 		operatorSri := tkValueObject.NewSriAccount(accountId)
 
 		operatorIpAddressVo, err := tkValueObject.NewIpAddress("192.168.1.1")
 		if err != nil {
-			t.Fatalf("CreateOperatorIpAddressVoFailed: %v", err)
+			subtest.Fatalf("CreateOperatorIpAddressVoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -69,23 +68,23 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Errorf("CreateRecordWithAllFieldsFailed: %v", err)
+			subtest.Errorf("CreateRecordWithAllFieldsFailed: %v", err)
 		}
 	})
 
-	t.Run("CreateRecordWithMultipleAffectedResources", func(t *testing.T) {
+	test.Run("CreateRecordWithMultipleAffectedResources", func(subtest *testing.T) {
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("MULTI_RES_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/resource1")
 		if err != nil {
-			t.Fatalf("CreateResource1VoFailed: %v", err)
+			subtest.Fatalf("CreateResource1VoFailed: %v", err)
 		}
 		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/resource2")
 		if err != nil {
-			t.Fatalf("CreateResource2VoFailed: %v", err)
+			subtest.Fatalf("CreateResource2VoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -96,20 +95,20 @@ func TestActivityRecordCmdRepoCreate(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Errorf("CreateRecordWithMultipleAffectedResourcesFailed: %v", err)
+			subtest.Errorf("CreateRecordWithMultipleAffectedResourcesFailed: %v", err)
 		}
 	})
 }
 
-func TestActivityRecordCmdRepoDelete(t *testing.T) {
-	t.Run("DeleteWithRecordId", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+func TestActivityRecordCmdRepoDelete(test *testing.T) {
+	test.Run("DeleteWithRecordId", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_ID_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -120,12 +119,12 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		testRecord, err := createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		recordIdVo, err := tkValueObject.NewActivityRecordId(testRecord.RecordId.Uint64())
 		if err != nil {
-			t.Fatalf("CreateRecordIdVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordIdVoFailed: %v", err)
 		}
 
 		deleteDto := tkDto.NewDeleteActivityRecord(
@@ -135,7 +134,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		err = cmdRepo.Delete(deleteDto)
 		if err != nil {
-			t.Errorf("DeleteWithRecordIdFailed: %v", err)
+			subtest.Errorf("DeleteWithRecordIdFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
@@ -143,21 +142,21 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			RecordId:   &recordIdVo,
 		})
 		if err != nil {
-			t.Errorf("VerifyDeleteFailed: %v", err)
+			subtest.Errorf("VerifyDeleteFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 0 {
-			t.Errorf("RecordNotDeleted: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("RecordNotDeleted: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
 		}
 	})
 
-	t.Run("DeleteWithRecordLevel", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("DeleteWithRecordLevel", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode1Vo, err := tkValueObject.NewActivityRecordCode("DELETE_LEVEL_1")
 		if err != nil {
-			t.Fatalf("CreateRecordCode1VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode1VoFailed: %v", err)
 		}
 
 		createDto1 := tkDto.CreateActivityRecord{
@@ -168,12 +167,12 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto1)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		recordCode2Vo, err := tkValueObject.NewActivityRecordCode("DELETE_LEVEL_2")
 		if err != nil {
-			t.Fatalf("CreateRecordCode2VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode2VoFailed: %v", err)
 		}
 
 		createDto2 := tkDto.CreateActivityRecord{
@@ -184,7 +183,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto2)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		deleteDto := tkDto.NewDeleteActivityRecord(
@@ -194,34 +193,34 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		err = cmdRepo.Delete(deleteDto)
 		if err != nil {
-			t.Errorf("DeleteWithRecordLevelFailed: %v", err)
+			subtest.Errorf("DeleteWithRecordLevelFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err != nil {
-			t.Errorf("VerifyDeleteLevelFailed: %v", err)
+			subtest.Errorf("VerifyDeleteLevelFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecordRemaining: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecordRemaining: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
 		}
 		if responseDto.ActivityRecords[0].RecordLevel != tkValueObject.ActivityRecordLevelError {
-			t.Errorf(
+			subtest.Errorf(
 				"WrongRecordRemaining: expected ERROR level, got %s",
 				responseDto.ActivityRecords[0].RecordLevel.String(),
 			)
 		}
 	})
 
-	t.Run("DeleteWithRecordCode", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("DeleteWithRecordCode", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode3Vo, err := tkValueObject.NewActivityRecordCode("DELETE_CODE_1")
 		if err != nil {
-			t.Fatalf("CreateRecordCode3VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode3VoFailed: %v", err)
 		}
 
 		createDto3 := tkDto.CreateActivityRecord{
@@ -232,12 +231,12 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto3)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		recordCode4Vo, err := tkValueObject.NewActivityRecordCode("DELETE_CODE_2")
 		if err != nil {
-			t.Fatalf("CreateRecordCode4VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode4VoFailed: %v", err)
 		}
 
 		createDto4 := tkDto.CreateActivityRecord{
@@ -248,12 +247,12 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto4)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_CODE_1")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		deleteDto := tkDto.NewDeleteActivityRecord(
@@ -263,34 +262,34 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		err = cmdRepo.Delete(deleteDto)
 		if err != nil {
-			t.Errorf("DeleteWithRecordCodeFailed: %v", err)
+			subtest.Errorf("DeleteWithRecordCodeFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err != nil {
-			t.Errorf("VerifyDeleteCodeFailed: %v", err)
+			subtest.Errorf("VerifyDeleteCodeFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecordRemaining: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecordRemaining: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
 		}
 		if responseDto.ActivityRecords[0].RecordCode.String() != "DELETE_CODE_2" {
-			t.Errorf(
+			subtest.Errorf(
 				"WrongRecordRemaining: expected DELETE_CODE_2, got %s",
 				responseDto.ActivityRecords[0].RecordCode.String(),
 			)
 		}
 	})
 
-	t.Run("DeleteWithTimeFilters", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("DeleteWithTimeFilters", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCode5Vo, err := tkValueObject.NewActivityRecordCode("DELETE_TIME_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCode5VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode5VoFailed: %v", err)
 		}
 
 		createDto5 := tkDto.CreateActivityRecord{
@@ -301,13 +300,13 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto5)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		// Use a future time to ensure nothing is deleted
 		futureTime, err := tkValueObject.NewUnixTime(time.Now().Add(time.Hour).Unix())
 		if err != nil {
-			t.Fatalf("CreateFutureTimeVoFailed: %v", err)
+			subtest.Fatalf("CreateFutureTimeVoFailed: %v", err)
 		}
 
 		deleteDto := tkDto.NewDeleteActivityRecord(
@@ -317,37 +316,37 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		err = cmdRepo.Delete(deleteDto)
 		if err != nil {
-			t.Errorf("DeleteWithTimeFiltersFailed: %v", err)
+			subtest.Errorf("DeleteWithTimeFiltersFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err != nil {
-			t.Errorf("VerifyDeleteTimeFailed: %v", err)
+			subtest.Errorf("VerifyDeleteTimeFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("RecordShouldStillExist: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("RecordShouldStillExist: FoundRecordsCount: %d", len(responseDto.ActivityRecords))
 		}
 	})
 
-	t.Run("DeleteWithMultipleMatchingAffectedResources", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("DeleteWithMultipleMatchingAffectedResources", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		cmdRepo := NewActivityRecordCmdRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("DELETE_MULTI_RES_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/del-multi1")
 		if err != nil {
-			t.Fatalf("CreateRes1VoFailed: %v", err)
+			subtest.Fatalf("CreateRes1VoFailed: %v", err)
 		}
 		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/del-multi2")
 		if err != nil {
-			t.Fatalf("CreateRes2VoFailed: %v", err)
+			subtest.Fatalf("CreateRes2VoFailed: %v", err)
 		}
 
 		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
@@ -356,7 +355,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
 		})
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		deleteDto := tkDto.NewDeleteActivityRecord(
@@ -366,7 +365,7 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 
 		err = cmdRepo.Delete(deleteDto)
 		if err != nil {
-			t.Errorf("DeleteWithMultipleMatchingAffectedResourcesFailed: %v", err)
+			subtest.Errorf("DeleteWithMultipleMatchingAffectedResourcesFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
@@ -374,36 +373,34 @@ func TestActivityRecordCmdRepoDelete(t *testing.T) {
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
 		})
 		if err != nil {
-			t.Errorf("VerifyDeleteMultipleResourcesFailed: %v", err)
+			subtest.Errorf("VerifyDeleteMultipleResourcesFailed: %v", err)
 		}
 
 		if len(responseDto.ActivityRecords) != 0 {
-			t.Errorf("ExpectedZeroRecords: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedZeroRecords: got %d", len(responseDto.ActivityRecords))
 		}
 	})
 }
 
-func SetupTestTrailDatabaseService(t *testing.T) *tkInfraDb.TrailDatabaseService {
-	t.Helper()
-	tempDir := t.TempDir()
-	rawDatabaseFilePath := filepath.Join(tempDir, strings.ReplaceAll(t.Name(), "/", "_")+".db")
+func SetupTestTrailDatabaseService(test *testing.T) *tkInfraDb.TrailDatabaseService {
+	test.Helper()
+	tempDir := test.TempDir()
+	rawDatabaseFilePath := filepath.Join(tempDir, strings.ReplaceAll(test.Name(), "/", "_")+".db")
 	rawDatabaseFilePath, err := filepath.Abs(rawDatabaseFilePath)
 	if err != nil {
-		t.Fatalf("ResolveRawDatabaseFilePathFailed: %v", err)
+		test.Fatalf("ResolveRawDatabaseFilePathFailed: %v", err)
 	}
 
 	databaseFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(rawDatabaseFilePath, false)
 	if err != nil {
-		t.Fatalf("ResolveDatabaseFilePathFailed: %v", err)
+		test.Fatalf("ResolveDatabaseFilePathFailed: %v", err)
 	}
 
-	originalValue := os.Getenv(tkInfraDb.TrailDatabaseFilePathEnvVarName)
-	t.Cleanup(func() { os.Setenv(tkInfraDb.TrailDatabaseFilePathEnvVarName, originalValue) })
-	os.Setenv(tkInfraDb.TrailDatabaseFilePathEnvVarName, databaseFilePath.String())
+	test.Setenv(tkInfraDb.TrailDatabaseFilePathEnvVarName, databaseFilePath.String())
 
 	dbSvc, err := tkInfraDb.NewTrailDatabaseService([]any{})
 	if err != nil {
-		t.Fatalf("SetupTrailDatabaseServiceFailed: %v", err)
+		test.Fatalf("SetupTrailDatabaseServiceFailed: %v", err)
 	}
 
 	return dbSvc

@@ -156,7 +156,7 @@ Extracts the real requester IP from an HTTP request by walking an ordered header
 
 **Flow:**
 
-1. `src/presentation/requesterIpExtractor.go` — `NewRequesterIpExtractor` reads the `IP_EXTRACT_HEADER` chain and trusted CIDRs from `TrustedCidrsReader`; `Execute(*http.Request)` returns an untrusted `RemoteAddr` directly and ignores the headers. When `RemoteAddr` is trusted, it walks each header right-to-left and returns the first address that is not trusted (the likely requester); when every entry is trusted, it returns the original requester — the first entry of the first header that has one — matching Echo's `RealIP`; otherwise it returns `RemoteAddr`
+1. `src/presentation/requesterIpExtractor.go` — `NewRequesterIpExtractor` reads the `IP_EXTRACT_HEADER` chain and trusted CIDRs from `TrustedCidrsReader`, plus the optional `IP_EXTRACT_CONFIRMATION_HEADERS` gate; `Execute(*http.Request)` returns an untrusted `RemoteAddr` directly and ignores the headers. When `RemoteAddr` is trusted, it requires a configured confirmation header to pass before it walks each header right-to-left and returns the first address that is not trusted (the likely requester); when every entry is trusted, it returns the original requester, the first entry of the first header that has one, matching Echo's `RealIP`; otherwise it returns `RemoteAddr`
 
 ---
 

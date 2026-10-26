@@ -3,6 +3,7 @@ package tkValueObject
 import (
 	"errors"
 	"regexp"
+	"strings"
 
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
@@ -34,4 +35,8 @@ func NewHttpHeader(value any) (httpHeader HttpHeader, err error) {
 
 func (vo HttpHeader) String() string {
 	return string(vo)
+}
+
+func (vo HttpHeader) ReadAsLowerCase() HttpHeader {
+	return HttpHeader(strings.ToLower(vo.String()))
 }

@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestNewAccountId(t *testing.T) {
-	t.Run("ValidAccountId", func(t *testing.T) {
+func TestNewAccountId(test *testing.T) {
+	test.Run("ValidAccountId", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -28,15 +28,15 @@ func TestNewAccountId(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewAccountId(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("InvalidAccountId", func(t *testing.T) {
+	test.Run("InvalidAccountId", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -56,10 +56,10 @@ func TestNewAccountId(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewAccountId(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 		}
 	})

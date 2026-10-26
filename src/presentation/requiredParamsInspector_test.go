@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestRequiredParamsInspector(t *testing.T) {
+func TestRequiredParamsInspector(test *testing.T) {
 	testCases := []struct {
 		name            string
 		paramsReceived  map[string]any
@@ -62,24 +62,24 @@ func TestRequiredParamsInspector(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			err := RequiredParamsInspector(testCase.paramsReceived, testCase.paramsRequired)
 
 			if testCase.expectError {
 				if err == nil {
-					t.Errorf("RequiredParamsInspectorSucceededWhenItShouldFail")
+					subtest.Errorf("RequiredParamsInspectorSucceededWhenItShouldFail")
 					return
 				}
 
 				expectedErrorMsg := "RequiredParamsMissing: " + strings.Join(testCase.expectedMissing, ", ")
 				if err.Error() != expectedErrorMsg {
-					t.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedErrorMsg, err.Error())
+					subtest.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedErrorMsg, err.Error())
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("RequiredParamsInspectorFailedWhenItShouldSucceed: %v", err)
+				subtest.Errorf("RequiredParamsInspectorFailedWhenItShouldSucceed: %v", err)
 				return
 			}
 		})

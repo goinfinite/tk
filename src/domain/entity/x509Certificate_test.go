@@ -8,60 +8,60 @@ import (
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
-func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
+func TestNewX509CertificateFromEnvelopedCertificate(test *testing.T) {
 	synthesizer := tkInfra.Synthesizer{}
 
-	t.Run("ValidCACertificate", func(t *testing.T) {
+	test.Run("ValidCACertificate", func(subtest *testing.T) {
 		caCertPem, _, err := synthesizer.CACertificatePemFactory(
 			tkInfra.CertificateSettings{},
 		)
 		if err != nil {
-			t.Fatalf("CACertificateGenerationFailed: %s", err.Error())
+			subtest.Fatalf("CACertificateGenerationFailed: %s", err.Error())
 		}
 
 		envelopedCert, err := tkValueObject.NewX509EnvelopedCertificate(caCertPem)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %s", err.Error())
+			subtest.Fatalf("UnexpectedError: %s", err.Error())
 		}
 
 		if x509CertEntity.SerialNumber.String() == "" {
-			t.Errorf("SerialNumberEmpty")
+			subtest.Errorf("SerialNumberEmpty")
 		}
 
 		expectedVersion := uint8(3)
 		if x509CertEntity.VersionNumber.Uint8() != expectedVersion {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedVersionNumber: got %d, expected %d",
 				x509CertEntity.VersionNumber.Uint8(), expectedVersion,
 			)
 		}
 
 		if x509CertEntity.SubjectDistinguishedName == nil {
-			t.Errorf("SubjectDistinguishedNameIsNil")
+			subtest.Errorf("SubjectDistinguishedNameIsNil")
 		}
 
 		if x509CertEntity.IssuerDistinguishedName == nil {
-			t.Errorf("IssuerDistinguishedNameIsNil")
+			subtest.Errorf("IssuerDistinguishedNameIsNil")
 		}
 
 		if x509CertEntity.ValidityNotBefore.Int64() <= 0 {
-			t.Errorf("InvalidValidityNotBefore")
+			subtest.Errorf("InvalidValidityNotBefore")
 		}
 
 		if x509CertEntity.ValidityNotAfter.Int64() <= 0 {
-			t.Errorf("InvalidValidityNotAfter")
+			subtest.Errorf("InvalidValidityNotAfter")
 		}
 
 		expectedPublicKeyAlgorithm := "ECDSA"
 		if x509CertEntity.PublicKeyAlgorithm.String() != expectedPublicKeyAlgorithm {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedPublicKeyAlgorithm: got %s, expected %s",
 				x509CertEntity.PublicKeyAlgorithm.String(), expectedPublicKeyAlgorithm,
 			)
@@ -69,43 +69,43 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 
 		expectedPublicKeySize := uint16(256)
 		if x509CertEntity.PublicKeySize.Uint16() != expectedPublicKeySize {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedPublicKeySize: got %d, expected %d",
 				x509CertEntity.PublicKeySize.Uint16(), expectedPublicKeySize,
 			)
 		}
 
 		if x509CertEntity.PublicKeyValue.String() == "" {
-			t.Errorf("PublicKeyValueEmpty")
+			subtest.Errorf("PublicKeyValueEmpty")
 		}
 
 		expectedSignatureAlgorithm := "ECDSAWithSHA256"
 		actualSignatureAlgorithm := x509CertEntity.SignatureAlgorithm.String()
 		if actualSignatureAlgorithm != expectedSignatureAlgorithm {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedSignatureAlgorithm: got %s, expected %s",
 				actualSignatureAlgorithm, expectedSignatureAlgorithm,
 			)
 		}
 
 		if x509CertEntity.SignatureValue == nil {
-			t.Errorf("SignatureValueIsNil")
+			subtest.Errorf("SignatureValueIsNil")
 		}
 
 		if x509CertEntity.FingerprintSHA256.String() == "" {
-			t.Errorf("FingerprintSHA256Empty")
+			subtest.Errorf("FingerprintSHA256Empty")
 		}
 
 		if x509CertEntity.BasicConstraints == nil {
-			t.Fatalf("BasicConstraintsIsNil")
+			subtest.Fatalf("BasicConstraintsIsNil")
 		}
 
 		if !x509CertEntity.BasicConstraints.IsAuthority {
-			t.Errorf("CertificateShouldBeCA")
+			subtest.Errorf("CertificateShouldBeCA")
 		}
 	})
 
-	t.Run("CACertificateWithoutMaxPathLenConstraint", func(t *testing.T) {
+	test.Run("CACertificateWithoutMaxPathLenConstraint", func(subtest *testing.T) {
 		caCertPem, _, err := synthesizer.CACertificatePemFactory(
 			tkInfra.CertificateSettings{
 				MaxPathLengthPtr:     nil,
@@ -113,31 +113,31 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			},
 		)
 		if err != nil {
-			t.Fatalf("CACertificateGenerationFailed: %s", err.Error())
+			subtest.Fatalf("CACertificateGenerationFailed: %s", err.Error())
 		}
 
 		envelopedCert, err := tkValueObject.NewX509EnvelopedCertificate(caCertPem)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %s", err.Error())
+			subtest.Fatalf("UnexpectedError: %s", err.Error())
 		}
 
 		if x509CertEntity.BasicConstraints == nil {
-			t.Fatalf("BasicConstraintsIsNil")
+			subtest.Fatalf("BasicConstraintsIsNil")
 		}
 
 		if !x509CertEntity.BasicConstraints.IsAuthority {
-			t.Errorf("CertificateShouldBeCA")
+			subtest.Errorf("CertificateShouldBeCA")
 		}
 
 		if x509CertEntity.BasicConstraints.MaxPathLength != nil {
-			t.Errorf(
+			subtest.Errorf(
 				"MaxPathLengthShouldBeNil: CA cert without path length "+
 					"constraint should have nil MaxPathLength, got %d",
 				*x509CertEntity.BasicConstraints.MaxPathLength,
@@ -145,7 +145,7 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 		}
 	})
 
-	t.Run("CACertificateWithMaxPathLenZero", func(t *testing.T) {
+	test.Run("CACertificateWithMaxPathLenZero", func(subtest *testing.T) {
 		caCertPem, _, err := synthesizer.CACertificatePemFactory(
 			tkInfra.CertificateSettings{
 				MaxPathLengthPtr:     nil,
@@ -153,45 +153,45 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			},
 		)
 		if err != nil {
-			t.Fatalf("CACertificateGenerationFailed: %s", err.Error())
+			subtest.Fatalf("CACertificateGenerationFailed: %s", err.Error())
 		}
 
 		envelopedCert, err := tkValueObject.NewX509EnvelopedCertificate(caCertPem)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %s", err.Error())
+			subtest.Fatalf("UnexpectedError: %s", err.Error())
 		}
 
 		if x509CertEntity.BasicConstraints == nil {
-			t.Fatalf("BasicConstraintsIsNil")
+			subtest.Fatalf("BasicConstraintsIsNil")
 		}
 
 		if !x509CertEntity.BasicConstraints.IsAuthority {
-			t.Errorf("CertificateShouldBeCA")
+			subtest.Errorf("CertificateShouldBeCA")
 		}
 
 		if x509CertEntity.BasicConstraints.MaxPathLength == nil {
-			t.Fatalf(
+			subtest.Fatalf(
 				"MaxPathLengthShouldNotBeNil: CA cert with MaxPathLenZero=true " +
 					"should have MaxPathLength=0",
 			)
 		}
 
 		if *x509CertEntity.BasicConstraints.MaxPathLength != 0 {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedMaxPathLength: got %d, expected 0",
 				*x509CertEntity.BasicConstraints.MaxPathLength,
 			)
 		}
 	})
 
-	t.Run("CACertificateWithMaxPathLenPositive", func(t *testing.T) {
+	test.Run("CACertificateWithMaxPathLenPositive", func(subtest *testing.T) {
 		maxPathLen := 2
 		caCertPem, _, err := synthesizer.CACertificatePemFactory(
 			tkInfra.CertificateSettings{
@@ -200,31 +200,31 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			},
 		)
 		if err != nil {
-			t.Fatalf("CACertificateGenerationFailed: %s", err.Error())
+			subtest.Fatalf("CACertificateGenerationFailed: %s", err.Error())
 		}
 
 		envelopedCert, err := tkValueObject.NewX509EnvelopedCertificate(caCertPem)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %s", err.Error())
+			subtest.Fatalf("UnexpectedError: %s", err.Error())
 		}
 
 		if x509CertEntity.BasicConstraints == nil {
-			t.Fatalf("BasicConstraintsIsNil")
+			subtest.Fatalf("BasicConstraintsIsNil")
 		}
 
 		if !x509CertEntity.BasicConstraints.IsAuthority {
-			t.Errorf("CertificateShouldBeCA")
+			subtest.Errorf("CertificateShouldBeCA")
 		}
 
 		if x509CertEntity.BasicConstraints.MaxPathLength == nil {
-			t.Fatalf(
+			subtest.Fatalf(
 				"MaxPathLengthShouldNotBeNil: CA cert with MaxPathLen=%d "+
 					"should have MaxPathLength set",
 				maxPathLen,
@@ -232,45 +232,45 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 		}
 
 		if *x509CertEntity.BasicConstraints.MaxPathLength != maxPathLen {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedMaxPathLength: got %d, expected %d",
 				*x509CertEntity.BasicConstraints.MaxPathLength, maxPathLen,
 			)
 		}
 	})
 
-	t.Run("ValidSelfSignedCertificate", func(t *testing.T) {
+	test.Run("ValidSelfSignedCertificate", func(subtest *testing.T) {
 		certPem, _, err := synthesizer.SelfSignedCertificatePairPemFactory(nil, nil)
 		if err != nil {
-			t.Fatalf("SelfSignedCertificateGenerationFailed: %s", err.Error())
+			subtest.Fatalf("SelfSignedCertificateGenerationFailed: %s", err.Error())
 		}
 
 		envelopedCert, err := tkValueObject.NewX509EnvelopedCertificate(certPem)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		x509CertEntity, err := tkEntity.NewX509CertificateFromEnvelopedCertificate(
 			envelopedCert,
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %s", err.Error())
+			subtest.Fatalf("UnexpectedError: %s", err.Error())
 		}
 
 		if x509CertEntity.SerialNumber.String() == "" {
-			t.Errorf("SerialNumberEmpty")
+			subtest.Errorf("SerialNumberEmpty")
 		}
 
 		if x509CertEntity.PublicKeyValue.String() == "" {
-			t.Errorf("PublicKeyValueEmpty")
+			subtest.Errorf("PublicKeyValueEmpty")
 		}
 
 		if x509CertEntity.FingerprintSHA256.String() == "" {
-			t.Errorf("FingerprintSHA256Empty")
+			subtest.Errorf("FingerprintSHA256Empty")
 		}
 	})
 
-	t.Run("MalformedCertificate", func(t *testing.T) {
+	test.Run("MalformedCertificate", func(subtest *testing.T) {
 		malformedCertPem := "-----BEGIN CERTIFICATE-----\n" +
 			"SGVsbG9Xb3JsZEhlbGxvV29ybGRIZWxsb1dvcmxkSGVsbG9Xb3JsZEhlbGxv\n" +
 			"V29ybGRIZWxsb1dvcmxkSGVsbG9Xb3JsZEhlbGxvV29ybGRIZWxsb1dvcmxk\n" +
@@ -280,17 +280,17 @@ func TestNewX509CertificateFromEnvelopedCertificate(t *testing.T) {
 			malformedCertPem,
 		)
 		if err != nil {
-			t.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
+			subtest.Fatalf("EnvelopedCertificateCreationFailed: %s", err.Error())
 		}
 
 		_, err = tkEntity.NewX509CertificateFromEnvelopedCertificate(envelopedCert)
 		if err == nil {
-			t.Fatalf("MissingExpectedError: malformed certificate should fail")
+			subtest.Fatalf("MissingExpectedError: malformed certificate should fail")
 		}
 
 		expectedError := "ParseCertificateFailed"
 		if err.Error() != expectedError {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedError: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)

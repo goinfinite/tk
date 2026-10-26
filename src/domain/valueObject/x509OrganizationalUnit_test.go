@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewX509OrganizationalUnit(t *testing.T) {
-	t.Run("ValidOrganizationalUnit", func(t *testing.T) {
+func TestNewX509OrganizationalUnit(test *testing.T) {
+	test.Run("ValidOrganizationalUnit", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509OrganizationalUnit
@@ -115,16 +115,16 @@ func TestNewX509OrganizationalUnit(t *testing.T) {
 			)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -132,7 +132,7 @@ func TestNewX509OrganizationalUnit(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509OrganizationalUnit
 			expectedOutput string
@@ -148,7 +148,7 @@ func TestNewX509OrganizationalUnit(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)

@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewCatalogItemEnv(t *testing.T) {
-	t.Run("ValidCatalogItemEnv", func(t *testing.T) {
+func TestNewCatalogItemEnv(test *testing.T) {
+	test.Run("ValidCatalogItemEnv", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput CatalogItemEnv
@@ -27,18 +27,18 @@ func TestNewCatalogItemEnv(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewCatalogItemEnv(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("ReadKeyAndReadValueMethods", func(t *testing.T) {
+	test.Run("ReadKeyAndReadValueMethods", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue    CatalogItemEnv
 			expectedKey   string
@@ -52,16 +52,16 @@ func TestNewCatalogItemEnv(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualKey := testCase.inputValue.ReadKey()
 			if actualKey != testCase.expectedKey {
-				t.Errorf("UnexpectedKey: '%v' vs '%v' [%v]", actualKey, testCase.expectedKey, testCase.inputValue)
+				subtest.Errorf("UnexpectedKey: '%v' vs '%v' [%v]", actualKey, testCase.expectedKey, testCase.inputValue)
 			}
 			actualValue := testCase.inputValue.ReadValue()
 			if actualValue != testCase.expectedValue {
-				t.Errorf("UnexpectedValue: '%v' vs '%v' [%v]", actualValue, testCase.expectedValue, testCase.inputValue)
+				subtest.Errorf("UnexpectedValue: '%v' vs '%v' [%v]", actualValue, testCase.expectedValue, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     CatalogItemEnv
 			expectedOutput string
@@ -73,7 +73,7 @@ func TestNewCatalogItemEnv(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

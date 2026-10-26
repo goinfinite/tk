@@ -33,11 +33,24 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   requestData, requestParsingErr := inputReader.Reader(echoContext)
   ```
 
-- **RequesterIpExtractor**: Requester IP extraction with a peer trust gate and a right-to-left trust chain walk. Reads `IP_EXTRACT_HEADER` env var as a comma-separated ordered chain (default: `X-Forwarded-For,X-Real-IP`). When `RemoteAddr` is not a trusted IP (local, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`), the extractor returns it and ignores the headers, because the client connected directly. Otherwise each header is walked right-to-left; malformed entries are ignored, and the first entry that is not a trusted IP is returned. When every entry is trusted, the extractor returns the original requester — the first entry of the first header that has one. This matches Echo's `RealIP` semantics. Otherwise it returns `RemoteAddr`. The chain supports the special keywords `Direct` and `RemoteAddr` to force extraction from `http.Request.RemoteAddr`.
+- **RequesterIpExtractor**: Requester IP extraction with a peer trust gate and a right-to-left trust chain walk. Reads `IP_EXTRACT_HEADER` env var as a comma-separated ordered chain (default: `X-Forwarded-For,X-Real-IP`). When `RemoteAddr` is not a trusted IP (local, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`), the extractor returns it and ignores the headers, because the client connected directly. Otherwise each header is walked right-to-left; malformed entries are ignored, and the first entry that is not a trusted IP is returned. When every entry is trusted, the extractor returns the original requester, the first entry of the first header that has one. This matches Echo's `RealIP` semantics. Otherwise it returns `RemoteAddr`. The chain supports the special keywords `Direct` and `RemoteAddr` to force extraction from `http.Request.RemoteAddr`.
+
+  `IP_EXTRACT_CONFIRMATION_HEADERS` adds an optional confirmation gate:
+  - The value is a comma-separated list of header names.
+  - A bare `HeaderName`, or `HeaderName=` with an empty value, requires presence.
+  - `HeaderName=secret` requires a constant-time value match.
+  - All entries must use the same mode; a mixed list is invalid.
+  - The gate passes when at least one requirement passes.
+  - A missing header, wrong value, mixed list, or invalid name/value returns `RemoteAddr`.
+  - Whitespace around entries, names, and values is trimmed.
+  - Confirmation header names and values are not logged.
+  - Unset or empty preserves the current behavior.
 
   Example: a request arrives with `X-Forwarded-For: 127.0.0.1` and `RemoteAddr: 172.17.0.1:54321`. Both addresses are trusted, so the extractor returns `127.0.0.1`, not the proxy address.
 
-  > **Security:** The headers are read only from trusted peers: loopback, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`. A client on an untrusted network cannot choose the reported address. Right-to-left traversal skips values a client prepends when a trusted proxy appends the real client last. A proxy with a public address must be listed in `TRUSTED_CIDRS`, or the extractor reports the proxy address. Over-broad `TRUSTED_CIDRS` is the risk: the extractor would trust a range that includes untrusted clients.
+  > **Security:** The headers are read only from trusted peers: loopback, private, link-local, or in `TRUSTED_IPS`/`TRUSTED_CIDRS`. A client on an untrusted network cannot choose the reported address. Right-to-left traversal skips values a client prepends when a trusted proxy appends the real client last. A proxy with a public address must be listed in `TRUSTED_CIDRS`, or the extractor reports the proxy address. Over-broad `TRUSTED_CIDRS` is the risk: the extractor would trust a range that includes untrusted clients. Behind an L4 proxy that cannot overwrite headers, set `IP_EXTRACT_CONFIRMATION_HEADERS` so requests that bypass the edge fail closed. Presence alone is forgeable; use `HeaderName=secret` when the origin is directly reachable.
+
+  > **Proxy entries:** Do not add a private/internal proxy range to `TRUSTED_IPS` or `TRUSTED_CIDRS` unless you intend that proxy to be a trusted panic operator. The extractor already trusts loopback, private, and link-local peers, so the entry does not change header trust. It does make `PanicHandler` trust the proxy address: when the confirmation gate fails, `Execute` returns the proxy's `RemoteAddr`, and a listed proxy then unlocks full panic details. A public proxy must be listed for header extraction. If you also configure the confirmation gate, make sure it passes on that path, or a failed gate will return the proxy address and treat it as a trusted operator.
 
   ```go
   extractor := NewRequesterIpExtractor()

@@ -14,7 +14,7 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestShell(t *testing.T) {
+func TestShell(test *testing.T) {
 	unresolvableUserIdFinder := func() uint32 {
 		for candidate := uint32(999999); candidate > 0; candidate-- {
 			_, lookupErr := user.LookupId(strconv.FormatUint(uint64(candidate), 10))
@@ -23,12 +23,12 @@ func TestShell(t *testing.T) {
 			}
 		}
 
-		t.Fatal("NoUnresolvableUserIdFound")
+		test.Fatal("NoUnresolvableUserIdFound")
 		return 0
 	}
 	unresolvableUserId := unresolvableUserIdFinder()
 
-	t.Run("BasicShell", func(t *testing.T) {
+	test.Run("BasicShell", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			command        string
 			args           []string
@@ -47,13 +47,13 @@ func TestShell(t *testing.T) {
 			)
 			shellOutput, err := shell.Run()
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%s %v]", testCase.command, testCase.args)
+				subtest.Errorf("MissingExpectedError: [%s %v]", testCase.command, testCase.args)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedError: '%s' [%s %v]", err.Error(), testCase.command, testCase.args)
+				subtest.Errorf("UnexpectedError: '%s' [%s %v]", err.Error(), testCase.command, testCase.args)
 			}
 			if !testCase.expectError && shellOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%s' vs '%s' [%s %v]",
 					shellOutput, testCase.expectedOutput, testCase.command, testCase.args,
 				)
@@ -61,7 +61,7 @@ func TestShell(t *testing.T) {
 		}
 	})
 
-	t.Run("ErrorHandling", func(t *testing.T) {
+	test.Run("ErrorHandling", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			command     string
 			args        []string
@@ -79,21 +79,21 @@ func TestShell(t *testing.T) {
 
 			_, err := shell.Run()
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%s %v]", testCase.command, testCase.args)
+				subtest.Errorf("MissingExpectedError: [%s %v]", testCase.command, testCase.args)
 			}
 
 			if err != nil {
 				if shellErr, assertOk := err.(*ShellError); assertOk {
 					if shellErr.ExitCode == 0 {
-						t.Errorf("UnexpectedZeroExitCode: [%s %v]", testCase.command, testCase.args)
+						subtest.Errorf("UnexpectedZeroExitCode: [%s %v]", testCase.command, testCase.args)
 					}
 				}
 			}
 		}
 	})
 
-	t.Run("StdoutFileCapture", func(t *testing.T) {
-		outputFilePath := filepath.Join(t.TempDir(), "stdout.log")
+	test.Run("StdoutFileCapture", func(subtest *testing.T) {
+		outputFilePath := filepath.Join(subtest.TempDir(), "stdout.log")
 
 		shell := NewShell(ShellSettings{
 			Command:        "echo",
@@ -102,28 +102,28 @@ func TestShell(t *testing.T) {
 		})
 		_, err := shell.Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 
 		fileContent, readErr := os.ReadFile(outputFilePath)
 		if readErr != nil {
-			t.Fatalf("OutputFileReadFailed: %v", readErr)
+			subtest.Fatalf("OutputFileReadFailed: %v", readErr)
 		}
 		if string(fileContent) != "hello\n" {
-			t.Errorf("UnexpectedFileContent: '%s'", fileContent)
+			subtest.Errorf("UnexpectedFileContent: '%s'", fileContent)
 		}
 	})
 
-	t.Run("CaptureFileHandlesDoNotLeak", func(t *testing.T) {
+	test.Run("CaptureFileHandlesDoNotLeak", func(subtest *testing.T) {
 		openDescriptorCount := func() int {
 			fdEntries, err := os.ReadDir("/proc/self/fd")
 			if err != nil {
-				t.Fatalf("FdScanFailed: %v", err)
+				subtest.Fatalf("FdScanFailed: %v", err)
 			}
 			return len(fdEntries)
 		}
 
-		captureDir := t.TempDir()
+		captureDir := subtest.TempDir()
 		settings := ShellSettings{
 			Command:        "echo",
 			Args:           []string{"hello"},
@@ -133,7 +133,7 @@ func TestShell(t *testing.T) {
 
 		runCapture := func() {
 			if _, runErr := NewShell(settings).Run(); runErr != nil {
-				t.Fatalf("RunFailed: %v", runErr)
+				subtest.Fatalf("RunFailed: %v", runErr)
 			}
 		}
 
@@ -145,11 +145,11 @@ func TestShell(t *testing.T) {
 		}
 
 		if leakedCount := openDescriptorCount() - baselineDescriptors; leakedCount > 0 {
-			t.Errorf("CaptureFileHandlesLeaked: %d descriptors left open", leakedCount)
+			subtest.Errorf("CaptureFileHandlesLeaked: %d descriptors left open", leakedCount)
 		}
 	})
 
-	t.Run("CommandTimeoutEnforced", func(t *testing.T) {
+	test.Run("CommandTimeoutEnforced", func(subtest *testing.T) {
 		_, err := NewShell(ShellSettings{
 			Command:              "sleep",
 			Args:                 []string{"5"},
@@ -158,17 +158,17 @@ func TestShell(t *testing.T) {
 
 		shellErr, assertOk := err.(*ShellError)
 		if !assertOk {
-			t.Fatalf("ExpectedShellError,Got%v", err)
+			subtest.Fatalf("ExpectedShellError,Got%v", err)
 		}
 		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
-			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+			subtest.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
 		}
 		if shellErr.StdErr != "CommandDeadlineExceeded" {
-			t.Errorf("UnexpectedTimeoutMessage: '%s'", shellErr.StdErr)
+			subtest.Errorf("UnexpectedTimeoutMessage: '%s'", shellErr.StdErr)
 		}
 	})
 
-	t.Run("NaturalExitCode124KeepsCommandStdErr", func(t *testing.T) {
+	test.Run("NaturalExitCode124KeepsCommandStdErr", func(subtest *testing.T) {
 		_, err := NewShell(ShellSettings{
 			Command: "bash",
 			Args:    []string{"-c", "echo boom 1>&2; exit 124"},
@@ -176,17 +176,17 @@ func TestShell(t *testing.T) {
 
 		shellErr, assertOk := err.(*ShellError)
 		if !assertOk {
-			t.Fatalf("ExpectedShellError,Got%v", err)
+			subtest.Fatalf("ExpectedShellError,Got%v", err)
 		}
 		if shellErr.ExitCode != 124 {
-			t.Errorf("UnexpectedExitCode: %d", shellErr.ExitCode)
+			subtest.Errorf("UnexpectedExitCode: %d", shellErr.ExitCode)
 		}
 		if shellErr.StdErr != "boom\n" {
-			t.Errorf("Natural124MisreportedAsTimeout: '%s'", shellErr.StdErr)
+			subtest.Errorf("Natural124MisreportedAsTimeout: '%s'", shellErr.StdErr)
 		}
 	})
 
-	t.Run("ShouldDisableTimeoutLetsLongCommandFinish", func(t *testing.T) {
+	test.Run("ShouldDisableTimeoutLetsLongCommandFinish", func(subtest *testing.T) {
 		_, err := NewShell(ShellSettings{
 			Command:              "sleep",
 			Args:                 []string{"2"},
@@ -194,11 +194,11 @@ func TestShell(t *testing.T) {
 			ShouldDisableTimeout: true,
 		}).Run()
 		if err != nil {
-			t.Errorf("CommandKilledDespiteDisabledTimeout: %v", err)
+			subtest.Errorf("CommandKilledDespiteDisabledTimeout: %v", err)
 		}
 	})
 
-	t.Run("ExecutionDeadlineEnforced", func(t *testing.T) {
+	test.Run("ExecutionDeadlineEnforced", func(subtest *testing.T) {
 		deadline := tkValueObject.NewUnixTimeAfterNow(1 * time.Second)
 
 		_, err := NewShell(ShellSettings{
@@ -209,14 +209,14 @@ func TestShell(t *testing.T) {
 
 		shellErr, assertOk := err.(*ShellError)
 		if !assertOk {
-			t.Fatalf("ExpectedShellError,Got%v", err)
+			subtest.Fatalf("ExpectedShellError,Got%v", err)
 		}
 		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
-			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+			subtest.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
 		}
 	})
 
-	t.Run("PastExecutionDeadlineTimesOutImmediately", func(t *testing.T) {
+	test.Run("PastExecutionDeadlineTimesOutImmediately", func(subtest *testing.T) {
 		pastDeadline := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
 
 		_, err := NewShell(ShellSettings{
@@ -227,14 +227,14 @@ func TestShell(t *testing.T) {
 
 		shellErr, assertOk := err.(*ShellError)
 		if !assertOk {
-			t.Fatalf("ExpectedShellError,Got%v", err)
+			subtest.Fatalf("ExpectedShellError,Got%v", err)
 		}
 		if shellErr.ExitCode != ShellCommandTimeoutExitCode {
-			t.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
+			subtest.Errorf("UnexpectedTimeoutExitCode: %d", shellErr.ExitCode)
 		}
 	})
 
-	t.Run("ShouldDisableTimeoutOverridesDeadline", func(t *testing.T) {
+	test.Run("ShouldDisableTimeoutOverridesDeadline", func(subtest *testing.T) {
 		pastDeadline := tkValueObject.NewUnixTimeBeforeNow(1 * time.Hour)
 
 		_, err := NewShell(ShellSettings{
@@ -244,22 +244,22 @@ func TestShell(t *testing.T) {
 		}).Run()
 
 		if err != nil {
-			t.Errorf("ExpectedSuccess,Got%v", err)
+			subtest.Errorf("ExpectedSuccess,Got%v", err)
 		}
 	})
 
-	t.Run("UserIdRunsCommandAsTargetAccount", func(t *testing.T) {
+	test.Run("UserIdRunsCommandAsTargetAccount", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		nobody, lookupErr := user.Lookup("nobody")
 		if lookupErr != nil {
-			t.Skipf("NobodyUserMissing: %v", lookupErr)
+			subtest.Skipf("NobodyUserMissing: %v", lookupErr)
 		}
 		nobodyUid, uidErr := strconv.Atoi(nobody.Uid)
 		if uidErr != nil {
-			t.Fatalf("UidParseFailed: %v", uidErr)
+			subtest.Fatalf("UidParseFailed: %v", uidErr)
 		}
 		nobodyUserId := uint32(nobodyUid)
 
@@ -269,10 +269,10 @@ func TestShell(t *testing.T) {
 			UserId:  &nobodyUserId,
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if uidStr != nobody.Uid {
-			t.Errorf("UidMismatch: %s vs %s", uidStr, nobody.Uid)
+			subtest.Errorf("UidMismatch: %s vs %s", uidStr, nobody.Uid)
 		}
 
 		gidStr, err := NewShell(ShellSettings{
@@ -281,14 +281,14 @@ func TestShell(t *testing.T) {
 			UserId:  &nobodyUserId,
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if gidStr != nobody.Gid {
-			t.Errorf("GidMismatch: %s vs %s", gidStr, nobody.Gid)
+			subtest.Errorf("GidMismatch: %s vs %s", gidStr, nobody.Gid)
 		}
 	})
 
-	t.Run("UserIdZeroRequestsRootAccount", func(t *testing.T) {
+	test.Run("UserIdZeroRequestsRootAccount", func(subtest *testing.T) {
 		rootUserId := uint32(0)
 
 		runPlan := NewShell(ShellSettings{
@@ -296,29 +296,29 @@ func TestShell(t *testing.T) {
 			UserId:  &rootUserId,
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 
 		sysProcAttr := runPlan.ExecCmd.SysProcAttr
 		if sysProcAttr == nil || sysProcAttr.Credential == nil {
-			t.Fatalf("MissingSysCallCredentialsForRootUserId")
+			subtest.Fatalf("MissingSysCallCredentialsForRootUserId")
 		}
 		if sysProcAttr.Credential.Uid != 0 {
-			t.Errorf("UnexpectedCredentialUid: %d", sysProcAttr.Credential.Uid)
+			subtest.Errorf("UnexpectedCredentialUid: %d", sysProcAttr.Credential.Uid)
 		}
 	})
 
-	t.Run("UnresolvableUserIdFailsLoud", func(t *testing.T) {
+	test.Run("UnresolvableUserIdFailsLoud", func(subtest *testing.T) {
 		_, err := NewShell(ShellSettings{
 			Command: "true",
 			UserId:  &unresolvableUserId,
 		}).Run()
 		if err == nil {
-			t.Errorf("MissingErrorForUnresolvableUserId")
+			subtest.Errorf("MissingErrorForUnresolvableUserId")
 		}
 	})
 
-	t.Run("UnresolvableUserIdIgnoredByFlag", func(t *testing.T) {
+	test.Run("UnresolvableUserIdIgnoredByFlag", func(subtest *testing.T) {
 		stdoutStr, err := NewShell(ShellSettings{
 			Command:                         "id",
 			Args:                            []string{"-u"},
@@ -326,16 +326,16 @@ func TestShell(t *testing.T) {
 			ShouldIgnoreUsernameLookupError: true,
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if stdoutStr != strconv.Itoa(os.Getuid()) {
-			t.Errorf("ExpectedCurrentUser: %s vs %d", stdoutStr, os.Getuid())
+			subtest.Errorf("ExpectedCurrentUser: %s vs %d", stdoutStr, os.Getuid())
 		}
 	})
 
-	t.Run("UsernameWinsOverUserId", func(t *testing.T) {
+	test.Run("UsernameWinsOverUserId", func(subtest *testing.T) {
 		if os.Geteuid() != 0 {
-			t.Skip("RootPrivilegesRequired")
+			subtest.Skip("RootPrivilegesRequired")
 		}
 
 		stdoutStr, err := NewShell(ShellSettings{
@@ -345,50 +345,50 @@ func TestShell(t *testing.T) {
 			UserId:   &unresolvableUserId,
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if stdoutStr != "0" {
-			t.Errorf("ExpectedRootUid: %s", stdoutStr)
+			subtest.Errorf("ExpectedRootUid: %s", stdoutStr)
 		}
 	})
 }
 
-func TestShellExecutionTimeoutResolver(t *testing.T) {
+func TestShellExecutionTimeoutResolver(test *testing.T) {
 	secondsToDuration := func(seconds uint64) time.Duration {
 		return time.Duration(seconds) * time.Second
 	}
 
-	t.Run("DefaultWhenUnset", func(t *testing.T) {
+	test.Run("DefaultWhenUnset", func(subtest *testing.T) {
 		timeout := NewShell(ShellSettings{}).executionTimeoutResolver()
 		expectedTimeout := secondsToDuration(ShellExecutionTimeoutDefaultSecs)
 
 		if timeout != expectedTimeout {
-			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+			subtest.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
 		}
 	})
 
-	t.Run("RequestedTimeoutAboveLegacyCapIsHonored", func(t *testing.T) {
+	test.Run("RequestedTimeoutAboveLegacyCapIsHonored", func(subtest *testing.T) {
 		timeout := NewShell(ShellSettings{
 			ExecutionTimeoutSecs: 7200,
 		}).executionTimeoutResolver()
 		expectedTimeout := secondsToDuration(7200)
 
 		if timeout != expectedTimeout {
-			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+			subtest.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
 		}
 	})
 
-	t.Run("HugeRequestedTimeoutSaturatesWithoutOverflow", func(t *testing.T) {
+	test.Run("HugeRequestedTimeoutSaturatesWithoutOverflow", func(subtest *testing.T) {
 		timeout := NewShell(ShellSettings{
 			ExecutionTimeoutSecs: math.MaxUint64,
 		}).executionTimeoutResolver()
 
 		if timeout <= 0 {
-			t.Errorf("HugeTimeoutOverflowed: %s", timeout)
+			subtest.Errorf("HugeTimeoutOverflowed: %s", timeout)
 		}
 	})
 
-	t.Run("EarlierDeadlineWinsOverDuration", func(t *testing.T) {
+	test.Run("EarlierDeadlineWinsOverDuration", func(subtest *testing.T) {
 		deadline := tkValueObject.NewUnixTimeAfterNow(120 * time.Second)
 
 		timeout := NewShell(ShellSettings{
@@ -397,11 +397,11 @@ func TestShellExecutionTimeoutResolver(t *testing.T) {
 		}).executionTimeoutResolver()
 
 		if timeout > 121*time.Second || timeout < 118*time.Second {
-			t.Errorf("DeadlineDidNotWin: %s", timeout)
+			subtest.Errorf("DeadlineDidNotWin: %s", timeout)
 		}
 	})
 
-	t.Run("EarlierDurationWinsOverDeadline", func(t *testing.T) {
+	test.Run("EarlierDurationWinsOverDeadline", func(subtest *testing.T) {
 		deadline := tkValueObject.NewUnixTimeAfterNow(6000 * time.Second)
 
 		timeout := NewShell(ShellSettings{
@@ -411,11 +411,11 @@ func TestShellExecutionTimeoutResolver(t *testing.T) {
 		expectedTimeout := secondsToDuration(600)
 
 		if timeout != expectedTimeout {
-			t.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
+			subtest.Errorf("UnexpectedTimeout: %s vs %s", timeout, expectedTimeout)
 		}
 	})
 
-	t.Run("DeadlineAloneDefinesTimeout", func(t *testing.T) {
+	test.Run("DeadlineAloneDefinesTimeout", func(subtest *testing.T) {
 		deadline := tkValueObject.NewUnixTimeAfterNow(3000 * time.Second)
 
 		timeout := NewShell(ShellSettings{
@@ -423,11 +423,11 @@ func TestShellExecutionTimeoutResolver(t *testing.T) {
 		}).executionTimeoutResolver()
 
 		if timeout > 3001*time.Second || timeout < 2998*time.Second {
-			t.Errorf("DeadlineAloneNotHonored: %s", timeout)
+			subtest.Errorf("DeadlineAloneNotHonored: %s", timeout)
 		}
 	})
 
-	t.Run("FarDeadlineAloneIsHonored", func(t *testing.T) {
+	test.Run("FarDeadlineAloneIsHonored", func(subtest *testing.T) {
 		deadline := tkValueObject.NewUnixTimeAfterNow(7200 * time.Second)
 
 		timeout := NewShell(ShellSettings{
@@ -435,52 +435,52 @@ func TestShellExecutionTimeoutResolver(t *testing.T) {
 		}).executionTimeoutResolver()
 
 		if timeout > 7201*time.Second || timeout < 7198*time.Second {
-			t.Errorf("FarDeadlineNotHonored: %s", timeout)
+			subtest.Errorf("FarDeadlineNotHonored: %s", timeout)
 		}
 	})
 }
 
-func TestChildEnvironment(t *testing.T) {
-	t.Setenv("TK_PARENT_ONLY_VAR", "leaked")
+func TestChildEnvironment(test *testing.T) {
+	test.Setenv("TK_PARENT_ONLY_VAR", "leaked")
 	standardSystemPath := "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-	t.Run("InheritsParentEnvAndWorkingDirectoryPwd", func(t *testing.T) {
+	test.Run("InheritsParentEnvAndWorkingDirectoryPwd", func(subtest *testing.T) {
 		runPlan := NewShell(ShellSettings{
 			Command:          "env",
 			WorkingDirectory: "/tmp",
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 		childEnv := runPlan.ExecCmd.Env
 
 		if !slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
-			t.Errorf("ParentEnvNotInherited: %v", childEnv)
+			subtest.Errorf("ParentEnvNotInherited: %v", childEnv)
 		}
 		if !slices.Contains(childEnv, "DEBIAN_FRONTEND=noninteractive") {
-			t.Errorf("MissingDebianFrontend: %v", childEnv)
+			subtest.Errorf("MissingDebianFrontend: %v", childEnv)
 		}
 		if !slices.Contains(childEnv, "PWD=/tmp") {
-			t.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
+			subtest.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
 		}
 	})
 
-	t.Run("UsernameAloneStillInheritsParentEnv", func(t *testing.T) {
+	test.Run("UsernameAloneStillInheritsParentEnv", func(subtest *testing.T) {
 		runPlan := NewShell(ShellSettings{
 			Command:  "env",
 			Username: "root",
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 		childEnv := runPlan.ExecCmd.Env
 
 		if !slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
-			t.Errorf("UsernameShouldNotImplyCleanEnv: %v", childEnv)
+			subtest.Errorf("UsernameShouldNotImplyCleanEnv: %v", childEnv)
 		}
 	})
 
-	t.Run("CleanEnvDropsParentWhenFlagSet", func(t *testing.T) {
+	test.Run("CleanEnvDropsParentWhenFlagSet", func(subtest *testing.T) {
 		runPlan := NewShell(ShellSettings{
 			Command:           "env",
 			ShouldUseCleanEnv: true,
@@ -488,49 +488,49 @@ func TestChildEnvironment(t *testing.T) {
 			Envs:              []string{"HOME=/home/target"},
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 		childEnv := runPlan.ExecCmd.Env
 
 		if slices.Contains(childEnv, "TK_PARENT_ONLY_VAR=leaked") {
-			t.Errorf("ParentEnvLeakedIntoCleanChild: %v", childEnv)
+			subtest.Errorf("ParentEnvLeakedIntoCleanChild: %v", childEnv)
 		}
 		if !slices.Contains(childEnv, "DEBIAN_FRONTEND=noninteractive") {
-			t.Errorf("MissingDebianFrontend: %v", childEnv)
+			subtest.Errorf("MissingDebianFrontend: %v", childEnv)
 		}
 		if !slices.Contains(childEnv, "PWD=/tmp") {
-			t.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
+			subtest.Errorf("WorkingDirectoryPwdNotPropagated: %v", childEnv)
 		}
 		if !slices.Contains(childEnv, "HOME=/home/target") {
-			t.Errorf("MissingExplicitEnv: %v", childEnv)
+			subtest.Errorf("MissingExplicitEnv: %v", childEnv)
 		}
 		expectedPath := "PATH=" + os.Getenv("HOME") + "/.local/bin:" + standardSystemPath
 		if !slices.Contains(childEnv, expectedPath) {
-			t.Errorf("MissingUserLocalBinAndStandardPath: %v", childEnv)
+			subtest.Errorf("MissingUserLocalBinAndStandardPath: %v", childEnv)
 		}
 	})
 
-	t.Run("CleanEnvKeepsParentHomeForSameUser", func(t *testing.T) {
-		t.Setenv("HOME", "/home/simulator-user")
+	test.Run("CleanEnvKeepsParentHomeForSameUser", func(subtest *testing.T) {
+		subtest.Setenv("HOME", "/home/simulator-user")
 
 		runPlan := NewShell(ShellSettings{
 			Command:           "env",
 			ShouldUseCleanEnv: true,
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 		childEnv := runPlan.ExecCmd.Env
 
 		if !slices.Contains(childEnv, "HOME=/home/simulator-user") {
-			t.Errorf("ParentHomeDroppedForSameUser: %v", childEnv)
+			subtest.Errorf("ParentHomeDroppedForSameUser: %v", childEnv)
 		}
 	})
 
-	t.Run("CleanEnvSetsTargetUserHomeOnUsernameSwitch", func(t *testing.T) {
+	test.Run("CleanEnvSetsTargetUserHomeOnUsernameSwitch", func(subtest *testing.T) {
 		targetUser, err := user.Lookup("root")
 		if err != nil {
-			t.Fatalf("RootLookupFailed: %v", err)
+			subtest.Fatalf("RootLookupFailed: %v", err)
 		}
 
 		runPlan := NewShell(ShellSettings{
@@ -539,46 +539,46 @@ func TestChildEnvironment(t *testing.T) {
 			Username:          "root",
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 		childEnv := runPlan.ExecCmd.Env
 
 		if !slices.Contains(childEnv, "HOME="+targetUser.HomeDir) {
-			t.Errorf("TargetUserHomeMissing: %v", childEnv)
+			subtest.Errorf("TargetUserHomeMissing: %v", childEnv)
 		}
 		if parentHome := os.Getenv("HOME"); parentHome != targetUser.HomeDir {
 			if slices.Contains(childEnv, "HOME="+parentHome) {
-				t.Errorf("ParentHomeLeakedIntoSwitchedChild: %v", childEnv)
+				subtest.Errorf("ParentHomeLeakedIntoSwitchedChild: %v", childEnv)
 			}
 			targetLocalBinPath := "PATH=" + targetUser.HomeDir + "/.local/bin:" +
 				standardSystemPath
 			if !slices.Contains(childEnv, targetLocalBinPath) {
-				t.Errorf("TargetUserLocalBinPathMissing: %v", childEnv)
+				subtest.Errorf("TargetUserLocalBinPathMissing: %v", childEnv)
 			}
 		}
 	})
 
-	t.Run("CleanEnvPwdIsAbsoluteForRelativeWorkingDirectory", func(t *testing.T) {
+	test.Run("CleanEnvPwdIsAbsoluteForRelativeWorkingDirectory", func(subtest *testing.T) {
 		runPlan := NewShell(ShellSettings{
 			Command:           "env",
 			ShouldUseCleanEnv: true,
 			WorkingDirectory:  "relative-dir",
 		}).executionPlanner(context.Background())
 		if runPlan.Err != nil {
-			t.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
+			subtest.Fatalf("ExecutionPlanningFailed: %v", runPlan.Err)
 		}
 
 		expectedPwd, err := filepath.Abs("relative-dir")
 		if err != nil {
-			t.Fatalf("AbsPathFailed: %v", err)
+			subtest.Fatalf("AbsPathFailed: %v", err)
 		}
 		if !slices.Contains(runPlan.ExecCmd.Env, "PWD="+expectedPwd) {
-			t.Errorf("RelativeWorkingDirectoryPwdNotAbsolute: %v", runPlan.ExecCmd.Env)
+			subtest.Errorf("RelativeWorkingDirectoryPwdNotAbsolute: %v", runPlan.ExecCmd.Env)
 		}
 	})
 
-	t.Run("EnvsWinOverSameNamedParentEntries", func(t *testing.T) {
-		t.Setenv("TK_TEST_ENV_PRECEDENCE", "from-parent")
+	test.Run("EnvsWinOverSameNamedParentEntries", func(subtest *testing.T) {
+		subtest.Setenv("TK_TEST_ENV_PRECEDENCE", "from-parent")
 
 		shellOutput, err := NewShell(ShellSettings{
 			Command: "printenv",
@@ -586,15 +586,15 @@ func TestChildEnvironment(t *testing.T) {
 			Envs:    []string{"TK_TEST_ENV_PRECEDENCE=from-envs"},
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if shellOutput != "from-envs" {
-			t.Errorf("EnvsDidNotOverrideParentEntry: got '%s'", shellOutput)
+			subtest.Errorf("EnvsDidNotOverrideParentEntry: got '%s'", shellOutput)
 		}
 	})
 
-	t.Run("EnvsWinOverCleanBaseEntries", func(t *testing.T) {
-		t.Setenv("HOME", "/parent/home")
+	test.Run("EnvsWinOverCleanBaseEntries", func(subtest *testing.T) {
+		subtest.Setenv("HOME", "/parent/home")
 
 		shellOutput, err := NewShell(ShellSettings{
 			Command:           "printenv",
@@ -603,21 +603,21 @@ func TestChildEnvironment(t *testing.T) {
 			Envs:              []string{"HOME=/home/envs-wins"},
 		}).Run()
 		if err != nil {
-			t.Fatalf("RunFailed: %v", err)
+			subtest.Fatalf("RunFailed: %v", err)
 		}
 		if shellOutput != "/home/envs-wins" {
-			t.Errorf("EnvsDidNotOverrideCleanBaseHome: got '%s'", shellOutput)
+			subtest.Errorf("EnvsDidNotOverrideCleanBaseHome: got '%s'", shellOutput)
 		}
 	})
 }
 
-func TestIsStdoutTerminal(t *testing.T) {
-	t.Run("PipeIsNotTerminal", func(t *testing.T) {
+func TestIsStdoutTerminal(test *testing.T) {
+	test.Run("PipeIsNotTerminal", func(subtest *testing.T) {
 		originalStdout := os.Stdout
 
 		readEnd, writeEnd, err := os.Pipe()
 		if err != nil {
-			t.Fatalf("PipeCreationFailed: %v", err)
+			subtest.Fatalf("PipeCreationFailed: %v", err)
 		}
 		defer func() { _ = writeEnd.Close() }()
 		defer func() { _ = readEnd.Close() }()
@@ -625,7 +625,7 @@ func TestIsStdoutTerminal(t *testing.T) {
 
 		os.Stdout = readEnd
 		if IsStdoutTerminal() {
-			t.Errorf("PipeReportedAsTerminal")
+			subtest.Errorf("PipeReportedAsTerminal")
 		}
 	})
 }

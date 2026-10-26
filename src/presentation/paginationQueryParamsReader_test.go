@@ -10,8 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func TestPaginationQueryParamsReader(t *testing.T) {
-	t.Run("ReadsPaginationKeysFromGetRequestWithoutContentType", func(t *testing.T) {
+func TestPaginationQueryParamsReader(test *testing.T) {
+	test.Run("ReadsPaginationKeysFromGetRequestWithoutContentType", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet,
@@ -24,36 +24,36 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		requestParams := PaginationQueryParamsReader(echoContext, nil)
 
 		if requestParams["pageNumber"] != uint32(2) {
-			t.Errorf("PageNumberMismatch: expected 2, got %v", requestParams["pageNumber"])
+			subtest.Errorf("PageNumberMismatch: expected 2, got %v", requestParams["pageNumber"])
 		}
 
 		if requestParams["itemsPerPage"] != uint16(25) {
-			t.Errorf(
+			subtest.Errorf(
 				"ItemsPerPageMismatch: expected 25, got %v",
 				requestParams["itemsPerPage"],
 			)
 		}
 
 		if requestParams["sortBy"] != tkValueObject.PaginationSortBy("name") {
-			t.Errorf("SortByMismatch: expected name, got %v", requestParams["sortBy"])
+			subtest.Errorf("SortByMismatch: expected name, got %v", requestParams["sortBy"])
 		}
 
 		if requestParams["sortDirection"] != tkValueObject.PaginationSortDirection("desc") {
-			t.Errorf(
+			subtest.Errorf(
 				"SortDirectionMismatch: expected desc, got %v",
 				requestParams["sortDirection"],
 			)
 		}
 
 		if requestParams["lastSeenId"] != tkValueObject.PaginationLastSeenId("abc123") {
-			t.Errorf(
+			subtest.Errorf(
 				"LastSeenIdMismatch: expected abc123, got %v",
 				requestParams["lastSeenId"],
 			)
 		}
 	})
 
-	t.Run("DropsMalformedPaginationValues", func(t *testing.T) {
+	test.Run("DropsMalformedPaginationValues", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet,
@@ -69,12 +69,12 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 			"pageNumber", "itemsPerPage", "sortBy", "sortDirection", "lastSeenId",
 		} {
 			if _, hasKey := requestParams[paginationKey]; hasKey {
-				t.Errorf("UnexpectedKey: %s", paginationKey)
+				subtest.Errorf("UnexpectedKey: %s", paginationKey)
 			}
 		}
 	})
 
-	t.Run("MalformedSortByFallsBackToPaginationParserDefault", func(t *testing.T) {
+	test.Run("MalformedSortByFallsBackToPaginationParserDefault", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, "/?sortBy=bad@sort", nil,
@@ -87,15 +87,15 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		defaultPagination := tkDto.Pagination{PageNumber: 1, ItemsPerPage: 10}
 		parsedPagination, err := PaginationParser(defaultPagination, requestParams)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		if parsedPagination.SortBy != nil {
-			t.Errorf("UnexpectedSortBy: %v", parsedPagination.SortBy)
+			subtest.Errorf("UnexpectedSortBy: %v", parsedPagination.SortBy)
 		}
 	})
 
-	t.Run("ReadsOptionalParamsWhenPresentAndNonEmpty", func(t *testing.T) {
+	test.Run("ReadsOptionalParamsWhenPresentAndNonEmpty", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, "/?nature=app&name=&status=running", nil,
@@ -107,23 +107,23 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		requestParams := PaginationQueryParamsReader(echoContext, optionalParamNames)
 
 		if requestParams["nature"] != "app" {
-			t.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
+			subtest.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
 		}
 
 		if requestParams["status"] != "running" {
-			t.Errorf("StatusMismatch: expected running, got %v", requestParams["status"])
+			subtest.Errorf("StatusMismatch: expected running, got %v", requestParams["status"])
 		}
 
 		if _, hasName := requestParams["name"]; hasName {
-			t.Errorf("UnexpectedEmptyNameParam")
+			subtest.Errorf("UnexpectedEmptyNameParam")
 		}
 
 		if _, hasType := requestParams["type"]; hasType {
-			t.Errorf("UnexpectedAbsentTypeParam")
+			subtest.Errorf("UnexpectedAbsentTypeParam")
 		}
 	})
 
-	t.Run("IgnoresPaginationKeysListedAsOptional", func(t *testing.T) {
+	test.Run("IgnoresPaginationKeysListedAsOptional", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, "/?pageNumber=2&sortBy=bad@sort&nature=app", nil,
@@ -135,22 +135,22 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		requestParams := PaginationQueryParamsReader(echoContext, optionalParamNames)
 
 		if requestParams["pageNumber"] != uint32(2) {
-			t.Errorf(
+			subtest.Errorf(
 				"PageNumberMismatch: expected converted 2, got %v",
 				requestParams["pageNumber"],
 			)
 		}
 
 		if _, hasSortBy := requestParams["sortBy"]; hasSortBy {
-			t.Errorf("UnexpectedMalformedSortBy: %v", requestParams["sortBy"])
+			subtest.Errorf("UnexpectedMalformedSortBy: %v", requestParams["sortBy"])
 		}
 
 		if requestParams["nature"] != "app" {
-			t.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
+			subtest.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
 		}
 	})
 
-	t.Run("ReadsOnlyPaginationKeysWithoutOptionalNames", func(t *testing.T) {
+	test.Run("ReadsOnlyPaginationKeysWithoutOptionalNames", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, "/?pageNumber=3&nature=app", nil,
@@ -161,11 +161,11 @@ func TestPaginationQueryParamsReader(t *testing.T) {
 		requestParams := PaginationQueryParamsReader(echoContext, nil)
 
 		if len(requestParams) != 1 {
-			t.Fatalf("ExpectedOneParamButGot: %d", len(requestParams))
+			subtest.Fatalf("ExpectedOneParamButGot: %d", len(requestParams))
 		}
 
 		if requestParams["pageNumber"] != uint32(3) {
-			t.Errorf("PageNumberMismatch: expected 3, got %v", requestParams["pageNumber"])
+			subtest.Errorf("PageNumberMismatch: expected 3, got %v", requestParams["pageNumber"])
 		}
 	})
 }

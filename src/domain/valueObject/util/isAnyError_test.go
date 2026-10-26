@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestIsAnyError(t *testing.T) {
+func TestIsAnyError(test *testing.T) {
 	errA := errors.New("ErrA")
 	errB := errors.New("ErrB")
 	wrappedA := fmt.Errorf("context: %w", errA)
@@ -27,11 +27,11 @@ func TestIsAnyError(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			actual := IsAnyError(testCase.err, testCase.targets...)
 
 			if actual != testCase.expected {
-				t.Errorf("UnexpectedResult: %t vs %t", actual, testCase.expected)
+				subtest.Errorf("UnexpectedResult: %t vs %t", actual, testCase.expected)
 			}
 		})
 	}

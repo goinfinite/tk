@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestSystemResourceIdentifier(t *testing.T) {
-	t.Run("NewSystemResourceIdentifier/Valid", func(t *testing.T) {
+func TestSystemResourceIdentifier(test *testing.T) {
+	test.Run("NewSystemResourceIdentifier/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -29,15 +29,15 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceIdentifier(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
+				subtest.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewSystemResourceIdentifier/Invalid", func(t *testing.T) {
+	test.Run("NewSystemResourceIdentifier/Invalid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue  any
 			expectError bool
@@ -52,33 +52,33 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			_, err := NewSystemResourceIdentifier(testCase.inputValue)
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
+				subtest.Errorf("MissingExpectedErrorForInput: %v", testCase.inputValue)
 			}
 			if !testCase.expectError && err != nil {
-				t.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedErrorForInput: %s %v", err.Error(), testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("NewSystemResourceIdentifierMustCreate/Valid", func(t *testing.T) {
+	test.Run("NewSystemResourceIdentifierMustCreate/Valid", func(subtest *testing.T) {
 		validSri := "sri://1:account/120"
 		sri := NewSystemResourceIdentifierMustCreate(validSri)
 		if sri.String() != validSri {
-			t.Errorf("UnexpectedSriValue: expected %s, got %s", validSri, sri.String())
+			subtest.Errorf("UnexpectedSriValue: expected %s, got %s", validSri, sri.String())
 		}
 	})
 
-	t.Run("NewSystemResourceIdentifierMustCreate/Panic", func(t *testing.T) {
+	test.Run("NewSystemResourceIdentifierMustCreate/Panic", func(subtest *testing.T) {
 		invalidSri := "invalid"
 		defer func() {
-			if r := recover(); r == nil {
-				t.Errorf("MissingExpectedPanicForInvalidSri")
+			if recovered := recover(); recovered == nil {
+				subtest.Errorf("MissingExpectedPanicForInvalidSri")
 			}
 		}()
 		NewSystemResourceIdentifierMustCreate(invalidSri)
 	})
 
-	t.Run("String/Valid", func(t *testing.T) {
+	test.Run("String/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputSri    string
 			expectedStr string
@@ -91,7 +91,7 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
 			actualStr := sri.String()
 			if actualStr != testCase.expectedStr {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedStringValueForSri: expected %s, got %s",
 					testCase.expectedStr, actualStr,
 				)
@@ -99,7 +99,7 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadAccountId/Valid", func(t *testing.T) {
+	test.Run("ReadAccountId/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputSri        string
 			expectedAccount string
@@ -113,10 +113,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
 			accountId, err := sri.ReadAccountId()
 			if err != nil {
-				t.Errorf("UnexpectedErrorReadingAccountIdForSri")
+				subtest.Errorf("UnexpectedErrorReadingAccountIdForSri")
 			}
 			if accountId.String() != testCase.expectedAccount {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedAccountIdForSri: expected %s, got %s",
 					testCase.expectedAccount, accountId.String(),
 				)
@@ -124,16 +124,16 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadAccountId/Invalid", func(t *testing.T) {
+	test.Run("ReadAccountId/Invalid", func(subtest *testing.T) {
 		invalidSri := "invalid"
 		sri := SystemResourceIdentifier(invalidSri)
 		_, err := sri.ReadAccountId()
 		if err == nil {
-			t.Errorf("MissingExpectedErrorForInvalidSri")
+			subtest.Errorf("MissingExpectedErrorForInvalidSri")
 		}
 	})
 
-	t.Run("ReadResourceType/Valid", func(t *testing.T) {
+	test.Run("ReadResourceType/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputSri             string
 			expectedResourceType string
@@ -147,10 +147,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
 			resourceType, err := sri.ReadResourceType()
 			if err != nil {
-				t.Errorf("UnexpectedErrorReadingResourceTypeForSri")
+				subtest.Errorf("UnexpectedErrorReadingResourceTypeForSri")
 			}
 			if resourceType.String() != testCase.expectedResourceType {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedResourceTypeForSri: expected %s, got %s",
 					testCase.expectedResourceType, resourceType.String(),
 				)
@@ -158,16 +158,16 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadResourceType/Invalid", func(t *testing.T) {
+	test.Run("ReadResourceType/Invalid", func(subtest *testing.T) {
 		invalidSri := "invalid"
 		sri := SystemResourceIdentifier(invalidSri)
 		_, err := sri.ReadResourceType()
 		if err == nil {
-			t.Errorf("MissingExpectedErrorForInvalidSri")
+			subtest.Errorf("MissingExpectedErrorForInvalidSri")
 		}
 	})
 
-	t.Run("ReadResourceId/Valid", func(t *testing.T) {
+	test.Run("ReadResourceId/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputSri           string
 			expectedResourceId string
@@ -181,10 +181,10 @@ func TestSystemResourceIdentifier(t *testing.T) {
 			sri := NewSystemResourceIdentifierMustCreate(testCase.inputSri)
 			resourceId, err := sri.ReadResourceId()
 			if err != nil {
-				t.Errorf("UnexpectedErrorReadingResourceIdForSri")
+				subtest.Errorf("UnexpectedErrorReadingResourceIdForSri")
 			}
 			if resourceId.String() != testCase.expectedResourceId {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedResourceIdForSri: expected %s, got %s",
 					testCase.expectedResourceId, resourceId.String(),
 				)
@@ -192,16 +192,16 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		}
 	})
 
-	t.Run("ReadResourceId/Invalid", func(t *testing.T) {
+	test.Run("ReadResourceId/Invalid", func(subtest *testing.T) {
 		invalidSri := "invalid"
 		sri := SystemResourceIdentifier(invalidSri)
 		_, err := sri.ReadResourceId()
 		if err == nil {
-			t.Errorf("MissingExpectedErrorForInvalidSri")
+			subtest.Errorf("MissingExpectedErrorForInvalidSri")
 		}
 	})
 
-	t.Run("NewSriAccount/Valid", func(t *testing.T) {
+	test.Run("NewSriAccount/Valid", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputAccountId string
 			expectedSri    string
@@ -214,11 +214,11 @@ func TestSystemResourceIdentifier(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			accountId, err := NewAccountId(testCase.inputAccountId)
 			if err != nil {
-				t.Errorf("UnexpectedErrorCreatingAccountIdForInput")
+				subtest.Errorf("UnexpectedErrorCreatingAccountIdForInput")
 			}
 			sri := NewSriAccount(accountId)
 			if sri.String() != testCase.expectedSri {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedSriAccountForAccountId: expected %s, got %s",
 					testCase.expectedSri, sri.String(),
 				)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestPaginationPagesTotalResolver(t *testing.T) {
+func TestPaginationPagesTotalResolver(test *testing.T) {
 	testCases := []struct {
 		name               string
 		itemsTotal         uint64
@@ -58,7 +58,7 @@ func TestPaginationPagesTotalResolver(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			pagesTotal, err := PaginationPagesTotalResolver(
 				testCase.itemsTotal,
 				testCase.itemsPerPage,
@@ -66,18 +66,18 @@ func TestPaginationPagesTotalResolver(t *testing.T) {
 
 			if testCase.expectedError != nil {
 				if err == nil {
-					t.Fatalf(
+					subtest.Fatalf(
 						"MissingExpectedError: %v", testCase.expectedError,
 					)
 				}
 				if !errors.Is(err, testCase.expectedError) {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedError: expected %v, got %v",
 						testCase.expectedError, err,
 					)
 				}
 				if err.Error() != testCase.expectedError.Error() {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedErrorMessage: expected %s, got %v",
 						testCase.expectedError.Error(), err,
 					)
@@ -86,10 +86,10 @@ func TestPaginationPagesTotalResolver(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("UnexpectedError: %v", err)
+				subtest.Fatalf("UnexpectedError: %v", err)
 			}
 			if pagesTotal != testCase.expectedPagesTotal {
-				t.Errorf(
+				subtest.Errorf(
 					"PagesTotalMismatch: expected %d, got %d",
 					testCase.expectedPagesTotal, pagesTotal,
 				)

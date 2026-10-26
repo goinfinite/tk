@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestNewIpAddress(t *testing.T) {
-	t.Run("StringInput", func(t *testing.T) {
+func TestNewIpAddress(test *testing.T) {
+	test.Run("StringInput", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput IpAddress
@@ -35,18 +35,18 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput, conversionErr := NewIpAddress(testCase.inputValue)
 			if testCase.expectError && conversionErr == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 			if !testCase.expectError && conversionErr != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", conversionErr.Error(), testCase.inputValue)
 			}
 			if !testCase.expectError && actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput string
@@ -58,20 +58,20 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("LocalConstant", func(t *testing.T) {
+	test.Run("LocalConstant", func(subtest *testing.T) {
 		expectedValue := "127.0.0.1"
 		actualValue := IpAddressLocal.String()
 		if actualValue != expectedValue {
-			t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [IpAddressLocal]", actualValue, expectedValue)
+			subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [IpAddressLocal]", actualValue, expectedValue)
 		}
 	})
 
-	t.Run("IsLocalMethod", func(t *testing.T) {
+	test.Run("IsLocalMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -89,12 +89,12 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsLocal()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsIpv4Method", func(t *testing.T) {
+	test.Run("IsIpv4Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -106,12 +106,12 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsIpv4()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsIpv6Method", func(t *testing.T) {
+	test.Run("IsIpv6Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -129,12 +129,12 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsIpv6()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsPrivateMethod", func(t *testing.T) {
+	test.Run("IsPrivateMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -146,12 +146,12 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsPrivate()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsPublicMethod", func(t *testing.T) {
+	test.Run("IsPublicMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -172,12 +172,12 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsPublic()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})
 
-	t.Run("IsLinkLocalMethod", func(t *testing.T) {
+	test.Run("IsLinkLocalMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput bool
@@ -199,7 +199,7 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.IsLinkLocal()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -207,7 +207,7 @@ func TestNewIpAddress(t *testing.T) {
 		}
 	})
 
-	t.Run("ToCidrBlockMethod", func(t *testing.T) {
+	test.Run("ToCidrBlockMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     IpAddress
 			expectedOutput CidrBlock
@@ -219,7 +219,7 @@ func TestNewIpAddress(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.ToCidrBlock()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

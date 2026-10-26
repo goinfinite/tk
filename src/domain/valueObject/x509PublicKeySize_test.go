@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-func TestNewX509PublicKeySize(t *testing.T) {
-	t.Run("ValidPublicKeySize", func(t *testing.T) {
+func TestNewX509PublicKeySize(test *testing.T) {
+	test.Run("ValidPublicKeySize", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509PublicKeySize
@@ -43,16 +43,16 @@ func TestNewX509PublicKeySize(t *testing.T) {
 			actualOutput, err := NewX509PublicKeySize(testCase.inputValue)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -60,7 +60,7 @@ func TestNewX509PublicKeySize(t *testing.T) {
 		}
 	})
 
-	t.Run("Uint16Method", func(t *testing.T) {
+	test.Run("Uint16Method", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509PublicKeySize
 			expectedOutput uint16
@@ -74,7 +74,7 @@ func TestNewX509PublicKeySize(t *testing.T) {
 			actualOutput := testCase.inputValue.Uint16()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)
@@ -82,7 +82,7 @@ func TestNewX509PublicKeySize(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509PublicKeySize
 			expectedOutput string
@@ -96,7 +96,7 @@ func TestNewX509PublicKeySize(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)
@@ -105,16 +105,16 @@ func TestNewX509PublicKeySize(t *testing.T) {
 	})
 }
 
-func TestNewX509PublicKeySizeFromStdlib(t *testing.T) {
+func TestNewX509PublicKeySizeFromStdlib(test *testing.T) {
 	rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		t.Fatalf("RSAKeyGenerationFailed: %s", err.Error())
+		test.Fatalf("RSAKeyGenerationFailed: %s", err.Error())
 	}
 	rsaPublicKey := &rsaPrivateKey.PublicKey
 
 	ecdsaPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		t.Fatalf("ECDSAKeyGenerationFailed: %s", err.Error())
+		test.Fatalf("ECDSAKeyGenerationFailed: %s", err.Error())
 	}
 	ecdsaPublicKey := &ecdsaPrivateKey.PublicKey
 
@@ -150,16 +150,16 @@ func TestNewX509PublicKeySizeFromStdlib(t *testing.T) {
 		actualOutput, err := NewX509PublicKeySizeFromStdlib(testCase.inputValue)
 
 		if testCase.expectError && err == nil {
-			t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+			test.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 		}
 
 		if !testCase.expectError && err != nil {
-			t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+			test.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 		}
 
 		if !testCase.expectError &&
 			actualOutput != testCase.expectedOutput {
-			t.Errorf(
+			test.Errorf(
 				"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 				actualOutput, testCase.expectedOutput, testCase.inputValue,
 			)

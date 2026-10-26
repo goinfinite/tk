@@ -8,33 +8,33 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestActivityRecordQueryRepoRead(t *testing.T) {
-	t.Run("EmptyDatabase", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+func TestActivityRecordQueryRepoRead(test *testing.T) {
+	test.Run("EmptyDatabase", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err != nil {
-			t.Errorf("ReadFailedOnEmptyDatabase: %v", err)
+			subtest.Errorf("ReadFailedOnEmptyDatabase: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 0 {
-			t.Errorf("ExpectedEmptyResponse: got %d records", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedEmptyResponse: got %d records", len(responseDto.ActivityRecords))
 		}
 	})
 
-	t.Run("ReadWithRecordIdFilter", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithRecordIdFilter", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("TEST_CODE")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		testSri, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/resource1")
 		if err != nil {
-			t.Fatalf("CreateResourceVoFailed: %v", err)
+			subtest.Fatalf("CreateResourceVoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -45,38 +45,38 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		testRecord, err := createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		recordIdVo, err := tkValueObject.NewActivityRecordId(testRecord.RecordId.Uint64())
 		if err != nil {
-			t.Fatalf("CreateRecordIdVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordIdVoFailed: %v", err)
 		}
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 			RecordId:   &recordIdVo,
 		})
 		if err != nil {
-			t.Errorf("ReadWithRecordIdFilterFailed: %v", err)
+			subtest.Errorf("ReadWithRecordIdFilterFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
 		}
 		if responseDto.ActivityRecords[0].RecordId.Uint64() != testRecord.RecordId.Uint64() {
-			t.Errorf(
+			subtest.Errorf(
 				"RecordIdMismatch: expected %d, got %d",
 				testRecord.RecordId.Uint64(), responseDto.ActivityRecords[0].RecordId.Uint64(),
 			)
 		}
 	})
 
-	t.Run("ReadWithRecordLevelFilter", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithRecordLevelFilter", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCode1Vo, err := tkValueObject.NewActivityRecordCode("CODE1")
 		if err != nil {
-			t.Fatalf("CreateRecordCode1VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode1VoFailed: %v", err)
 		}
 
 		createDto1 := tkDto.CreateActivityRecord{
@@ -87,12 +87,12 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto1)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord1Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord1Failed: %v", err)
 		}
 
 		recordCode2Vo, err := tkValueObject.NewActivityRecordCode("CODE2")
 		if err != nil {
-			t.Fatalf("CreateRecordCode2VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode2VoFailed: %v", err)
 		}
 
 		createDto2 := tkDto.CreateActivityRecord{
@@ -103,7 +103,7 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto2)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord2Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord2Failed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
@@ -111,31 +111,31 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 			RecordLevel: &tkValueObject.ActivityRecordLevelInfo,
 		})
 		if err != nil {
-			t.Errorf("ReadWithRecordLevelFilterFailed: %v", err)
+			subtest.Errorf("ReadWithRecordLevelFilterFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
 		}
 		if responseDto.ActivityRecords[0].RecordLevel.String() != "INFO" {
-			t.Errorf(
+			subtest.Errorf(
 				"RecordLevelMismatch: expected INFO, got %s",
 				responseDto.ActivityRecords[0].RecordLevel.String(),
 			)
 		}
 	})
 
-	t.Run("ReadWithAffectedResourcesFilter", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithAffectedResourcesFilter", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCode3Vo, err := tkValueObject.NewActivityRecordCode("CODE1")
 		if err != nil {
-			t.Fatalf("CreateRecordCode3VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode3VoFailed: %v", err)
 		}
 
 		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/res1")
 		if err != nil {
-			t.Fatalf("CreateRes1VoFailed: %v", err)
+			subtest.Fatalf("CreateRes1VoFailed: %v", err)
 		}
 
 		createDto3 := tkDto.CreateActivityRecord{
@@ -146,17 +146,17 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto3)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord3Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord3Failed: %v", err)
 		}
 
 		recordCode4Vo, err := tkValueObject.NewActivityRecordCode("CODE2")
 		if err != nil {
-			t.Fatalf("CreateRecordCode4VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode4VoFailed: %v", err)
 		}
 
 		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/res2")
 		if err != nil {
-			t.Fatalf("CreateRes2VoFailed: %v", err)
+			subtest.Fatalf("CreateRes2VoFailed: %v", err)
 		}
 
 		createDto4 := tkDto.CreateActivityRecord{
@@ -167,7 +167,7 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto4)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord4Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord4Failed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
@@ -175,35 +175,35 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1},
 		})
 		if err != nil {
-			t.Errorf("ReadWithAffectedResourcesFilterFailed: %v", err)
+			subtest.Errorf("ReadWithAffectedResourcesFilterFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
 		}
 		if responseDto.ActivityRecords[0].RecordCode.String() != "CODE1" {
-			t.Errorf(
+			subtest.Errorf(
 				"RecordCodeMismatch: expected CODE1, got %s",
 				responseDto.ActivityRecords[0].RecordCode.String(),
 			)
 		}
 	})
 
-	t.Run("ReadWithMultipleMatchingAffectedResources", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithMultipleMatchingAffectedResources", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("MULTI_RES_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		testSri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/multi1")
 		if err != nil {
-			t.Fatalf("CreateRes1VoFailed: %v", err)
+			subtest.Fatalf("CreateRes1VoFailed: %v", err)
 		}
 		testSri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/multi2")
 		if err != nil {
-			t.Fatalf("CreateRes2VoFailed: %v", err)
+			subtest.Fatalf("CreateRes2VoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -214,7 +214,7 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
@@ -222,28 +222,28 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{testSri1, testSri2},
 		})
 		if err != nil {
-			t.Errorf("ReadWithMultipleMatchingAffectedResourcesFailed: %v", err)
+			subtest.Errorf("ReadWithMultipleMatchingAffectedResourcesFailed: %v", err)
 		}
 
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecord: got %d", len(responseDto.ActivityRecords))
 		}
 
 		if responseDto.Pagination.ItemsTotal == nil {
-			t.Fatalf("Expected ItemsTotal to be non-nil")
+			subtest.Fatalf("Expected ItemsTotal to be non-nil")
 		}
 		if *responseDto.Pagination.ItemsTotal != 1 {
-			t.Errorf("ExpectedTotalItemsToBeOne: got %d", *responseDto.Pagination.ItemsTotal)
+			subtest.Errorf("ExpectedTotalItemsToBeOne: got %d", *responseDto.Pagination.ItemsTotal)
 		}
 	})
 
-	t.Run("ReadWithTimeFilters", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithTimeFilters", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCodeVo, err := tkValueObject.NewActivityRecordCode("TIME_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCodeVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCodeVoFailed: %v", err)
 		}
 
 		createDto := tkDto.CreateActivityRecord{
@@ -254,7 +254,7 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		testRecord, err := createTestActivityRecord(dbSvc, createDto)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecordFailed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecordFailed: %v", err)
 		}
 
 		time.Sleep(10 * time.Millisecond)
@@ -307,7 +307,7 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
+			subtest.Run(testCase.name, func(subtest *testing.T) {
 				requestDto := tkDto.ReadActivityRecordsRequest{
 					RecordLevel: &tkValueObject.ActivityRecordLevelInfo,
 					RecordCode:  &recordCodeVo,
@@ -322,22 +322,22 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 				recordEntity, err := queryRepo.ReadFirst(requestDto)
 				if err != nil {
-					t.Errorf("ReadWith%sFilterFailed: %v", testCase.name, err)
+					subtest.Errorf("ReadWith%sFilterFailed: %v", testCase.name, err)
 				}
 				if recordEntity.RecordId.Uint64() != testRecord.RecordId.Uint64() {
-					t.Errorf("TestRecordNotFoundIn%sFilter", testCase.name)
+					subtest.Errorf("TestRecordNotFoundIn%sFilter", testCase.name)
 				}
 			})
 		}
 	})
 
-	t.Run("ReadWithPagination", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("ReadWithPagination", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		recordCode6Vo, err := tkValueObject.NewActivityRecordCode("PAGE1")
 		if err != nil {
-			t.Fatalf("CreateRecordCode6VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode6VoFailed: %v", err)
 		}
 
 		createDto6 := tkDto.CreateActivityRecord{
@@ -348,12 +348,12 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto6)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord6Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord6Failed: %v", err)
 		}
 
 		recordCode7Vo, err := tkValueObject.NewActivityRecordCode("PAGE2")
 		if err != nil {
-			t.Fatalf("CreateRecordCode7VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode7VoFailed: %v", err)
 		}
 
 		createDto7 := tkDto.CreateActivityRecord{
@@ -364,75 +364,75 @@ func TestActivityRecordQueryRepoRead(t *testing.T) {
 
 		_, err = createTestActivityRecord(dbSvc, createDto7)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord7Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord7Failed: %v", err)
 		}
 
 		responseDto, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.Pagination{PageNumber: 0, ItemsPerPage: 1},
 		})
 		if err != nil {
-			t.Errorf("ReadWithPaginationFailed: %v", err)
+			subtest.Errorf("ReadWithPaginationFailed: %v", err)
 		}
 		if len(responseDto.ActivityRecords) != 1 {
-			t.Errorf("ExpectedOneRecordWithPagination: got %d", len(responseDto.ActivityRecords))
+			subtest.Errorf("ExpectedOneRecordWithPagination: got %d", len(responseDto.ActivityRecords))
 		}
 	})
 }
 
-func TestActivityRecordQueryRepoCount(t *testing.T) {
-	t.Run("EmptyDatabase", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+func TestActivityRecordQueryRepoCount(test *testing.T) {
+	test.Run("EmptyDatabase", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		count, err := queryRepo.Count(tkDto.ReadActivityRecordsRequest{})
 		if err != nil {
-			t.Errorf("CountFailedOnEmptyDatabase: %v", err)
+			subtest.Errorf("CountFailedOnEmptyDatabase: %v", err)
 		}
 		if count != 0 {
-			t.Errorf("ExpectedZeroCount: got %d", count)
+			subtest.Errorf("ExpectedZeroCount: got %d", count)
 		}
 	})
 
-	t.Run("CountWithFilters", func(t *testing.T) {
-		dbSvc := SetupTestTrailDatabaseService(t)
+	test.Run("CountWithFilters", func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
 		queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
 		codeAVo, err := tkValueObject.NewActivityRecordCode("COUNT_CODE_A")
 		if err != nil {
-			t.Fatalf("CreateCodeAVoFailed: %v", err)
+			subtest.Fatalf("CreateCodeAVoFailed: %v", err)
 		}
 		codeBVo, err := tkValueObject.NewActivityRecordCode("COUNT_CODE_B")
 		if err != nil {
-			t.Fatalf("CreateCodeBVoFailed: %v", err)
+			subtest.Fatalf("CreateCodeBVoFailed: %v", err)
 		}
 
 		sri1, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/count1")
 		if err != nil {
-			t.Fatalf("CreateRes1VoFailed: %v", err)
+			subtest.Fatalf("CreateRes1VoFailed: %v", err)
 		}
 		sri2, err := tkValueObject.NewSystemResourceIdentifier("sri://0:test/count2")
 		if err != nil {
-			t.Fatalf("CreateRes2VoFailed: %v", err)
+			subtest.Fatalf("CreateRes2VoFailed: %v", err)
 		}
 
 		accountId1Vo, err := tkValueObject.NewAccountId(1)
 		if err != nil {
-			t.Fatalf("CreateAccountId1VoFailed: %v", err)
+			subtest.Fatalf("CreateAccountId1VoFailed: %v", err)
 		}
 		operatorSri1 := tkValueObject.NewSriAccount(accountId1Vo)
 		accountId2Vo, err := tkValueObject.NewAccountId(2)
 		if err != nil {
-			t.Fatalf("CreateAccountId2VoFailed: %v", err)
+			subtest.Fatalf("CreateAccountId2VoFailed: %v", err)
 		}
 		operatorSri2 := tkValueObject.NewSriAccount(accountId2Vo)
 
 		ip1, err := tkValueObject.NewIpAddress("192.168.1.1")
 		if err != nil {
-			t.Fatalf("CreateIp1VoFailed: %v", err)
+			subtest.Fatalf("CreateIp1VoFailed: %v", err)
 		}
 		ip2, err := tkValueObject.NewIpAddress("192.168.1.2")
 		if err != nil {
-			t.Fatalf("CreateIp2VoFailed: %v", err)
+			subtest.Fatalf("CreateIp2VoFailed: %v", err)
 		}
 
 		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
@@ -443,7 +443,7 @@ func TestActivityRecordQueryRepoCount(t *testing.T) {
 			OperatorIpAddress: &ip1,
 		})
 		if err != nil {
-			t.Fatalf("CreateRecordAFailed: %v", err)
+			subtest.Fatalf("CreateRecordAFailed: %v", err)
 		}
 
 		recordB, err := createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
@@ -454,7 +454,7 @@ func TestActivityRecordQueryRepoCount(t *testing.T) {
 			OperatorIpAddress: &ip2,
 		})
 		if err != nil {
-			t.Fatalf("CreateRecordBFailed: %v", err)
+			subtest.Fatalf("CreateRecordBFailed: %v", err)
 		}
 
 		_, err = createTestActivityRecord(dbSvc, tkDto.CreateActivityRecord{
@@ -463,12 +463,12 @@ func TestActivityRecordQueryRepoCount(t *testing.T) {
 			AffectedResources: []tkValueObject.SystemResourceIdentifier{},
 		})
 		if err != nil {
-			t.Fatalf("CreateRecordCFailed: %v", err)
+			subtest.Fatalf("CreateRecordCFailed: %v", err)
 		}
 
 		recordIdVo, err := tkValueObject.NewActivityRecordId(recordB.RecordId.Uint64())
 		if err != nil {
-			t.Fatalf("CreateRecordIdVoFailed: %v", err)
+			subtest.Fatalf("CreateRecordIdVoFailed: %v", err)
 		}
 
 		futureTimeVo := tkValueObject.NewUnixTimeAfterNow(1 * time.Hour)
@@ -566,13 +566,13 @@ func TestActivityRecordQueryRepoCount(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
+			subtest.Run(testCase.name, func(subtest *testing.T) {
 				count, err := queryRepo.Count(testCase.requestDto)
 				if err != nil {
-					t.Errorf("CountWith%sFilterFailed: %v", testCase.name, err)
+					subtest.Errorf("CountWith%sFilterFailed: %v", testCase.name, err)
 				}
 				if count != testCase.expectedCount {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedCountWith%sFilter: expected %d, got %d",
 						testCase.name, testCase.expectedCount, count,
 					)
@@ -582,27 +582,27 @@ func TestActivityRecordQueryRepoCount(t *testing.T) {
 	})
 }
 
-func TestActivityRecordQueryRepoReadFirst(t *testing.T) {
-	dbSvc := SetupTestTrailDatabaseService(t)
+func TestActivityRecordQueryRepoReadFirst(test *testing.T) {
+	dbSvc := SetupTestTrailDatabaseService(test)
 	queryRepo := NewActivityRecordQueryRepo(dbSvc)
 
-	t.Run("ReadFirstFromEmptyDatabase", func(t *testing.T) {
+	test.Run("ReadFirstFromEmptyDatabase", func(subtest *testing.T) {
 		_, err := queryRepo.ReadFirst(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err == nil {
-			t.Errorf("ReadFirstSucceededWhenShouldFailOnEmptyDatabase")
+			subtest.Errorf("ReadFirstSucceededWhenShouldFailOnEmptyDatabase")
 		}
 		expectedError := "ActivityRecordNotFound"
 		if err.Error() != expectedError {
-			t.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedError, err.Error())
+			subtest.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedError, err.Error())
 		}
 	})
 
-	t.Run("ReadFirstSuccess", func(t *testing.T) {
+	test.Run("ReadFirstSuccess", func(subtest *testing.T) {
 		recordCode8Vo, err := tkValueObject.NewActivityRecordCode("FIRST_TEST")
 		if err != nil {
-			t.Fatalf("CreateRecordCode8VoFailed: %v", err)
+			subtest.Fatalf("CreateRecordCode8VoFailed: %v", err)
 		}
 
 		createDto8 := tkDto.CreateActivityRecord{
@@ -613,17 +613,17 @@ func TestActivityRecordQueryRepoReadFirst(t *testing.T) {
 
 		createdRecordEntity, err := createTestActivityRecord(dbSvc, createDto8)
 		if err != nil {
-			t.Fatalf("CreateTestActivityRecord8Failed: %v", err)
+			subtest.Fatalf("CreateTestActivityRecord8Failed: %v", err)
 		}
 
 		readRecordEntity, err := queryRepo.ReadFirst(tkDto.ReadActivityRecordsRequest{
 			Pagination: tkDto.PaginationUnpaginated,
 		})
 		if err != nil {
-			t.Errorf("ReadFirstFailed: %v", err)
+			subtest.Errorf("ReadFirstFailed: %v", err)
 		}
 		if readRecordEntity.RecordId.Uint64() != createdRecordEntity.RecordId.Uint64() {
-			t.Errorf(
+			subtest.Errorf(
 				"ReadFirstReturnedWrongRecord: expected ID %d, got %d",
 				createdRecordEntity.RecordId.Uint64(), readRecordEntity.RecordId.Uint64(),
 			)

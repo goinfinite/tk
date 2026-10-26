@@ -2,8 +2,8 @@ package tkValueObject
 
 import "testing"
 
-func TestNewHardwareSpecs(t *testing.T) {
-	t.Run("NewHardwareSpecs", func(t *testing.T) {
+func TestNewHardwareSpecs(test *testing.T) {
+	test.Run("NewHardwareSpecs", func(subtest *testing.T) {
 		cpuModelName, _ := NewCpuModelName("Intel Xeon E5-2670 v3")
 		memoryTotal, _ := NewGibibyte(16)
 		storageTotal, _ := NewGibibyte(512)
@@ -13,23 +13,23 @@ func TestNewHardwareSpecs(t *testing.T) {
 		)
 
 		if hardwareSpecs.CpuModelName != cpuModelName {
-			t.Errorf("UnexpectedCpuModelName: '%v'", hardwareSpecs.CpuModelName)
+			subtest.Errorf("UnexpectedCpuModelName: '%v'", hardwareSpecs.CpuModelName)
 		}
 		if hardwareSpecs.CpuCoresCount != 8 {
-			t.Errorf("UnexpectedCpuCoresCount: '%v'", hardwareSpecs.CpuCoresCount)
+			subtest.Errorf("UnexpectedCpuCoresCount: '%v'", hardwareSpecs.CpuCoresCount)
 		}
 		if hardwareSpecs.CpuFrequencyGhz != 2.3 {
-			t.Errorf("UnexpectedCpuFrequencyGhz: '%v'", hardwareSpecs.CpuFrequencyGhz)
+			subtest.Errorf("UnexpectedCpuFrequencyGhz: '%v'", hardwareSpecs.CpuFrequencyGhz)
 		}
 		if hardwareSpecs.MemoryTotalBytes != memoryTotal {
-			t.Errorf("UnexpectedMemoryTotalBytes: '%v'", hardwareSpecs.MemoryTotalBytes)
+			subtest.Errorf("UnexpectedMemoryTotalBytes: '%v'", hardwareSpecs.MemoryTotalBytes)
 		}
 		if hardwareSpecs.StorageTotalBytes != storageTotal {
-			t.Errorf("UnexpectedStorageTotalBytes: '%v'", hardwareSpecs.StorageTotalBytes)
+			subtest.Errorf("UnexpectedStorageTotalBytes: '%v'", hardwareSpecs.StorageTotalBytes)
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		memoryTotal, _ := NewGibibyte(16)
 
 		testCaseStructs := []struct {
@@ -62,7 +62,7 @@ func TestNewHardwareSpecs(t *testing.T) {
 		for _, testCase := range testCaseStructs {
 			actualOutput := testCase.inputValue.String()
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
+				subtest.Errorf("UnexpectedOutputValue: '%v' vs '%v' [%v]", actualOutput, testCase.expectedOutput, testCase.inputValue)
 			}
 		}
 	})

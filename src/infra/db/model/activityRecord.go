@@ -10,12 +10,12 @@ import (
 type ActivityRecord struct {
 	ID                uint64 `gorm:"primaryKey"`
 	RecordLevel       string `gorm:"not null"`
-	RecordCode        string `gorm:"not null"`
+	RecordCode        string `gorm:"not null;index:idx_activity_records_code_ip_created_at,priority:1"`
 	AffectedResources []ActivityRecordAffectedResource
 	RecordDetails     *string
-	OperatorSri       *string
-	OperatorIpAddress *string
-	CreatedAt         time.Time `gorm:"not null"`
+	OperatorSri       *string   `gorm:"index:idx_activity_records_operator_sri_created_at,priority:1"`
+	OperatorIpAddress *string   `gorm:"index:idx_activity_records_code_ip_created_at,priority:2"`
+	CreatedAt         time.Time `gorm:"not null;index:idx_activity_records_created_at;index:idx_activity_records_operator_sri_created_at,priority:2;index:idx_activity_records_code_ip_created_at,priority:3"`
 }
 
 func (ActivityRecord) TableName() string {

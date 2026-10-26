@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNewUserAgent(t *testing.T) {
+func TestNewUserAgent(test *testing.T) {
 	testCases := []struct {
 		name        string
 		input       any
@@ -109,23 +109,23 @@ func TestNewUserAgent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		test.Run(testCase.name, func(subtest *testing.T) {
 			userAgent, err := NewUserAgent(testCase.input)
 
 			if testCase.expectError {
 				if err == nil {
-					t.Errorf("MissingExpectedError: [%v]", testCase.input)
+					subtest.Errorf("MissingExpectedError: [%v]", testCase.input)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.input)
+				subtest.Errorf("UnexpectedError: '%s' [%v]", err.Error(), testCase.input)
 				return
 			}
 
 			if userAgent.String() != testCase.expected {
-				t.Errorf("Expected '%s', got '%s'", testCase.expected, userAgent.String())
+				subtest.Errorf("Expected '%s', got '%s'", testCase.expected, userAgent.String())
 			}
 		})
 	}

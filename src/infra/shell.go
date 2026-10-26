@@ -72,8 +72,8 @@ type ShellError struct {
 	ExitCode int    `json:"exitCode"`
 }
 
-func (e *ShellError) Error() string {
-	jsonError, _ := json.Marshal(e)
+func (shellError *ShellError) Error() string {
+	jsonError, _ := json.Marshal(shellError)
 	return string(jsonError)
 }
 

@@ -27,7 +27,7 @@ type testPaginationCapitalIdModel struct {
 	Name string
 }
 
-func TestPaginationQueryBuilder(t *testing.T) {
+func TestPaginationQueryBuilder(test *testing.T) {
 	sortByName, _ := tkValueObject.NewPaginationSortBy("name")
 	sortByLastRunAt, _ := tkValueObject.NewPaginationSortBy("lastRunAt")
 	sortByUnknown, _ := tkValueObject.NewPaginationSortBy("notAField")
@@ -166,8 +166,8 @@ func TestPaginationQueryBuilder(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			dbSvc := setupTestDb(t)
+		test.Run(testCase.name, func(subtest *testing.T) {
+			dbSvc := setupTestDb(subtest)
 			dbQuery := dbSvc.Model(&testPaginationModel{})
 
 			paginatedQuery, responsePagination, err := PaginationQueryBuilder(
@@ -178,14 +178,14 @@ func TestPaginationQueryBuilder(t *testing.T) {
 
 			if testCase.expectedError != "" {
 				if err == nil {
-					t.Errorf(
+					subtest.Errorf(
 						"MissingExpectedError: %s",
 						testCase.expectedError,
 					)
 					return
 				}
 				if err.Error() != testCase.expectedError {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedErrorMessage: '%s' vs '%s'",
 						err.Error(), testCase.expectedError,
 					)
@@ -194,13 +194,13 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Errorf("UnexpectedError: %v", err)
+				subtest.Errorf("UnexpectedError: %v", err)
 				return
 			}
 
 			if responsePagination.ItemsTotal == nil ||
 				*responsePagination.ItemsTotal != testCase.expectedItemsTotal {
-				t.Errorf(
+				subtest.Errorf(
 					"ItemsTotalMismatch: expected %d, got %v",
 					testCase.expectedItemsTotal,
 					responsePagination.ItemsTotal,
@@ -209,7 +209,7 @@ func TestPaginationQueryBuilder(t *testing.T) {
 
 			if responsePagination.PagesTotal == nil ||
 				*responsePagination.PagesTotal != testCase.expectedPagesTotal {
-				t.Errorf(
+				subtest.Errorf(
 					"PagesTotalMismatch: expected %d, got %v",
 					testCase.expectedPagesTotal,
 					responsePagination.PagesTotal,
@@ -219,12 +219,12 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			var queryResults []testPaginationModel
 			err = paginatedQuery.Find(&queryResults).Error
 			if err != nil {
-				t.Errorf("ExecuteQueryFailed: %v", err)
+				subtest.Errorf("ExecuteQueryFailed: %v", err)
 				return
 			}
 
 			if len(queryResults) != testCase.expectedResultCount {
-				t.Errorf(
+				subtest.Errorf(
 					"ResultCountMismatch: expected %d, got %d",
 					testCase.expectedResultCount,
 					len(queryResults),
@@ -234,7 +234,7 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			if testCase.expectedFirstItemName != "" &&
 				len(queryResults) > 0 &&
 				queryResults[0].Name != testCase.expectedFirstItemName {
-				t.Errorf(
+				subtest.Errorf(
 					"FirstItemNameMismatch: expected %s, got %s",
 					testCase.expectedFirstItemName,
 					queryResults[0].Name,
@@ -243,8 +243,8 @@ func TestPaginationQueryBuilder(t *testing.T) {
 		})
 	}
 
-	t.Run("LastSeenIdWithCustomPrimaryKey", func(t *testing.T) {
-		dbSvc := setupTestDb(t)
+	test.Run("LastSeenIdWithCustomPrimaryKey", func(subtest *testing.T) {
+		dbSvc := setupTestDb(subtest)
 		dbQuery := dbSvc.Model(&testPaginationCustomPkModel{})
 
 		paginatedQuery, responsePagination, err := PaginationQueryBuilder(
@@ -256,12 +256,12 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			"custom_id",
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		if responsePagination.ItemsTotal == nil ||
 			*responsePagination.ItemsTotal != 10 {
-			t.Errorf(
+			subtest.Errorf(
 				"ItemsTotalMismatch: expected 10, got %v",
 				responsePagination.ItemsTotal,
 			)
@@ -270,26 +270,26 @@ func TestPaginationQueryBuilder(t *testing.T) {
 		var queryResults []testPaginationCustomPkModel
 		err = paginatedQuery.Find(&queryResults).Error
 		if err != nil {
-			t.Fatalf("ExecuteQueryFailed: %v", err)
+			subtest.Fatalf("ExecuteQueryFailed: %v", err)
 		}
 
 		if len(queryResults) != 3 {
-			t.Errorf(
+			subtest.Errorf(
 				"ResultCountMismatch: expected 3, got %d",
 				len(queryResults),
 			)
 		}
 
 		if len(queryResults) > 0 && queryResults[0].Name != "item6" {
-			t.Errorf(
+			subtest.Errorf(
 				"FirstItemNameMismatch: expected item6, got %s",
 				queryResults[0].Name,
 			)
 		}
 	})
 
-	t.Run("LastSeenIdWithCustomPrimaryKeySchemaDefault", func(t *testing.T) {
-		dbSvc := setupTestDb(t)
+	test.Run("LastSeenIdWithCustomPrimaryKeySchemaDefault", func(subtest *testing.T) {
+		dbSvc := setupTestDb(subtest)
 		dbQuery := dbSvc.Model(&testPaginationCustomPkModel{})
 
 		paginatedQuery, _, err := PaginationQueryBuilder(
@@ -301,25 +301,25 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			"",
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		var queryResults []testPaginationCustomPkModel
 		err = paginatedQuery.Find(&queryResults).Error
 		if err != nil {
-			t.Fatalf("ExecuteQueryFailed: %v", err)
+			subtest.Fatalf("ExecuteQueryFailed: %v", err)
 		}
 
 		if len(queryResults) != 3 || queryResults[0].Name != "item6" {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedResults: count %d, first %v",
 				len(queryResults), queryResults,
 			)
 		}
 	})
 
-	t.Run("SortByCustomPrimaryKeyColumn", func(t *testing.T) {
-		dbSvc := setupTestDb(t)
+	test.Run("SortByCustomPrimaryKeyColumn", func(subtest *testing.T) {
+		dbSvc := setupTestDb(subtest)
 		dbQuery := dbSvc.Model(&testPaginationCustomPkModel{})
 		sortByCustomId, _ := tkValueObject.NewPaginationSortBy("customId")
 
@@ -333,25 +333,25 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			"",
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		var queryResults []testPaginationCustomPkModel
 		err = paginatedQuery.Find(&queryResults).Error
 		if err != nil {
-			t.Fatalf("ExecuteQueryFailed: %v", err)
+			subtest.Fatalf("ExecuteQueryFailed: %v", err)
 		}
 
 		if len(queryResults) != 3 || queryResults[0].Name != "item10" {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedResults: count %d, first %v",
 				len(queryResults), queryResults,
 			)
 		}
 	})
 
-	t.Run("SortByCapitalIdPrimaryKeyColumn", func(t *testing.T) {
-		dbSvc := setupTestDb(t)
+	test.Run("SortByCapitalIdPrimaryKeyColumn", func(subtest *testing.T) {
+		dbSvc := setupTestDb(subtest)
 		dbQuery := dbSvc.Model(&testPaginationCapitalIdModel{})
 		sortByCapitalId, _ := tkValueObject.NewPaginationSortBy("ID")
 
@@ -365,17 +365,17 @@ func TestPaginationQueryBuilder(t *testing.T) {
 			"",
 		)
 		if err != nil {
-			t.Fatalf("UnexpectedError: %v", err)
+			subtest.Fatalf("UnexpectedError: %v", err)
 		}
 
 		var queryResults []testPaginationCapitalIdModel
 		err = paginatedQuery.Find(&queryResults).Error
 		if err != nil {
-			t.Fatalf("ExecuteQueryFailed: %v", err)
+			subtest.Fatalf("ExecuteQueryFailed: %v", err)
 		}
 
 		if len(queryResults) != 3 || queryResults[0].Name != "item1" {
-			t.Errorf(
+			subtest.Errorf(
 				"UnexpectedResults: count %d, first %v",
 				len(queryResults), queryResults,
 			)
@@ -383,15 +383,15 @@ func TestPaginationQueryBuilder(t *testing.T) {
 	})
 }
 
-func setupTestDb(t *testing.T) *gorm.DB {
-	t.Helper()
+func setupTestDb(test *testing.T) *gorm.DB {
+	test.Helper()
 	dbSvc, err := gorm.Open(
 		sqlite.Open("file::memory:"), &gorm.Config{
 			NowFunc: func() time.Time { return time.Now().UTC() },
 		},
 	)
 	if err != nil {
-		t.Fatalf("OpenTestDbFailed: %v", err)
+		test.Fatalf("OpenTestDbFailed: %v", err)
 	}
 
 	err = dbSvc.AutoMigrate(
@@ -400,7 +400,7 @@ func setupTestDb(t *testing.T) *gorm.DB {
 		&testPaginationCapitalIdModel{},
 	)
 	if err != nil {
-		t.Fatalf("MigrateTestDbFailed: %v", err)
+		test.Fatalf("MigrateTestDbFailed: %v", err)
 	}
 
 	for itemIndex := 1; itemIndex <= 10; itemIndex++ {
@@ -412,7 +412,7 @@ func setupTestDb(t *testing.T) *gorm.DB {
 			},
 		).Error
 		if err != nil {
-			t.Fatalf("InsertTestDataFailed: %v", err)
+			test.Fatalf("InsertTestDataFailed: %v", err)
 		}
 		err = dbSvc.Create(
 			&testPaginationCustomPkModel{
@@ -420,7 +420,7 @@ func setupTestDb(t *testing.T) *gorm.DB {
 			},
 		).Error
 		if err != nil {
-			t.Fatalf("InsertTestDataFailed: %v", err)
+			test.Fatalf("InsertTestDataFailed: %v", err)
 		}
 		err = dbSvc.Create(
 			&testPaginationCapitalIdModel{
@@ -428,7 +428,7 @@ func setupTestDb(t *testing.T) *gorm.DB {
 			},
 		).Error
 		if err != nil {
-			t.Fatalf("InsertTestDataFailed: %v", err)
+			test.Fatalf("InsertTestDataFailed: %v", err)
 		}
 	}
 

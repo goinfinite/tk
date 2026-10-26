@@ -6,37 +6,37 @@ import (
 	"testing"
 )
 
-func TestCypher(t *testing.T) {
+func TestCypher(test *testing.T) {
 	encodedSecretKey, err := NewCypherSecretKey()
 	if err != nil {
-		t.Fatalf("FailedToGenerateValidKey: %v", err)
+		test.Fatalf("FailedToGenerateValidKey: %v", err)
 	}
 
-	t.Run("NewCypherSecretKey", func(t *testing.T) {
+	test.Run("NewCypherSecretKey", func(subtest *testing.T) {
 		encodedKey, err := NewCypherSecretKey()
 		if err != nil {
-			t.Errorf("NewCypherSecretKeyFailed: %v", err)
+			subtest.Errorf("NewCypherSecretKeyFailed: %v", err)
 		}
 		if encodedKey == "" {
-			t.Error("GeneratedKeyIsEmpty")
+			subtest.Error("GeneratedKeyIsEmpty")
 		}
 
 		decodedBytes, err := base64.RawURLEncoding.DecodeString(encodedKey)
 		if err != nil {
-			t.Errorf("GeneratedKeyInvalidBase64: %v", err)
+			subtest.Errorf("GeneratedKeyInvalidBase64: %v", err)
 		}
 		if len(decodedBytes) != CypherNewSecretKeyLength {
-			t.Errorf(
+			subtest.Errorf(
 				"GeneratedKeyWrongLength: expected %d, got %d",
 				CypherNewSecretKeyLength, len(decodedBytes),
 			)
 		}
 	})
 
-	t.Run("Cypher", func(t *testing.T) {
+	test.Run("Cypher", func(subtest *testing.T) {
 		cypher, err := NewCypher(encodedSecretKey)
 		if err != nil {
-			t.Fatalf("CreateCypherInstanceFailed: %v", err)
+			subtest.Fatalf("CreateCypherInstanceFailed: %v", err)
 		}
 
 		testCases := []struct {
@@ -57,7 +57,7 @@ func TestCypher(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
+			subtest.Run(testCase.name, func(subtest *testing.T) {
 				if testCase.expectError {
 					var err error
 					switch testCase.operationType {
@@ -69,17 +69,17 @@ func TestCypher(t *testing.T) {
 					case "decrypt":
 						_, err = cypher.Decrypt(testCase.input)
 					default:
-						t.Errorf("InvalidOperationType: %s", testCase.operationType)
+						subtest.Errorf("InvalidOperationType: %s", testCase.operationType)
 					}
 
 					if testCase.expectError && err == nil {
-						t.Errorf("MissingExpectedError: %s", testCase.name)
+						subtest.Errorf("MissingExpectedError: %s", testCase.name)
 					}
 					if !testCase.expectError && err != nil {
-						t.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.name)
+						subtest.Errorf("UnexpectedError: '%s' [%s]", err.Error(), testCase.name)
 					}
 					if testCase.expectError && err != nil && !strings.Contains(err.Error(), testCase.errorContains) {
-						t.Errorf(
+						subtest.Errorf(
 							"ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]",
 							err.Error(), testCase.errorContains, testCase.name,
 						)
@@ -90,14 +90,14 @@ func TestCypher(t *testing.T) {
 
 				encryptedText, err := cypher.Encrypt(testCase.input)
 				if err != nil {
-					t.Errorf("EncryptFailed: %v", err)
+					subtest.Errorf("EncryptFailed: %v", err)
 				}
 				decryptedText, err := cypher.Decrypt(encryptedText)
 				if err != nil {
-					t.Errorf("DecryptFailed: %v", err)
+					subtest.Errorf("DecryptFailed: %v", err)
 				}
 				if decryptedText != testCase.input {
-					t.Errorf(
+					subtest.Errorf(
 						"UnexpectedDecryptedText: expected %q, got %q",
 						testCase.input, decryptedText,
 					)

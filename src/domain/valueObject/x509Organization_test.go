@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNewX509Organization(t *testing.T) {
-	t.Run("ValidOrganization", func(t *testing.T) {
+func TestNewX509Organization(test *testing.T) {
+	test.Run("ValidOrganization", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     any
 			expectedOutput X509Organization
@@ -109,16 +109,16 @@ func TestNewX509Organization(t *testing.T) {
 			actualOutput, err := NewX509Organization(testCase.inputValue)
 
 			if testCase.expectError && err == nil {
-				t.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
+				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputValue)
 			}
 
 			if !testCase.expectError && err != nil {
-				t.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
+				subtest.Fatalf("UnexpectedError: '%s' [%v]", err.Error(), testCase.inputValue)
 			}
 
 			if !testCase.expectError &&
 				actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
 					actualOutput, testCase.expectedOutput, testCase.inputValue,
 				)
@@ -126,7 +126,7 @@ func TestNewX509Organization(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethod", func(t *testing.T) {
+	test.Run("StringMethod", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputValue     X509Organization
 			expectedOutput string
@@ -139,7 +139,7 @@ func TestNewX509Organization(t *testing.T) {
 			actualOutput := testCase.inputValue.String()
 
 			if actualOutput != testCase.expectedOutput {
-				t.Errorf(
+				subtest.Errorf(
 					"UnexpectedOutputValue: '%v' vs '%v'",
 					actualOutput, testCase.expectedOutput,
 				)
@@ -147,16 +147,16 @@ func TestNewX509Organization(t *testing.T) {
 		}
 	})
 
-	t.Run("StringMethodReturnsNormalizedValue", func(t *testing.T) {
+	test.Run("StringMethodReturnsNormalizedValue", func(subtest *testing.T) {
 		normalizedOrg, err := NewX509Organization("Société Française")
 		if err != nil {
-			t.Fatalf("UnexpectedError: '%s'", err.Error())
+			subtest.Fatalf("UnexpectedError: '%s'", err.Error())
 		}
 
 		expectedNormalizedString := "Societe Francaise"
 		actualOutput := normalizedOrg.String()
 		if actualOutput != expectedNormalizedString {
-			t.Errorf(
+			subtest.Errorf(
 				"StringMethodShouldReturnNormalizedValue: '%v' vs '%v'",
 				actualOutput, expectedNormalizedString,
 			)

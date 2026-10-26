@@ -240,7 +240,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   )
   ```
 
-- **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`.
+- **TrustedCidrsReader**: Parse comma-separated trusted entries from both `TRUSTED_IPS` and `TRUSTED_CIDRS` environment variables. Accepts plain IP addresses (converted to `/32` for IPv4 and `/128` for IPv6) and CIDR notation in either variable. Invalid entries are logged and skipped. Returns `[]CidrBlock`. The same list drives peer trust in `RequesterIpExtractor` and operator trust in `PanicHandler`, so a listed proxy address is also a trusted operator when it becomes the resolved requester IP.
 
   ```go
   trustedCidrBlocks, trustedCidrsReadingErr := TrustedCidrsReader()
@@ -290,7 +290,7 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   pagesTotal, pagesTotalErr := PaginationPagesTotalResolver(250, 20)
   ```
 
-- **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable.
+- **TrailDatabaseService**: Initialize and migrate a SQLite trail database for activity records using GORM, configurable via `TRAIL_DATABASE_FILE_PATH` environment variable. Migration creates indexes for time-range, operator audit, code-plus-IP audit, and affected-resource queries.
 
   ```go
   os.Setenv("TRAIL_DATABASE_FILE_PATH", "/path/to/trail.db")
