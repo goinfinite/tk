@@ -7,15 +7,16 @@ import (
 	tkInfra "github.com/goinfinite/tk/src/infra"
 )
 
-func TestRequesterIpExtractor(t *testing.T) {
+func TestRequesterIpExtractor(test *testing.T) {
 	testCaseStructs := []struct {
-		description        string
-		headerChainEnvVal  string
-		trustedCidrsEnvVal string
-		remoteAddr         string
-		requestHeaders     map[string]string
-		expectedIp         string
-		expectError        bool
+		description               string
+		headerChainEnvVal         string
+		confirmationHeadersEnvVal string
+		trustedCidrsEnvVal        string
+		remoteAddr                string
+		requestHeaders            map[string]string
+		expectedIp                string
+		expectError               bool
 	}{
 		{
 			description:        "XffInChainExtractsRightmostUntrusted",
@@ -32,6 +33,202 @@ func TestRequesterIpExtractor(t *testing.T) {
 			remoteAddr:         "127.0.0.1:1234",
 			requestHeaders:     map[string]string{"X-Forwarded-For": "203.0.113.10"},
 			expectedIp:         "203.0.113.10",
+		},
+		{
+			description:               "ConfirmationGateDisabledByEmptyConfig",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders:            map[string]string{"X-Forwarded-For": "203.0.113.11"},
+			expectedIp:                "203.0.113.11",
+		},
+		{
+			description:               "ConfirmationGateAbsentHeaderFallsBackToRemoteAddr",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders:            map[string]string{"X-Forwarded-For": "203.0.113.12"},
+			expectedIp:                "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGatePresentHeaderUnlocksForwardedHeader",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.13",
+				"X-Edge-Confirmation": "present",
+			},
+			expectedIp: "203.0.113.13",
+		},
+		{
+			description:               "ConfirmationGateMatchingValueUnlocksForwardedHeader",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=shared-secret",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.14",
+				"X-Edge-Confirmation": "shared-secret",
+			},
+			expectedIp: "203.0.113.14",
+		},
+		{
+			description:               "ConfirmationGateHeaderNameIsCaseInsensitive",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "x-edge-confirmation=shared-secret",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.27",
+				"X-Edge-Confirmation": "shared-secret",
+			},
+			expectedIp: "203.0.113.27",
+		},
+		{
+			description:               "ConfirmationGateWrongValueFallsBackToRemoteAddr",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=shared-secret",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.15",
+				"X-Edge-Confirmation": "wrong-secret",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateMissingExpectedValueFallsBackToRemoteAddr",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=shared-secret",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders:            map[string]string{"X-Forwarded-For": "203.0.113.16"},
+			expectedIp:                "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateEmptyHeaderValueFailsClosed",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.23",
+				"X-Edge-Confirmation": "",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateAnyConfiguredHeaderSatisfies",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation,X-Edge-Signature",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":  "203.0.113.17",
+				"X-Edge-Signature": "present",
+			},
+			expectedIp: "203.0.113.17",
+		},
+		{
+			description:               "ConfirmationGateInvalidConfigFailsClosed",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X.Edge.Confirmation,=broken",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.18",
+				"X.Edge.Confirmation": "present",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateInvalidEntryInvalidatesList",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=shared-secret,X.Edge.Confirmation",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.24",
+				"X-Edge-Confirmation": "shared-secret",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateInvalidValueFailsClosed",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=invalid\nvalue",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.28",
+				"X-Edge-Confirmation": "present",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateEmptyExpectedValueRequiresPresence",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.19",
+				"X-Edge-Confirmation": "present",
+			},
+			expectedIp: "203.0.113.19",
+		},
+		{
+			description:               "ConfirmationGateMixedConfigFailsClosed",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Presence,X-Edge-Secret=shared-secret",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For": "203.0.113.25",
+				"X-Edge-Presence": "present",
+				"X-Edge-Secret":   "shared-secret",
+			},
+			expectedIp: "127.0.0.1",
+		},
+		{
+			description:               "ConfirmationGateAnyValueCheckedHeaderSatisfies",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Secret-A=secret-a,X-Edge-Secret-B=secret-b",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For": "203.0.113.26",
+				"X-Edge-Secret-B": "secret-b",
+			},
+			expectedIp: "203.0.113.26",
+		},
+		{
+			description:               "ConfirmationGateTrimsWhitespace",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: " X-Edge-Confirmation = shared-secret , X-Edge-Other = other-secret ",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.21",
+				"X-Edge-Confirmation": "shared-secret",
+			},
+			expectedIp: "203.0.113.21",
+		},
+		{
+			description:               "ConfirmationGateValueMayContainEquals",
+			headerChainEnvVal:         "X-Forwarded-For",
+			confirmationHeadersEnvVal: "X-Edge-Confirmation=abc=def",
+			trustedCidrsEnvVal:        "",
+			remoteAddr:                "127.0.0.1:1234",
+			requestHeaders: map[string]string{
+				"X-Forwarded-For":     "203.0.113.22",
+				"X-Edge-Confirmation": "abc=def",
+			},
+			expectedIp: "203.0.113.22",
 		},
 		{
 			description:        "HeaderChainFallbackToXffWhenXRealIpEmpty",
@@ -228,9 +425,13 @@ func TestRequesterIpExtractor(t *testing.T) {
 	}
 
 	for _, testCase := range testCaseStructs {
-		t.Run(testCase.description, func(t *testing.T) {
-			t.Setenv(ipExtractHeaderEnvVarName, testCase.headerChainEnvVal)
-			t.Setenv(tkInfra.TrustedCidrsEnvVarName, testCase.trustedCidrsEnvVal)
+		test.Run(testCase.description, func(subtest *testing.T) {
+			subtest.Setenv(ipExtractHeaderEnvVarName, testCase.headerChainEnvVal)
+			subtest.Setenv(
+				ipExtractConfirmationHeadersEnvVarName,
+				testCase.confirmationHeadersEnvVal,
+			)
+			subtest.Setenv(tkInfra.TrustedCidrsEnvVarName, testCase.trustedCidrsEnvVal)
 
 			extractor := NewRequesterIpExtractor()
 
@@ -243,16 +444,16 @@ func TestRequesterIpExtractor(t *testing.T) {
 			actualIpAddress, extractionErr := extractor.Execute(httpRequest)
 			if testCase.expectError {
 				if extractionErr == nil {
-					t.Errorf("MissingExpectedError")
+					subtest.Errorf("MissingExpectedError")
 				}
 				return
 			}
 			if extractionErr != nil {
-				t.Errorf("UnexpectedError: '%s'", extractionErr.Error())
+				subtest.Errorf("UnexpectedError: '%s'", extractionErr.Error())
 				return
 			}
 			if actualIpAddress.String() != testCase.expectedIp {
-				t.Errorf(
+				subtest.Errorf(
 					"IpAddressMismatch: got='%s', want='%s'",
 					actualIpAddress.String(), testCase.expectedIp,
 				)
@@ -262,14 +463,15 @@ func TestRequesterIpExtractor(t *testing.T) {
 }
 
 func TestRequesterIpExtractor_InvalidHeaderConfig_FailsClosed(
-	t *testing.T,
+	test *testing.T,
 ) {
-	t.Setenv(ipExtractHeaderEnvVarName, "!!!invalid!!!")
-	t.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
+	test.Setenv(ipExtractHeaderEnvVarName, "!!!invalid!!!")
+	test.Setenv(ipExtractConfirmationHeadersEnvVarName, "")
+	test.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
 
 	extractor := NewRequesterIpExtractor()
 	if len(extractor.extractionHeaders) != 0 {
-		t.Errorf(
+		test.Errorf(
 			"ExpectedEmptyHeaders: got=%d",
 			len(extractor.extractionHeaders),
 		)
@@ -277,10 +479,11 @@ func TestRequesterIpExtractor_InvalidHeaderConfig_FailsClosed(
 }
 
 func TestRequesterIpExtractor_HeaderChainUsesAllValues(
-	t *testing.T,
+	test *testing.T,
 ) {
-	t.Setenv(ipExtractHeaderEnvVarName, "X-Forwarded-For")
-	t.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
+	test.Setenv(ipExtractHeaderEnvVarName, "X-Forwarded-For")
+	test.Setenv(ipExtractConfirmationHeadersEnvVarName, "")
+	test.Setenv(tkInfra.TrustedCidrsEnvVarName, "")
 
 	extractor := NewRequesterIpExtractor()
 
@@ -291,11 +494,11 @@ func TestRequesterIpExtractor_HeaderChainUsesAllValues(
 
 	actualIpAddress, extractionErr := extractor.Execute(httpRequest)
 	if extractionErr != nil {
-		t.Errorf("UnexpectedError: '%s'", extractionErr.Error())
+		test.Errorf("UnexpectedError: '%s'", extractionErr.Error())
 		return
 	}
 	if actualIpAddress.String() != "203.0.113.5" {
-		t.Errorf(
+		test.Errorf(
 			"IpAddressMismatch: got='%s', want='203.0.113.5'",
 			actualIpAddress.String(),
 		)

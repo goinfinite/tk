@@ -1,6 +1,7 @@
 package tkPresentation
 
 import (
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"net"
@@ -14,18 +15,38 @@ import (
 )
 
 const (
-	ipExtractHeaderEnvVarName  string = "IP_EXTRACT_HEADER"
-	ipExtractHeaderDefaults    string = "X-Forwarded-For,X-Real-IP"
-	ipExtractDirectKeyword     string = "Direct"
-	ipExtractRemoteAddrKeyword string = "RemoteAddr"
+	ipExtractHeaderEnvVarName              string = "IP_EXTRACT_HEADER"
+	ipExtractConfirmationHeadersEnvVarName string = "IP_EXTRACT_CONFIRMATION_HEADERS"
+	ipExtractHeaderDefaults                string = "X-Forwarded-For,X-Real-IP"
+	ipExtractDirectKeyword                 string = "Direct"
+	ipExtractRemoteAddrKeyword             string = "RemoteAddr"
 )
 
 type RequesterIpExtractor struct {
-	extractionHeaders []tkValueObject.HttpHeader
-	trustedCidrBlocks []tkValueObject.CidrBlock
+	extractionHeaders   []tkValueObject.HttpHeader
+	confirmationHeaders map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue
+	trustedCidrBlocks   []tkValueObject.CidrBlock
 }
 
-func IpExtractHeaderReader() []tkValueObject.HttpHeader {
+func NewRequesterIpExtractor() RequesterIpExtractor {
+	cidrBlocks, cidrsReadingErr := tkInfra.TrustedCidrsReader()
+	if cidrsReadingErr != nil {
+		slog.Debug(
+			"TrustedCidrsReaderError",
+			slog.String("err", cidrsReadingErr.Error()),
+		)
+	}
+
+	extractor := RequesterIpExtractor{
+		trustedCidrBlocks: cidrBlocks,
+	}
+	extractor.extractionHeaders = extractor.readExtractionHeaders()
+	extractor.confirmationHeaders = extractor.readConfirmationHeaders()
+
+	return extractor
+}
+
+func (RequesterIpExtractor) readExtractionHeaders() []tkValueObject.HttpHeader {
 	rawEnvVal, envVarWasSet := os.LookupEnv(ipExtractHeaderEnvVarName)
 	if !envVarWasSet || rawEnvVal == "" {
 		rawEnvVal = ipExtractHeaderDefaults
@@ -60,19 +81,54 @@ func IpExtractHeaderReader() []tkValueObject.HttpHeader {
 	return extractionHeaders
 }
 
-func NewRequesterIpExtractor() RequesterIpExtractor {
-	cidrBlocks, cidrsReadingErr := tkInfra.TrustedCidrsReader()
-	if cidrsReadingErr != nil {
-		slog.Debug(
-			"TrustedCidrsReaderError",
-			slog.String("err", cidrsReadingErr.Error()),
-		)
+func (RequesterIpExtractor) readConfirmationHeaders() map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue {
+	rawHeadersList := strings.TrimSpace(
+		os.Getenv(ipExtractConfirmationHeadersEnvVarName),
+	)
+	if rawHeadersList == "" {
+		return nil
 	}
 
-	return RequesterIpExtractor{
-		extractionHeaders: IpExtractHeaderReader(),
-		trustedCidrBlocks: cidrBlocks,
+	hasPresenceOnlyHeader := false
+	hasValueCheckedHeader := false
+	confirmationHeaders := map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+	for headerIndex, rawHeader := range strings.Split(rawHeadersList, ",") {
+		rawHeaderName, rawExpectedValue, _ := strings.Cut(rawHeader, "=")
+
+		header, headerErr := tkValueObject.NewHttpHeader(rawHeaderName)
+		if headerErr != nil {
+			slog.Error(
+				"InvalidIpExtractConfirmationHeaderName",
+				slog.Int("headerIndex", headerIndex),
+			)
+			return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+		}
+
+		expectedValue, expectedValueErr := tkValueObject.NewHttpHeaderValue(
+			rawExpectedValue,
+		)
+		if expectedValueErr != nil {
+			slog.Error(
+				"InvalidIpExtractConfirmationHeaderValue",
+				slog.Int("headerIndex", headerIndex),
+			)
+			return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+		}
+
+		isExpectedValueRequired := expectedValue.String() != ""
+		hasPresenceOnlyHeader = hasPresenceOnlyHeader ||
+			!isExpectedValueRequired
+		hasValueCheckedHeader = hasValueCheckedHeader ||
+			isExpectedValueRequired
+		confirmationHeaders[header.ReadAsLowerCase()] = expectedValue
 	}
+
+	if hasPresenceOnlyHeader && hasValueCheckedHeader {
+		slog.Error("MixedIpExtractConfirmationHeaders")
+		return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+	}
+
+	return confirmationHeaders
 }
 
 func (extractor RequesterIpExtractor) remoteAddrParser(
@@ -171,6 +227,33 @@ func (extractor RequesterIpExtractor) firstChainEntryIpExtractor(
 	return ipAddress, false
 }
 
+func (extractor RequesterIpExtractor) hasPassingConfirmationHeader(
+	httpRequest *http.Request,
+) bool {
+	for headerName, expectedValue := range extractor.confirmationHeaders {
+		headerValues := httpRequest.Header.Values(headerName.String())
+		for _, headerValue := range headerValues {
+			if headerValue == "" {
+				continue
+			}
+
+			isExpectedValueRequired := expectedValue.String() != ""
+			if !isExpectedValueRequired {
+				return true
+			}
+
+			doesValueMatch := subtle.ConstantTimeCompare(
+				[]byte(headerValue), []byte(expectedValue.String()),
+			) == 1
+			if doesValueMatch {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (extractor RequesterIpExtractor) Execute(
 	httpRequest *http.Request,
 ) (tkValueObject.IpAddress, error) {
@@ -182,6 +265,12 @@ func (extractor RequesterIpExtractor) Execute(
 	}
 
 	if !extractor.isIpTrusted(remoteAddrIpAddress) {
+		return remoteAddrIpAddress, nil
+	}
+
+	isConfirmationGateFailed := extractor.confirmationHeaders != nil &&
+		!extractor.hasPassingConfirmationHeader(httpRequest)
+	if isConfirmationGateFailed {
 		return remoteAddrIpAddress, nil
 	}
 

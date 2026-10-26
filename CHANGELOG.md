@@ -3,7 +3,8 @@
 ```log
 0.4.3 - 2026/10/26
 perf: add indexes to the trail database for activity record audit queries. activity_records indexes (created_at), (operator_sri, created_at), and (record_code, operator_ip_address, created_at). activity_records_affected_resources indexes (activity_record_id) and (system_resource_identifier, activity_record_id).
-feat: RequesterIpExtractor accepts IP_EXTRACT_CONFIRMATION_HEADERS. When set, forwarding headers are trusted only when a configured confirmation header is present. HeaderName=secret requires a constant-time value match. Missing headers, wrong values, mixed lists, and invalid configuration resolve to RemoteAddr. Confirmation header names and values are not logged. Unset or empty preserves the current behavior.
+feat: RequesterIpExtractor accepts IP_EXTRACT_CONFIRMATION_HEADERS. When set, forwarding headers are trusted only when a configured confirmation header is present. HeaderName=secret requires a constant-time value match; HeaderName= is presence-only. Missing headers, wrong values, mixed lists, and invalid configuration resolve to RemoteAddr. Confirmation header names and values are not logged. Unset or empty preserves the current behavior.
+feat: add HttpHeaderValue validation for RFC 9110 field values and HttpHeader.ReadAsLowerCase for case-insensitive header lookup.
 breaking: remove the exported IpExtractHeaderReader helper. Callers must use NewRequesterIpExtractor and Execute.
 docs: document the confirmation gate and activity record indexes in the layer READMEs, context files, and feature map.
 

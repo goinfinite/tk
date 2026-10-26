@@ -68,4 +68,26 @@ func TestNewHttpHeader(test *testing.T) {
 			}
 		}
 	})
+
+	test.Run("ReadAsLowerCase", func(subtest *testing.T) {
+		testCaseStructs := []struct {
+			inputValue     HttpHeader
+			expectedOutput HttpHeader
+		}{
+			{HttpHeader("X-Forwarded-For"), HttpHeader("x-forwarded-for")},
+			{HttpHeader("x-real-ip"), HttpHeader("x-real-ip")},
+			{HttpHeader("CF-Connecting-IP"), HttpHeader("cf-connecting-ip")},
+			{HttpHeader("X_Custom_Header"), HttpHeader("x_custom_header")},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := testCase.inputValue.ReadAsLowerCase()
+			if actualOutput != testCase.expectedOutput {
+				subtest.Errorf(
+					"UnexpectedOutputValue: '%v' vs '%v' [%v]",
+					actualOutput, testCase.expectedOutput, testCase.inputValue,
+				)
+			}
+		}
+	})
 }
