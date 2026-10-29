@@ -2,6 +2,7 @@ package tkInfraDb
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +11,7 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 	tkInfraDbModel "github.com/goinfinite/tk/src/infra/db/model"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 const (
@@ -32,24 +34,56 @@ func NewTrailDatabaseService(extraModelsPtrs []any) (*TrailDatabaseService, erro
 	}
 	rawDatabaseFilePath, err := filepath.Abs(rawDatabaseFilePath)
 	if err != nil {
+		slog.Error(
+			"TrailDatabaseFilePathResolutionError",
+			slog.String("rawDatabaseFilePath", rawDatabaseFilePath),
+			slog.String("error", err.Error()),
+		)
 		return nil, errors.New(errTrailDatabaseFilePathNotValid)
 	}
 
-	databaseFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(rawDatabaseFilePath, false)
+	databaseFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(
+		rawDatabaseFilePath, false,
+	)
 	if err != nil {
+		slog.Error(
+			"TrailDatabaseFilePathValidationError",
+			slog.Int(
+				"rawDatabaseFilePathLength", len(rawDatabaseFilePath),
+			),
+			slog.String("error", err.Error()),
+		)
 		return nil, errors.New(errTrailDatabaseFilePathNotValid)
 	}
 
 	ormSvc, err := gorm.Open(
 		sqlite.Open("file:"+databaseFilePath.String()+DatabaseStandardConnectionParams),
-		&gorm.Config{NowFunc: func() time.Time { return time.Now().UTC() }},
+		&gorm.Config{
+			NowFunc: func() time.Time { return time.Now().UTC() },
+			Logger:  gormLogger.Default.LogMode(gormLogger.Silent),
+		},
 	)
 	if err != nil {
+		slog.Error(
+			"TrailDatabaseConnectionError",
+			slog.String("databaseFilePath", databaseFilePath.String()),
+			slog.String("error", err.Error()),
+		)
 		return nil, errors.New(errTrailDatabaseConnectionError)
 	}
 
 	dbSvc := &TrailDatabaseService{Handler: ormSvc}
-	return dbSvc, dbSvc.dbMigrate(extraModelsPtrs)
+	err = dbSvc.dbMigrate(extraModelsPtrs)
+	if err != nil {
+		slog.Error(
+			"TrailDatabaseMigrationError",
+			slog.String("databaseFilePath", databaseFilePath.String()),
+			slog.String("error", err.Error()),
+		)
+		return nil, errors.New(errTrailDatabaseMigrationError)
+	}
+
+	return dbSvc, nil
 }
 
 func (service *TrailDatabaseService) dbMigrate(extraModelsPtrs []any) error {
@@ -58,10 +92,5 @@ func (service *TrailDatabaseService) dbMigrate(extraModelsPtrs []any) error {
 		&tkInfraDbModel.ActivityRecordAffectedResource{},
 	}
 	allModelsPtrs := append(standardModelsPtrs, extraModelsPtrs...)
-	err := service.Handler.AutoMigrate(allModelsPtrs...)
-	if err != nil {
-		return errors.New(errTrailDatabaseMigrationError + ": " + err.Error())
-	}
-
-	return nil
+	return service.Handler.AutoMigrate(allModelsPtrs...)
 }

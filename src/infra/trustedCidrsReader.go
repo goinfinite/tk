@@ -35,7 +35,7 @@ func TrustedCidrsReader() (trustedCidrBlocks []tkValueObject.CidrBlock, err erro
 		}
 
 		slog.Debug(
-			"InvalidTrustedEntry",
+			"TrustedCidrsReaderInvalidEntry",
 			slog.String("rawEntry", rawEntry),
 		)
 	}

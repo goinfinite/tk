@@ -1,10 +1,13 @@
 package tkInfraActivityRecord
 
 import (
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
+	tkUseCase "github.com/goinfinite/tk/src/domain/useCase"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
@@ -20,6 +23,27 @@ func TestActivityRecordQueryRepoRead(test *testing.T) {
 		}
 		if len(responseDto.ActivityRecords) != 0 {
 			subtest.Errorf("ExpectedEmptyResponse: got %d records", len(responseDto.ActivityRecords))
+		}
+	})
+
+	testName := "ReadWithUnknownSortFieldReturnsPaginationError"
+	test.Run(testName, func(subtest *testing.T) {
+		dbSvc := SetupTestTrailDatabaseService(subtest)
+		queryRepo := NewActivityRecordQueryRepo(dbSvc)
+
+		sortBy := tkValueObject.PaginationSortBy("notAField")
+		_, err := queryRepo.Read(tkDto.ReadActivityRecordsRequest{
+			Pagination: tkDto.Pagination{
+				PageNumber:   0,
+				ItemsPerPage: 10,
+				SortBy:       &sortBy,
+			},
+		})
+		if err == nil {
+			subtest.Fatalf("MissingExpectedError: unknown sort field")
+		}
+		if !strings.Contains(err.Error(), "PaginationQueryBuilderError") {
+			subtest.Errorf("UnexpectedError: %v", err)
 		}
 	})
 
@@ -596,6 +620,9 @@ func TestActivityRecordQueryRepoReadFirst(test *testing.T) {
 		expectedError := "ActivityRecordNotFound"
 		if err.Error() != expectedError {
 			subtest.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedError, err.Error())
+		}
+		if !errors.Is(err, tkUseCase.ErrActivityRecordNotFound) {
+			subtest.Errorf("ExpectedActivityRecordNotFoundSentinel: %v", err)
 		}
 	})
 

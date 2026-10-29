@@ -2,6 +2,8 @@ package tkInfra
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,7 +88,7 @@ func TestStringDeserializer(test *testing.T) {
 				"invalid: yaml:\n  - missing colon",
 				nil,
 				true,
-				"yaml",
+				"InvalidYamlContent",
 			},
 		}
 
@@ -108,6 +110,45 @@ func TestStringDeserializer(test *testing.T) {
 			if !testCase.expectError {
 				assertMapsEqual(subtest, actualMap, testCase.expectedMap)
 			}
+		}
+	})
+
+	test.Run("YamlErrorRedactsSourceLine", func(subtest *testing.T) {
+		secret := "super-secret-value"
+		inputYaml := "invalid: [" + secret
+
+		_, err := StringDeserializer(inputYaml, SerializationFormatYaml)
+		if err == nil {
+			subtest.Fatalf("MissingExpectedError")
+		}
+		if strings.Contains(err.Error(), secret) {
+			subtest.Errorf("YamlErrorLeakedSourceLine: %v", err)
+		}
+		if !errors.Is(err, ErrInvalidYamlContent) {
+			subtest.Errorf("ExpectedInvalidYamlContentSentinel: %v", err)
+		}
+	})
+
+	test.Run("YamlErrorRedactsValue", func(subtest *testing.T) {
+		secret := "super-secret-value"
+		inputYaml := "secret: !!bool " + secret
+
+		_, err := StringDeserializer(inputYaml, SerializationFormatYaml)
+		if err == nil {
+			subtest.Fatalf("MissingExpectedError")
+		}
+		if strings.Contains(err.Error(), secret) {
+			subtest.Errorf("YamlErrorLeakedValue: %v", err)
+		}
+		if !errors.Is(err, ErrInvalidYamlContent) {
+			subtest.Errorf("ExpectedInvalidYamlContentSentinel: %v", err)
+		}
+	})
+
+	test.Run("YamlEmptyContentReturnsEof", func(subtest *testing.T) {
+		_, err := StringDeserializer("", SerializationFormatYaml)
+		if !errors.Is(err, io.EOF) {
+			subtest.Errorf("ExpectedEof: %v", err)
 		}
 	})
 }
@@ -146,7 +187,10 @@ func TestFileDeserializer(test *testing.T) {
 
 		_, err := FileDeserializer(invalidFile)
 		if err == nil {
-			subtest.Errorf("MissingExpectedError: InvalidJsonFormat")
+			subtest.Fatalf("MissingExpectedError: InvalidJsonFormat")
+		}
+		if err.Error() != "FileDeserializerError" {
+			subtest.Errorf("UnexpectedErrorMessage: '%s'", err.Error())
 		}
 	})
 

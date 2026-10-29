@@ -2,6 +2,7 @@ package tkInfraDb
 
 import (
 	"errors"
+	"log/slog"
 
 	tkDto "github.com/goinfinite/tk/src/domain/dto"
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -22,9 +23,11 @@ func resolveOrderStatement(
 ) (orderStatement string, err error) {
 	sortField := statement.Schema.LookUpField(sortBy.String())
 	if sortField == nil {
-		return "", errors.New(
-			errUnknownPaginationSortFieldError + ": " + sortBy.String(),
+		slog.Warn(
+			"PaginationQueryBuilderUnknownSortField",
+			slog.String("sortBy", sortBy.String()),
 		)
+		return "", errors.New(errUnknownPaginationSortFieldError)
 	}
 
 	orderStatement = statement.Quote(sortField.DBName)
@@ -41,15 +44,27 @@ func PaginationQueryBuilder(
 ) (paginatedQuery *gorm.DB, responsePagination tkDto.Pagination, err error) {
 	err = dbQuery.Statement.Parse(dbQuery.Statement.Model)
 	if err != nil {
+		slog.Error(
+			"PaginationQueryBuilderParseStatementSchemaError",
+			slog.Int("pageNumber", int(requestPagination.PageNumber)),
+			slog.Int("itemsPerPage", int(requestPagination.ItemsPerPage)),
+			slog.String("error", err.Error()),
+		)
 		return paginatedQuery, responsePagination,
-			errors.New(errParseStatementSchemaError + ": " + err.Error())
+			errors.New(errParseStatementSchemaError)
 	}
 
 	var itemsTotal int64
 	err = dbQuery.Count(&itemsTotal).Error
 	if err != nil {
+		slog.Error(
+			"PaginationQueryBuilderCountItemsTotalError",
+			slog.Int("pageNumber", int(requestPagination.PageNumber)),
+			slog.Int("itemsPerPage", int(requestPagination.ItemsPerPage)),
+			slog.String("error", err.Error()),
+		)
 		return paginatedQuery, responsePagination,
-			errors.New(errCountItemsTotalError + ": " + err.Error())
+			errors.New(errCountItemsTotalError)
 	}
 
 	paginatedQuery = dbQuery.Limit(int(requestPagination.ItemsPerPage))

@@ -70,13 +70,15 @@ var (
 	FileClerkOwnerSourceContainingDirectory FileClerkOwnerSource = "containing-directory"
 	FileClerkOwnerSourceRunningProcess      FileClerkOwnerSource = "running-process"
 
-	ErrSourceFileMissing            = errors.New("SourceFileNotFound")
-	ErrTargetFileExists             = errors.New("TargetFileAlreadyExists")
-	ErrFileMissing                  = errors.New("FileNotFound")
-	ErrDirMissing                   = errors.New("DirNotFound")
-	ErrGlobPatternInvalid           = errors.New("GlobPatternInvalid")
-	ErrStartingPathMissing          = errors.New("StartingPathOrPatternMustBeSet")
-	ErrStartingPathConflict         = errors.New("StartingPathConflictsWithStartingPathPattern")
+	ErrSourceFileMissing    = errors.New("SourceFileNotFound")
+	ErrTargetFileExists     = errors.New("TargetFileAlreadyExists")
+	ErrFileMissing          = errors.New("FileNotFound")
+	ErrDirMissing           = errors.New("DirNotFound")
+	ErrGlobPatternInvalid   = errors.New("GlobPatternInvalid")
+	ErrStartingPathMissing  = errors.New("StartingPathOrPatternMustBeSet")
+	ErrStartingPathConflict = errors.New(
+		"StartingPathConflictsWithStartingPathPattern",
+	)
 	ErrFileEmpty                    = errors.New("FileEmpty")
 	ErrReplacementWouldTruncateFile = errors.New("ReplacementWouldTruncateFile")
 	ErrDirCompressionWrongFormat    = errors.New("DirectoryCompressionMustUseTarFormat")
@@ -536,7 +538,7 @@ func (clerk FileClerk) FileContentRegexSearch(
 			slog.String("filePath", filePathStr),
 			slog.Int64("fileSizeBytes", fileInfo.Size()),
 			slog.Int64("thresholdBytes", RegexLargeFileThresholdBytes),
-			slog.String("reason", "FileSizeExceedsThreshold"),
+			slog.String("fallbackReason", "FileSizeExceedsThreshold"),
 		)
 		return clerk.regexSearchStreaming(filePathStr, regexPattern)
 	}
@@ -1293,7 +1295,8 @@ func (FileClerk) dirChainPolicyNormalizer(
 		return &FileClerkDirChainPolicySharedWriteAllowed, nil
 	}
 	switch *dirChainPolicyPtr {
-	case FileClerkDirChainPolicySharedWriteAllowed, FileClerkDirChainPolicySharedWriteRefused:
+	case FileClerkDirChainPolicySharedWriteAllowed,
+		FileClerkDirChainPolicySharedWriteRefused:
 		return dirChainPolicyPtr, nil
 	default:
 		return nil, ErrDirChainPolicyInvalid
@@ -1654,7 +1657,7 @@ func (clerk FileClerk) FileContentRegexReplace(
 			slog.String("filePath", settings.FilePath.String()),
 			slog.Int64("fileSizeBytes", targetSnapshot.SizeBytes),
 			slog.Int64("thresholdBytes", RegexLargeFileThresholdBytes),
-			slog.String("reason", "FileSizeExceedsThreshold"),
+			slog.String("fallbackReason", "FileSizeExceedsThreshold"),
 		)
 		return clerk.regexReplaceStreaming(
 			fileHandler, target, regexPattern, replacement,
@@ -1995,10 +1998,10 @@ func (clerk FileClerk) UpsertFile(
 }
 
 type ownerNameCache struct {
-	usernames       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername
-	groupNames      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName
-	usernameErrors  map[tkValueObject.UnixUserId]error
-	groupNameErrors map[tkValueObject.UnixGroupId]error
+	userIdUsernamesMap        map[tkValueObject.UnixUserId]tkValueObject.UnixUsername
+	groupIdGroupNamesMap      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName
+	userIdUsernameErrorsMap   map[tkValueObject.UnixUserId]error
+	groupIdGroupNameErrorsMap map[tkValueObject.UnixGroupId]error
 }
 
 type dirReadSettings struct {
@@ -2036,10 +2039,18 @@ func (clerk FileClerk) dirReadSettingsResolver(
 		DirChainPolicy: *dirChainPolicy,
 		MaxFiles:       FileClerkDefaultMaxFiles,
 		OwnerNameCache: &ownerNameCache{
-			usernames:       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
-			groupNames:      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
-			usernameErrors:  map[tkValueObject.UnixUserId]error{},
-			groupNameErrors: map[tkValueObject.UnixGroupId]error{},
+			userIdUsernamesMap: make(
+				map[tkValueObject.UnixUserId]tkValueObject.UnixUsername,
+			),
+			groupIdGroupNamesMap: make(
+				map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName,
+			),
+			userIdUsernameErrorsMap: make(
+				map[tkValueObject.UnixUserId]error,
+			),
+			groupIdGroupNameErrorsMap: make(
+				map[tkValueObject.UnixGroupId]error,
+			),
 		},
 
 		TrustedDirOwnerUsernames: trustedDirOwnerUsernames,
@@ -2199,21 +2210,21 @@ func (clerk FileClerk) cachedUsernameResolver(
 	ownerNames *ownerNameCache,
 	ownerUserId tkValueObject.UnixUserId,
 ) (username tkValueObject.UnixUsername, err error) {
-	username, isCached := ownerNames.usernames[ownerUserId]
+	username, isCached := ownerNames.userIdUsernamesMap[ownerUserId]
 	if isCached {
 		return username, nil
 	}
-	cachedLookupErr, hasFailedBefore := ownerNames.usernameErrors[ownerUserId]
+	cachedLookupErr, hasFailedBefore := ownerNames.userIdUsernameErrorsMap[ownerUserId]
 	if hasFailedBefore {
 		return username, cachedLookupErr
 	}
 
 	username, err = clerk.usernameByUserIdResolver(ownerUserId)
 	if err != nil {
-		ownerNames.usernameErrors[ownerUserId] = err
+		ownerNames.userIdUsernameErrorsMap[ownerUserId] = err
 		return username, err
 	}
-	ownerNames.usernames[ownerUserId] = username
+	ownerNames.userIdUsernamesMap[ownerUserId] = username
 
 	return username, nil
 }
@@ -2222,21 +2233,22 @@ func (clerk FileClerk) cachedGroupNameResolver(
 	ownerNames *ownerNameCache,
 	ownerGroupId tkValueObject.UnixGroupId,
 ) (groupName tkValueObject.UnixGroupName, err error) {
-	groupName, isCached := ownerNames.groupNames[ownerGroupId]
+	groupName, isCached := ownerNames.groupIdGroupNamesMap[ownerGroupId]
 	if isCached {
 		return groupName, nil
 	}
-	cachedLookupErr, hasFailedBefore := ownerNames.groupNameErrors[ownerGroupId]
+	cachedLookupErr, hasFailedBefore :=
+		ownerNames.groupIdGroupNameErrorsMap[ownerGroupId]
 	if hasFailedBefore {
 		return groupName, cachedLookupErr
 	}
 
 	groupName, err = clerk.groupNameByGroupIdResolver(ownerGroupId)
 	if err != nil {
-		ownerNames.groupNameErrors[ownerGroupId] = err
+		ownerNames.groupIdGroupNameErrorsMap[ownerGroupId] = err
 		return groupName, err
 	}
-	ownerNames.groupNames[ownerGroupId] = groupName
+	ownerNames.groupIdGroupNamesMap[ownerGroupId] = groupName
 
 	return groupName, nil
 }
@@ -2332,15 +2344,15 @@ func (clerk FileClerk) collectDirTreeEntities(
 		)
 		if snapshotErr != nil {
 			slog.Warn(
-				"DirEntryStatFailed",
+				"FileClerkDirEntryStatFailed",
 				slog.String("entryPath", entryPath),
-				slog.String("reason", snapshotErr.Error()),
+				slog.String("error", snapshotErr.Error()),
 			)
 			continue
 		}
 		if !entrySnapshot.Exists {
 			slog.Debug(
-				"DirEntryVanishedMidWalk",
+				"FileClerkDirEntryVanishedMidWalk",
 				slog.String("dirPath", dirPath),
 				slog.String("entryName", entryName),
 			)
@@ -2354,9 +2366,9 @@ func (clerk FileClerk) collectDirTreeEntities(
 			)
 			if entityErr != nil {
 				slog.Debug(
-					"UnixFileEntitySkipped",
+					"FileClerkUnixFileEntitySkipped",
 					slog.String("entryPath", entryPath),
-					slog.String("reason", entityErr.Error()),
+					slog.String("error", entityErr.Error()),
 				)
 			}
 			if entityErr == nil {
@@ -2374,7 +2386,7 @@ func (clerk FileClerk) collectDirTreeEntities(
 		if openErr != nil {
 			if errors.Is(openErr, unix.ENOENT) {
 				slog.Debug(
-					"DirEntryVanishedMidWalk",
+					"FileClerkDirEntryVanishedMidWalk",
 					slog.String("dirPath", dirPath),
 					slog.String("entryName", entryName),
 				)
@@ -2386,9 +2398,9 @@ func (clerk FileClerk) collectDirTreeEntities(
 				)
 			}
 			slog.Warn(
-				"DirOpenFailed",
+				"FileClerkDirOpenFailed",
 				slog.String("entryPath", entryPath),
-				slog.String("reason", openErr.Error()),
+				slog.String("error", openErr.Error()),
 			)
 			continue
 		}
@@ -2509,7 +2521,12 @@ func (FileClerk) startingDirPathsResolver(
 		patternStr := startingPathPattern.String()
 		matchedPaths, globErr := filepath.Glob(patternStr)
 		if globErr != nil {
-			return nil, fmt.Errorf("%w: %s", ErrGlobPatternInvalid, patternStr)
+			slog.Warn(
+				"FileClerkGlobPatternInvalid",
+				slog.String("globPattern", patternStr),
+				slog.String("error", globErr.Error()),
+			)
+			return nil, ErrGlobPatternInvalid
 		}
 
 		if len(matchedPaths) == 0 {
@@ -2536,7 +2553,7 @@ func (FileClerk) startingDirPathsResolver(
 		if statErr != nil {
 			if os.IsNotExist(statErr) {
 				slog.Debug(
-					"StartingDirVanished",
+					"FileClerkStartingDirVanished",
 					slog.String("candidatePath", candidatePath),
 				)
 				continue
@@ -2545,9 +2562,9 @@ func (FileClerk) startingDirPathsResolver(
 				return nil, statErr
 			}
 			slog.Warn(
-				"StartingDirStatFailed",
+				"FileClerkStartingDirStatFailed",
 				slog.String("candidatePath", candidatePath),
-				slog.String("reason", statErr.Error()),
+				slog.String("error", statErr.Error()),
 			)
 			continue
 		}
@@ -2560,9 +2577,9 @@ func (FileClerk) startingDirPathsResolver(
 		)
 		if pathErr != nil {
 			slog.Debug(
-				"StartingDirPathRejected",
+				"FileClerkStartingDirPathRejected",
 				slog.String("candidatePath", candidatePath),
-				slog.String("reason", pathErr.Error()),
+				slog.String("error", pathErr.Error()),
 			)
 			continue
 		}
@@ -2631,9 +2648,9 @@ func (clerk FileClerk) Find(
 				return nil, readErr
 			}
 			slog.Warn(
-				"StartingDirReadFailed",
+				"FileClerkStartingDirReadFailed",
 				slog.String("startingDirPath", startingDirPath.String()),
-				slog.String("reason", readErr.Error()),
+				slog.String("error", readErr.Error()),
 			)
 			continue
 		}

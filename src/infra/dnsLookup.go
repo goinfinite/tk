@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -105,8 +106,8 @@ func (lookup *DnsLookup) dnsMessagePacker(
 	var idBytes [2]byte
 	_, readError := rand.Read(idBytes[:])
 	if readError != nil {
-		return nil, 0, errors.New(
-			"DnsLookupQueryIdRandomSourceUnavailable: " + readError.Error(),
+		return nil, 0, fmt.Errorf(
+			"DnsLookupQueryIdRandomSourceUnavailable: %w", readError,
 		)
 	}
 	transactionId = binary.BigEndian.Uint16(idBytes[:])
@@ -141,7 +142,21 @@ func (lookup *DnsLookup) dnsMessageExchanger(
 	if dialError != nil {
 		return nil, dialError
 	}
-	defer udpConn.Close()
+	defer func() {
+		closeErr := udpConn.Close()
+		if closeErr == nil {
+			return
+		}
+		if exchangeError == nil {
+			exchangeError = closeErr
+			return
+		}
+		slog.Warn(
+			"DnsLookupUdpConnectionCloseError",
+			slog.String("resolverIpAddress", resolverIpAddress.String()),
+			slog.String("error", closeErr.Error()),
+		)
+	}()
 
 	deadline := time.Now().Add(time.Duration(lookup.queryTimeoutSecs) * time.Second)
 	deadlineError := udpConn.SetDeadline(deadline)
@@ -174,12 +189,12 @@ func (lookup *DnsLookup) dnsMessageValidator(
 		return
 	}
 
-	if !responseMessage.Header.Response {
+	if !responseMessage.Response {
 		err = ErrDnsLookupResponseNotResponse
 		return
 	}
 
-	if responseMessage.Header.ID != expectedTransactionId {
+	if responseMessage.ID != expectedTransactionId {
 		err = ErrDnsLookupResponseIdMismatch
 		return
 	}
@@ -192,7 +207,7 @@ func (lookup *DnsLookup) dnsMessageValidator(
 		return
 	}
 
-	switch responseMessage.Header.RCode {
+	switch responseMessage.RCode {
 	case dnsmessage.RCodeSuccess:
 	case dnsmessage.RCodeNameError:
 		err = ErrDnsLookupResponseNameError
@@ -208,7 +223,7 @@ func (lookup *DnsLookup) dnsMessageValidator(
 		return
 	}
 
-	if responseMessage.Header.Truncated {
+	if responseMessage.Truncated {
 		err = ErrDnsLookupResponseTruncated
 		return
 	}

@@ -2,6 +2,7 @@ package tkInfra
 
 import (
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -83,6 +84,15 @@ func TestCypher(test *testing.T) {
 							"ErrorDoesNotContainExpectedText: '%s' vs '%s' [%s]",
 							err.Error(), testCase.errorContains, testCase.name,
 						)
+					}
+					if testCase.name == "InvalidSecretKey" ||
+						testCase.name == "InvalidEncryptedText" {
+						_, isCorruptInput := errors.AsType[base64.CorruptInputError](err)
+						if !isCorruptInput {
+							subtest.Errorf(
+								"ExpectedWrappedCorruptInputError: %v", err,
+							)
+						}
 					}
 
 					return
