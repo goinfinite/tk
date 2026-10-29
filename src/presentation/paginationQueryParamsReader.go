@@ -20,9 +20,9 @@ func queryParamConverter[TargetType any](
 	convertedValue, conversionErr := converter(rawValue)
 	if conversionErr != nil {
 		slog.Debug(
-			"InvalidQueryParam",
+			"PaginationQueryParamsReaderInvalidParam",
 			slog.String("paramName", paramName),
-			slog.String("err", conversionErr.Error()),
+			slog.String("error", conversionErr.Error()),
 		)
 		return convertedValue, true
 	}

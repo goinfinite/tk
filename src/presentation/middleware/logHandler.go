@@ -28,7 +28,7 @@ func (LogHandler) SetLevel(logLevel string) {
 	setEnvErr := os.Setenv(LogHandlerLogLevelEnvVarName, logLevel)
 	if setEnvErr != nil {
 		slog.Error(
-			"LogLevelSetEnvError",
+			"LogHandlerSetEnvError",
 			slog.String("error", setEnvErr.Error()),
 		)
 	}
@@ -55,7 +55,8 @@ func (LogHandler) logLevelParser(configuredLevel string) zerolog.Level {
 
 func (logHandler LogHandler) Init() {
 	logLevel := zerolog.WarnLevel
-	if configuredLevel := logHandler.ReadLevel(); configuredLevel != "" {
+	configuredLevel := logHandler.ReadLevel()
+	if configuredLevel != "" {
 		logLevel = logHandler.logLevelParser(configuredLevel)
 	}
 

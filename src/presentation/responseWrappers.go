@@ -171,7 +171,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 	if !tkInfra.IsStdoutTerminal() {
 		jsonBytes, err := json.Marshal(liaisonResponse)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ResponseEncodingError")
+			fmt.Fprintf(os.Stderr, "ResponseEncodingError: %v\n", err)
 			os.Exit(exitCodeSoftware)
 		}
 
@@ -181,7 +181,7 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	prettyJsonBytes, err := json.MarshalIndent(liaisonResponse, "", "  ")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ResponseEncodingError")
+		fmt.Fprintf(os.Stderr, "ResponseEncodingError: %v\n", err)
 		os.Exit(exitCodeSoftware)
 	}
 
@@ -192,7 +192,9 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	shIterator, err := syntaxHighlightingLexer.Tokenise(nil, string(prettyJsonBytes))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "SyntaxHighlightingTokenizingError")
+		fmt.Fprintf(
+			os.Stderr, "SyntaxHighlightingTokenizingError: %v\n", err,
+		)
 		os.Exit(exitCodeSoftware)
 	}
 
@@ -203,7 +205,9 @@ func LiaisonCliResponseRenderer(liaisonResponse LiaisonResponse) {
 
 	err = shFormatter.Format(os.Stdout, styles.Vulcan, shIterator)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "SyntaxHighlightingFormatError")
+		fmt.Fprintf(
+			os.Stderr, "SyntaxHighlightingFormatError: %v\n", err,
+		)
 		os.Exit(exitCodeSoftware)
 	}
 	fmt.Println()

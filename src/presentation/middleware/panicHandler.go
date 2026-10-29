@@ -79,20 +79,53 @@ func isOperatorTrustworthy(echoContext echo.Context) bool {
 }
 
 func logPanic(panicReportPtr *PanicReport) {
-	if _, statErr := os.Stat(panicHandlerLogsDir); os.IsNotExist(statErr) {
-		if mkdirErr := os.Mkdir(panicHandlerLogsDir, 0755); mkdirErr != nil {
-			slog.Error("CreateLogDirectoryError", slog.String("error", mkdirErr.Error()))
+	_, statErr := os.Stat(panicHandlerLogsDir)
+	if os.IsNotExist(statErr) {
+		mkdirErr := os.Mkdir(panicHandlerLogsDir, 0755)
+		if mkdirErr != nil {
+			slog.Error(
+				"PanicHandlerCreateLogDirectoryError",
+				slog.String("logDirectory", panicHandlerLogsDir),
+				slog.String("error", mkdirErr.Error()),
+			)
 			return
 		}
 	}
 
 	logFilePath := filepath.Join(panicHandlerLogsDir, panicHandlerLogFileName)
-	logFile, openErr := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, openErr := os.OpenFile(
+		logFilePath,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0600,
+	)
 	if openErr != nil {
-		slog.Error("OpenLogFileError", slog.String("error", openErr.Error()))
+		slog.Error(
+			"PanicHandlerOpenLogFileError",
+			slog.String("logFilePath", logFilePath),
+			slog.String("error", openErr.Error()),
+		)
 		return
 	}
-	defer logFile.Close()
+	defer func() {
+		closeErr := logFile.Close()
+		if closeErr != nil {
+			slog.Warn(
+				"PanicHandlerCloseLogFileError",
+				slog.String("logFilePath", logFilePath),
+				slog.String("error", closeErr.Error()),
+			)
+		}
+	}()
+
+	chmodErr := logFile.Chmod(0600)
+	if chmodErr != nil {
+		slog.Error(
+			"PanicHandlerSecureLogFileError",
+			slog.String("logFilePath", logFilePath),
+			slog.String("error", chmodErr.Error()),
+		)
+		return
+	}
 
 	slogger := slog.New(slog.NewTextHandler(logFile, nil))
 	errorStr := "UnknownError"
@@ -157,7 +190,15 @@ func apiHandlePanic(echoContext echo.Context) {
 		}
 	}
 
-	echoContext.JSON(statusCode, jsonResponse)
+	jsonEmitErr := echoContext.JSON(statusCode, jsonResponse)
+	if jsonEmitErr != nil {
+		slog.Error(
+			"PanicHandlerResponseEmitError",
+			slog.String("method", echoContext.Request().Method),
+			slog.String("path", echoContext.Request().URL.Path),
+			slog.String("error", jsonEmitErr.Error()),
+		)
+	}
 
 	panicReportPtr.RequestUri = echoContext.Request().RequestURI
 	operatorIpAddress, extractionErr := tkPresentation.NewRequesterIpExtractor().Execute(
