@@ -188,9 +188,16 @@ func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan 
 			return executionPlan{Err: lookupErr}
 		}
 		if lookupFailed {
-			slog.Error(
+			targetAccount := shell.runtimeSettings.Username
+			if targetAccount == "" && shell.runtimeSettings.UserId != nil {
+				targetAccount = strconv.FormatUint(
+					uint64(*shell.runtimeSettings.UserId), 10,
+				)
+			}
+			slog.Warn(
 				"ShellTargetAccountUnresolvedRunningAsCurrentAccount",
-				slog.String("err", lookupErr.Error()),
+				slog.String("targetAccount", targetAccount),
+				slog.String("error", lookupErr.Error()),
 			)
 		}
 		if !lookupFailed {
@@ -225,11 +232,12 @@ func (shell Shell) executionPlanner(executionCtx context.Context) executionPlan 
 	if shell.runtimeSettings.StderrFilePath != "" {
 		stderrFileHandler, err := os.Create(shell.runtimeSettings.StderrFilePath)
 		if err != nil {
-			if closeErr := shell.closeFileHandler(stdoutFileHandlerPtr); closeErr != nil {
-				slog.Error(
+			closeErr := shell.closeFileHandler(stdoutFileHandlerPtr)
+			if closeErr != nil {
+				slog.Warn(
 					"ShellStdoutFileCloseFailed",
-					slog.String("file", stdoutFileHandlerPtr.Name()),
-					slog.String("err", closeErr.Error()),
+					slog.String("filePath", stdoutFileHandlerPtr.Name()),
+					slog.String("error", closeErr.Error()),
 				)
 			}
 			return executionPlan{Err: err}
@@ -295,18 +303,20 @@ func (shell Shell) Run() (stdoutStr string, err error) {
 	}
 
 	runPlan.Err = runPlan.ExecCmd.Run()
-	if closeErr := shell.closeFileHandler(runPlan.StdoutFileHandler); closeErr != nil {
+	closeErr := shell.closeFileHandler(runPlan.StdoutFileHandler)
+	if closeErr != nil {
 		slog.Error(
 			"ShellStdoutFileCloseFailed",
-			slog.String("file", runPlan.StdoutFileHandler.Name()),
-			slog.String("err", closeErr.Error()),
+			slog.String("filePath", runPlan.StdoutFileHandler.Name()),
+			slog.String("error", closeErr.Error()),
 		)
 	}
-	if closeErr := shell.closeFileHandler(runPlan.StderrFileHandler); closeErr != nil {
+	closeErr = shell.closeFileHandler(runPlan.StderrFileHandler)
+	if closeErr != nil {
 		slog.Error(
 			"ShellStderrFileCloseFailed",
-			slog.String("file", runPlan.StderrFileHandler.Name()),
-			slog.String("err", closeErr.Error()),
+			slog.String("filePath", runPlan.StderrFileHandler.Name()),
+			slog.String("error", closeErr.Error()),
 		)
 	}
 

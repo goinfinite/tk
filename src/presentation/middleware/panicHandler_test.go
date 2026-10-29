@@ -93,6 +93,18 @@ func TestLogPanic(test *testing.T) {
 		return
 	}
 
+	logFileInfo, statErr := os.Stat(logFilePath)
+	if statErr != nil {
+		test.Errorf("LogFileStatFailed: %v", statErr)
+		return
+	}
+	if logFileInfo.Mode().Perm() != 0600 {
+		test.Errorf(
+			"LogFilePermissionMismatch: Expected=0600, Actual=%o",
+			logFileInfo.Mode().Perm(),
+		)
+	}
+
 	logFileContent, err := fileClerk.ReadFileContent(logFilePath, nil)
 	if err != nil {
 		test.Errorf("LogFileReadFailed: %v", err)
@@ -110,6 +122,35 @@ func TestLogPanic(test *testing.T) {
 	}
 	if !strings.Contains(logFileContent, "UnknownError") {
 		test.Errorf("ErrorMessageNotLogged: ExpectedContainUnknownError")
+	}
+}
+
+func TestLogPanicSecuresExistingFile(test *testing.T) {
+	tempDir := test.TempDir()
+	test.Chdir(tempDir)
+
+	logsDir := filepath.Join(tempDir, "logs")
+	err := os.Mkdir(logsDir, 0755)
+	if err != nil {
+		test.Fatalf("LogDirectoryCreationFailed: %v", err)
+	}
+	logFilePath := filepath.Join(logsDir, "panic.log")
+	err = os.WriteFile(logFilePath, []byte("existing"), 0644)
+	if err != nil {
+		test.Fatalf("LogFileCreationFailed: %v", err)
+	}
+
+	logPanic(&PanicReport{})
+
+	logFileInfo, err := os.Stat(logFilePath)
+	if err != nil {
+		test.Fatalf("LogFileStatFailed: %v", err)
+	}
+	if logFileInfo.Mode().Perm() != 0600 {
+		test.Errorf(
+			"LogFilePermissionMismatch: Expected=0600, Actual=%o",
+			logFileInfo.Mode().Perm(),
+		)
 	}
 }
 

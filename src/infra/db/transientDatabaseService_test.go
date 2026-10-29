@@ -263,6 +263,54 @@ func TestTransientDatabaseServiceExpiration(test *testing.T) {
 	}
 }
 
+func TestTransientDatabaseServiceClosedHandler(test *testing.T) {
+	test.Run("ReadReturnsConciseError", func(subtest *testing.T) {
+		dbSvc, err := NewTransientDatabaseService()
+		if err != nil {
+			subtest.Fatalf("SetupFailed: '%s'", err.Error())
+		}
+		sqlDb, err := dbSvc.Handler.DB()
+		if err != nil {
+			subtest.Fatalf("SqlDbResolutionFailed: '%s'", err.Error())
+		}
+		err = sqlDb.Close()
+		if err != nil {
+			subtest.Fatalf("SqlDbCloseFailed: '%s'", err.Error())
+		}
+
+		_, err = dbSvc.Read("closedHandlerKey")
+		if err == nil || err.Error() != errTransientDatabaseReadError {
+			subtest.Fatalf(
+				"ExpectedError: '%s', got: '%v'",
+				errTransientDatabaseReadError, err,
+			)
+		}
+	})
+
+	test.Run("SetReturnsConciseError", func(subtest *testing.T) {
+		dbSvc, err := NewTransientDatabaseService()
+		if err != nil {
+			subtest.Fatalf("SetupFailed: '%s'", err.Error())
+		}
+		sqlDb, err := dbSvc.Handler.DB()
+		if err != nil {
+			subtest.Fatalf("SqlDbResolutionFailed: '%s'", err.Error())
+		}
+		err = sqlDb.Close()
+		if err != nil {
+			subtest.Fatalf("SqlDbCloseFailed: '%s'", err.Error())
+		}
+
+		err = dbSvc.Set("closedHandlerKey", "value", nil)
+		if err == nil || err.Error() != errTransientDatabaseWriteError {
+			subtest.Fatalf(
+				"ExpectedError: '%s', got: '%v'",
+				errTransientDatabaseWriteError, err,
+			)
+		}
+	})
+}
+
 func TestTransientDatabaseServiceSetOverwritesTtl(test *testing.T) {
 	dbSvc, err := NewTransientDatabaseService()
 	if err != nil {

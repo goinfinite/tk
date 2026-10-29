@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
@@ -108,7 +109,7 @@ func NewX509CertificateFromEnvelopedCertificate(
 
 	stdlibCert, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
-		return x509CertEntity, errors.New("ParseCertificateFailed")
+		return x509CertEntity, fmt.Errorf("ParseCertificateFailed: %w", err)
 	}
 
 	serialNumberHex := stdlibCert.SerialNumber.Text(16)
@@ -140,7 +141,7 @@ func NewX509CertificateFromEnvelopedCertificate(
 		subjectAltName, err := tkValueObject.NewX509SubjectName(dnsName)
 		if err != nil {
 			slog.Debug(
-				"SkipInvalidSubjectAltName",
+				"X509CertificateSkipInvalidSubjectAltName",
 				slog.String("dnsName", dnsName),
 			)
 			continue
@@ -290,7 +291,7 @@ func NewX509CertificateFromEnvelopedCertificate(
 		policyOID, err := tkValueObject.NewX509PolicyOID(stdlibPolicyOID.String())
 		if err != nil {
 			slog.Debug(
-				"SkipInvalidPolicyOID",
+				"X509CertificateSkipInvalidPolicyOID",
 				slog.String("oid", stdlibPolicyOID.String()),
 			)
 			continue

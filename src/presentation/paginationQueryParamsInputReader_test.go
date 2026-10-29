@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func TestPaginationQueryParamsReader(test *testing.T) {
+func TestPaginationQueryParamsInputReader(test *testing.T) {
 	test.Run("ReadsPaginationKeysFromGetRequestWithoutContentType", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
@@ -21,7 +21,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-		requestParams := PaginationQueryParamsReader(echoContext, nil)
+		requestParams := PaginationQueryParamsInputReader(echoContext, nil)
 
 		if requestParams["pageNumber"] != uint32(2) {
 			subtest.Errorf("PageNumberMismatch: expected 2, got %v", requestParams["pageNumber"])
@@ -63,7 +63,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-		requestParams := PaginationQueryParamsReader(echoContext, nil)
+		requestParams := PaginationQueryParamsInputReader(echoContext, nil)
 
 		for _, paginationKey := range []string{
 			"pageNumber", "itemsPerPage", "sortBy", "sortDirection", "lastSeenId",
@@ -74,7 +74,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		}
 	})
 
-	test.Run("MalformedSortByFallsBackToPaginationParserDefault", func(subtest *testing.T) {
+	test.Run("MalformedSortByFallsBackToPaginationDtoParserDefault", func(subtest *testing.T) {
 		echoInstance := echo.New()
 		httpRequest := httptest.NewRequest(
 			http.MethodGet, "/?sortBy=bad@sort", nil,
@@ -82,10 +82,10 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-		requestParams := PaginationQueryParamsReader(echoContext, nil)
+		requestParams := PaginationQueryParamsInputReader(echoContext, nil)
 
 		defaultPagination := tkDto.Pagination{PageNumber: 1, ItemsPerPage: 10}
-		parsedPagination, err := PaginationParser(defaultPagination, requestParams)
+		parsedPagination, err := PaginationDtoParser(defaultPagination, requestParams)
 		if err != nil {
 			subtest.Fatalf("UnexpectedError: %v", err)
 		}
@@ -104,7 +104,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
 		optionalParamNames := []string{"nature", "name", "status", "type"}
-		requestParams := PaginationQueryParamsReader(echoContext, optionalParamNames)
+		requestParams := PaginationQueryParamsInputReader(echoContext, optionalParamNames)
 
 		if requestParams["nature"] != "app" {
 			subtest.Errorf("NatureMismatch: expected app, got %v", requestParams["nature"])
@@ -132,7 +132,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
 		optionalParamNames := []string{"pageNumber", "sortBy", "nature"}
-		requestParams := PaginationQueryParamsReader(echoContext, optionalParamNames)
+		requestParams := PaginationQueryParamsInputReader(echoContext, optionalParamNames)
 
 		if requestParams["pageNumber"] != uint32(2) {
 			subtest.Errorf(
@@ -158,7 +158,7 @@ func TestPaginationQueryParamsReader(test *testing.T) {
 		httpRecorder := httptest.NewRecorder()
 		echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-		requestParams := PaginationQueryParamsReader(echoContext, nil)
+		requestParams := PaginationQueryParamsInputReader(echoContext, nil)
 
 		if len(requestParams) != 1 {
 			subtest.Fatalf("ExpectedOneParamButGot: %d", len(requestParams))

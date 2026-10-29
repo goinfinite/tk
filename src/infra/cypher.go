@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 )
 
 const CypherNewSecretKeyLength = 32
@@ -19,8 +20,9 @@ type Cypher struct {
 // This key is suitable for AES-GCM encryption and should be kept confidential.
 func NewCypherSecretKey() (string, error) {
 	secretKeyBytes := make([]byte, CypherNewSecretKeyLength)
-	if _, err := rand.Read(secretKeyBytes); err != nil {
-		return "", errors.New("SecretKeyGenerationError: " + err.Error())
+	_, readErr := rand.Read(secretKeyBytes)
+	if readErr != nil {
+		return "", fmt.Errorf("SecretKeyGenerationError: %w", readErr)
 	}
 	return base64.RawURLEncoding.EncodeToString(secretKeyBytes), nil
 }
@@ -32,7 +34,7 @@ func NewCypherSecretKey() (string, error) {
 func NewCypher(encodedSecretKey string) (*Cypher, error) {
 	decodedKeyBytes, err := base64.RawURLEncoding.DecodeString(encodedSecretKey)
 	if err != nil {
-		return nil, errors.New("SecretKeyDecodeError: " + err.Error())
+		return nil, fmt.Errorf("SecretKeyDecodeError: %w", err)
 	}
 	keyLen := len(decodedKeyBytes)
 	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
@@ -44,17 +46,18 @@ func NewCypher(encodedSecretKey string) (*Cypher, error) {
 func (cypher *Cypher) Encrypt(plainText string) (encryptedText string, err error) {
 	aesBlock, err := aes.NewCipher(cypher.decodedSecretKeyBytes)
 	if err != nil {
-		return encryptedText, errors.New("AesCipherCreationError: " + err.Error())
+		return encryptedText, fmt.Errorf("AesCipherCreationError: %w", err)
 	}
 
 	gcmCipher, err := cipher.NewGCM(aesBlock)
 	if err != nil {
-		return encryptedText, errors.New("GcmCipherCreationError: " + err.Error())
+		return encryptedText, fmt.Errorf("GcmCipherCreationError: %w", err)
 	}
 
 	nonceBytes := make([]byte, gcmCipher.NonceSize())
-	if _, err := rand.Read(nonceBytes); err != nil {
-		return encryptedText, errors.New("NonceGenerationError: " + err.Error())
+	_, readErr := rand.Read(nonceBytes)
+	if readErr != nil {
+		return encryptedText, fmt.Errorf("NonceGenerationError: %w", readErr)
 	}
 
 	inputBytes := []byte(plainText)
@@ -67,17 +70,17 @@ func (cypher *Cypher) Encrypt(plainText string) (encryptedText string, err error
 func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error) {
 	inputBytes, err := base64.StdEncoding.DecodeString(encryptedText)
 	if err != nil {
-		return plainText, errors.New("EncryptedTextDecodeError: " + err.Error())
+		return plainText, fmt.Errorf("EncryptedTextDecodeError: %w", err)
 	}
 
 	aesBlock, err := aes.NewCipher(cypher.decodedSecretKeyBytes)
 	if err != nil {
-		return plainText, errors.New("AesCipherCreationError: " + err.Error())
+		return plainText, fmt.Errorf("AesCipherCreationError: %w", err)
 	}
 
 	gcmCipher, err := cipher.NewGCM(aesBlock)
 	if err != nil {
-		return plainText, errors.New("GcmCipherCreationError: " + err.Error())
+		return plainText, fmt.Errorf("GcmCipherCreationError: %w", err)
 	}
 
 	nonceSize := gcmCipher.NonceSize()
@@ -91,7 +94,7 @@ func (cypher *Cypher) Decrypt(encryptedText string) (plainText string, err error
 
 	plainTextBytes, err := gcmCipher.Open(nil, noncePart, authCipherTextWithoutNonce, nil)
 	if err != nil {
-		return plainText, errors.New("DecryptionError: " + err.Error())
+		return plainText, fmt.Errorf("DecryptionError: %w", err)
 	}
 
 	return string(plainTextBytes), nil

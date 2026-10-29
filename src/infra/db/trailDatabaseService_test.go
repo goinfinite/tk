@@ -118,7 +118,7 @@ func TestNewTrailDatabaseServiceWithExtraModels(test *testing.T) {
 				if err == nil {
 					subtest.Fatalf("MissingExpectedError: %s", testCase.expectedError)
 				}
-				if !strings.HasPrefix(err.Error(), testCase.expectedError) {
+				if err.Error() != testCase.expectedError {
 					subtest.Fatalf(
 						"UnexpectedErrorMessage: '%s' vs '%s'",
 						err.Error(), testCase.expectedError,

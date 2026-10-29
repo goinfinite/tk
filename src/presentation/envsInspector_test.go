@@ -1,6 +1,7 @@
 package tkPresentation
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,7 +173,7 @@ func TestEnvsInspectorInspect(test *testing.T) {
 			subtest.Errorf("InspectSucceededWhenItShouldFail: MissingRequiredEnvVar")
 		}
 
-		expectedError := "EnvsInspectorMissingRequiredEnvVars: DB_USER"
+		expectedError := "EnvsInspectorMissingRequiredEnvVars"
 		if err.Error() != expectedError {
 			subtest.Errorf("UnexpectedErrorMessage: expected '%s', got '%s'", expectedError, err.Error())
 		}
@@ -218,6 +219,34 @@ func TestEnvsInspectorInspect(test *testing.T) {
 
 		if !strings.Contains(err.Error(), "EnvsInspectorEnvTouchFileError") {
 			subtest.Errorf("UnexpectedError: expected EnvsInspectorEnvTouchFileError, got %v", err)
+		}
+	})
+
+	test.Run("InvalidEnvFileContentRedactsCause", func(subtest *testing.T) {
+		envFilePathStr := filepath.Join(subtest.TempDir(), ".env")
+		envFileContent := "SECRET_TOKEN='unterminated\n"
+		writeErr := os.WriteFile(envFilePathStr, []byte(envFileContent), 0600)
+		if writeErr != nil {
+			subtest.Fatalf("EnvFileWriteFailed: %v", writeErr)
+		}
+
+		envFilePath, pathErr := tkValueObject.NewUnixAbsoluteFilePath(
+			envFilePathStr, false,
+		)
+		if pathErr != nil {
+			subtest.Fatalf("EnvFilePathInvalid: %v", pathErr)
+		}
+
+		envsInspector := NewEnvsInspector(&envFilePath, nil, nil)
+		err := envsInspector.Inspect()
+		if err == nil {
+			subtest.Fatalf("MissingExpectedError: invalid env content")
+		}
+		if !errors.Is(err, ErrEnvsInspectorEnvLoad) {
+			subtest.Errorf("ExpectedEnvsInspectorEnvLoadSentinel: %v", err)
+		}
+		if strings.Contains(err.Error(), "SECRET_TOKEN") {
+			subtest.Errorf("EnvFileSecretLeakedInError: %v", err)
 		}
 	})
 }

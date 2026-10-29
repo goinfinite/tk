@@ -45,7 +45,7 @@ func NewX509SignatureAlgorithm(
 func NewX509SignatureAlgorithmFromStdlib(
 	stdlibAlgorithm x509.SignatureAlgorithm,
 ) (X509SignatureAlgorithm, error) {
-	algorithmMap := map[x509.SignatureAlgorithm]string{
+	signatureAlgorithmNamesMap := map[x509.SignatureAlgorithm]string{
 		x509.SHA256WithRSA:   "SHA256WithRSA",
 		x509.SHA384WithRSA:   "SHA384WithRSA",
 		x509.SHA512WithRSA:   "SHA512WithRSA",
@@ -55,7 +55,7 @@ func NewX509SignatureAlgorithmFromStdlib(
 		x509.PureEd25519:     "Ed25519",
 	}
 
-	algorithmStr, algorithmExists := algorithmMap[stdlibAlgorithm]
+	algorithmStr, algorithmExists := signatureAlgorithmNamesMap[stdlibAlgorithm]
 	if !algorithmExists {
 		return "", errors.New("UnsupportedSignatureAlgorithm")
 	}

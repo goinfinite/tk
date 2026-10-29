@@ -57,6 +57,48 @@ func TestShellEscape(test *testing.T) {
 		}
 	})
 
+	test.Run("Join", func(subtest *testing.T) {
+		testCaseStructs := []struct {
+			input          []string
+			expectedOutput string
+		}{
+			{
+				[]string{},
+				"",
+			},
+			{
+				[]string{"simple"},
+				"'simple'",
+			},
+			{
+				[]string{"with space"},
+				"'with space'",
+			},
+			{
+				[]string{"with'quote"},
+				"'with'\"'\"'quote'",
+			},
+			{
+				[]string{"simple", "with space", ""},
+				"'simple' 'with space' ''",
+			},
+			{
+				[]string{""},
+				"''",
+			},
+		}
+
+		for _, testCase := range testCaseStructs {
+			actualOutput := shellEscape.Join(testCase.input)
+			if actualOutput != testCase.expectedOutput {
+				subtest.Errorf(
+					"JoinMismatch: input='%v', expected='%s', actual='%s'",
+					testCase.input, testCase.expectedOutput, actualOutput,
+				)
+			}
+		}
+	})
+
 	test.Run("StripUnsafe", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			input          string

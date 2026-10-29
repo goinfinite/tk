@@ -2,6 +2,8 @@ package tkPresentation
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +17,8 @@ import (
 const (
 	EnvsInspectorEnvFilePathEnvVarName string = "ENV_FILE_PATH"
 )
+
+var ErrEnvsInspectorEnvLoad = errors.New("InvalidEnvFileContent")
 
 type EnvsInspector struct {
 	envFilePath         *tkValueObject.UnixAbsoluteFilePath
@@ -39,11 +43,22 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 		if rawEnvFilePath == "" {
 			rawEnvFilePath, err = filepath.Abs(".env")
 			if err != nil {
+				slog.Error(
+					"EnvsInspectorEnvFilePathResolutionError",
+					slog.String("error", err.Error()),
+				)
 				return errors.New("RetrieveEnvFilePathFailed")
 			}
 		}
-		envFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(rawEnvFilePath, false)
+		envFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(
+			rawEnvFilePath, false,
+		)
 		if err != nil {
+			slog.Error(
+				"EnvsInspectorInvalidEnvFilePath",
+				slog.String("rawEnvFilePath", rawEnvFilePath),
+				slog.String("error", err.Error()),
+			)
 			return errors.New("InvalidEnvFilePath")
 		}
 		envsInspector.envFilePath = &envFilePath
@@ -53,17 +68,40 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 	fileClerk := tkInfra.FileClerk{}
 	err = fileClerk.TouchFile(envFilePathStr)
 	if err != nil {
+		slog.Error(
+			"EnvsInspectorEnvTouchFileError",
+			slog.String("envFilePath", envFilePathStr),
+			slog.String("error", err.Error()),
+		)
 		return errors.New("EnvsInspectorEnvTouchFileError")
 	}
+
 	envFileWritePermissions := os.FileMode(0600)
-	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileWritePermissions)
+	err = fileClerk.UpdateFilePermissions(
+		envFilePathStr, &envFileWritePermissions,
+	)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvUpdateFileWritePermissionsError")
+		slog.Error(
+			"EnvsInspectorEnvUpdateFileWritePermissionsError",
+			slog.String("envFilePath", envFilePathStr),
+			slog.String("permissions", envFileWritePermissions.String()),
+			slog.String("error", err.Error()),
+		)
+		return errors.New(
+			"EnvsInspectorEnvUpdateFileWritePermissionsError",
+		)
 	}
 
 	err = godotenv.Load(envFilePathStr)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvLoadError: " + err.Error())
+		slog.Error(
+			"EnvsInspectorEnvLoadError",
+			slog.String("envFilePath", envFilePathStr),
+			slog.String("error", ErrEnvsInspectorEnvLoad.Error()),
+		)
+		return fmt.Errorf(
+			"EnvsInspectorEnvLoadError: %w", ErrEnvsInspectorEnvLoad,
+		)
 	}
 
 	missingRequiredEnvVars := []string{}
@@ -80,13 +118,25 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 
 		envVarValue, err = tkInfra.NewCypherSecretKey()
 		if err != nil {
+			slog.Error(
+				"EnvsInspectorSecretKeyGenerationError",
+				slog.String("envVarName", envVarName),
+				slog.String("error", err.Error()),
+			)
 			return errors.New("EnvsInspectorSecretKeyGenerationError")
 		}
 		envVarStr := envVarName + "=" + envVarValue + "\n"
 
-		envFileContent, readErr := fileClerk.ReadFileContent(envFilePathStr, nil)
+		envFileContent, readErr := fileClerk.ReadFileContent(
+			envFilePathStr, nil,
+		)
 		if readErr != nil {
-			return errors.New("EnvsInspectorEnvReadFileError: " + readErr.Error())
+			slog.Error(
+				"EnvsInspectorEnvReadFileError",
+				slog.String("envFilePath", envFilePathStr),
+				slog.String("error", readErr.Error()),
+			)
+			return errors.New("EnvsInspectorEnvReadFileError")
 		}
 		separator := ""
 		if len(envFileContent) > 0 && !strings.HasSuffix(envFileContent, "\n") {
@@ -100,23 +150,50 @@ func (envsInspector *EnvsInspector) Inspect() (err error) {
 			separator+envVarStr,
 		)
 		if err != nil {
+			slog.Error(
+				"EnvsInspectorEnvAppendFileError",
+				slog.String("envFilePath", envFilePathStr),
+				slog.String("envVarName", envVarName),
+				slog.String("error", err.Error()),
+			)
 			return errors.New("EnvsInspectorEnvAppendFileError")
 		}
 
-		os.Setenv(envVarName, envVarValue)
+		setenvErr := os.Setenv(envVarName, envVarValue)
+		if setenvErr != nil {
+			slog.Error(
+				"EnvsInspectorEnvSetError",
+				slog.String("envVarName", envVarName),
+				slog.String("error", setenvErr.Error()),
+			)
+			return errors.New("EnvsInspectorEnvSetError")
+		}
 	}
 
 	envFileReadOnlyPermissions := os.FileMode(0400)
-	err = fileClerk.UpdateFilePermissions(envFilePathStr, &envFileReadOnlyPermissions)
+	err = fileClerk.UpdateFilePermissions(
+		envFilePathStr, &envFileReadOnlyPermissions,
+	)
 	if err != nil {
-		return errors.New("EnvsInspectorEnvUpdateFileReadOnlyPermissionsError")
+		slog.Error(
+			"EnvsInspectorEnvUpdateFileReadOnlyPermissionsError",
+			slog.String("envFilePath", envFilePathStr),
+			slog.String("permissions", envFileReadOnlyPermissions.String()),
+			slog.String("error", err.Error()),
+		)
+		return errors.New(
+			"EnvsInspectorEnvUpdateFileReadOnlyPermissionsError",
+		)
 	}
 
 	if len(missingRequiredEnvVars) > 0 {
-		return errors.New(
-			"EnvsInspectorMissingRequiredEnvVars: " +
-				strings.Join(missingRequiredEnvVars, ", "),
+		slog.Error(
+			"EnvsInspectorMissingRequiredEnvVars",
+			slog.String(
+				"missingEnvVars", strings.Join(missingRequiredEnvVars, ","),
+			),
 		)
+		return errors.New("EnvsInspectorMissingRequiredEnvVars")
 	}
 
 	return nil

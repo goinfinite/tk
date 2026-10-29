@@ -43,14 +43,14 @@ func NewX509PublicKeyAlgorithm(
 func NewX509PublicKeyAlgorithmFromStdlib(
 	stdlibAlgorithm x509.PublicKeyAlgorithm,
 ) (X509PublicKeyAlgorithm, error) {
-	algorithmMap := map[x509.PublicKeyAlgorithm]string{
+	publicKeyAlgorithmNamesMap := map[x509.PublicKeyAlgorithm]string{
 		x509.RSA:     "RSA",
 		x509.ECDSA:   "ECDSA",
 		x509.Ed25519: "Ed25519",
 		x509.DSA:     "DSA",
 	}
 
-	algorithmStr, algorithmExists := algorithmMap[stdlibAlgorithm]
+	algorithmStr, algorithmExists := publicKeyAlgorithmNamesMap[stdlibAlgorithm]
 	if !algorithmExists {
 		return "", errors.New("UnsupportedPublicKeyAlgorithm")
 	}

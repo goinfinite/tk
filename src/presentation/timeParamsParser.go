@@ -15,7 +15,7 @@ func TimeParamsParser(
 	timeParamNames []string,
 	untrustedInput map[string]any,
 ) map[string]*tkValueObject.UnixTime {
-	timeParamsPtr := map[string]*tkValueObject.UnixTime{}
+	timeParamNameUnixTimesMap := map[string]*tkValueObject.UnixTime{}
 
 	for _, timeParamName := range timeParamNames {
 		switch untrustedInput[timeParamName].(type) {
@@ -29,13 +29,16 @@ func TimeParamsParser(
 
 		timeParam, err := tkValueObject.NewUnixTime(untrustedInput[timeParamName])
 		if err != nil {
-			slog.Debug("InvalidTimeParam", slog.String("timeParamName", timeParamName))
-			timeParamsPtr[timeParamName] = nil
+			slog.Debug(
+				"TimeParamsParserInvalidParam",
+				slog.String("timeParamName", timeParamName),
+			)
+			timeParamNameUnixTimesMap[timeParamName] = nil
 			continue
 		}
 
-		timeParamsPtr[timeParamName] = &timeParam
+		timeParamNameUnixTimesMap[timeParamName] = &timeParam
 	}
 
-	return timeParamsPtr
+	return timeParamNameUnixTimesMap
 }

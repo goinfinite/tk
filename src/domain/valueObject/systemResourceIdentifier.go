@@ -53,7 +53,11 @@ func NewSystemResourceIdentifierMustCreate(value any) SystemResourceIdentifier {
 	sri, err := NewSystemResourceIdentifier(value)
 	if err != nil {
 		panicMessage := "UnexpectedSystemResourceIdentifierCreationError"
-		slog.Debug(panicMessage, slog.Any("value", value), slog.String("err", err.Error()))
+		slog.Debug(
+			panicMessage,
+			slog.Any("rawValue", value),
+			slog.String("error", err.Error()),
+		)
 		panic(panicMessage)
 	}
 

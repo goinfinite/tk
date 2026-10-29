@@ -2541,17 +2541,21 @@ func TestOverwriteFile(test *testing.T) {
 		linkFile := filepath.Join(tempDir, "link.txt")
 		sourceFile := filepath.Join(tempDir, "source3.txt")
 
-		if err := os.WriteFile(realFile, []byte("original"), 0644); err != nil {
+		err := os.WriteFile(realFile, []byte("original"), 0644)
+		if err != nil {
 			subtest.Fatalf("UpdateRealFileContentFailed: %v", err)
 		}
-		if err := os.Symlink(realFile, linkFile); err != nil {
+		err = os.Symlink(realFile, linkFile)
+		if err != nil {
 			subtest.Fatalf("SymlinkFailed: %v", err)
 		}
-		if err := os.WriteFile(sourceFile, []byte("replaced"), 0644); err != nil {
+		err = os.WriteFile(sourceFile, []byte("replaced"), 0644)
+		if err != nil {
 			subtest.Fatalf("UpdateSourceFileContentFailed: %v", err)
 		}
 
-		if err := clerk.OverwriteFile(sourceFile, linkFile); err != nil {
+		err = clerk.OverwriteFile(sourceFile, linkFile)
+		if err != nil {
 			subtest.Fatalf("OverwriteFileFailed: %v", err)
 		}
 
@@ -2569,11 +2573,12 @@ func TestOverwriteFile(test *testing.T) {
 
 	test.Run("OverwriteWithDirectorySourceReturnsSourceIsDirectory", func(subtest *testing.T) {
 		sourceDir := filepath.Join(tempDir, "sourceDir")
-		if err := clerk.CreateDir(sourceDir); err != nil {
+		err := clerk.CreateDir(sourceDir)
+		if err != nil {
 			subtest.Fatalf("CreateDirFailed: %v", err)
 		}
 
-		err := clerk.OverwriteFile(sourceDir, filepath.Join(tempDir, "any.txt"))
+		err = clerk.OverwriteFile(sourceDir, filepath.Join(tempDir, "any.txt"))
 		if err == nil || err.Error() != "SourceIsDirectory" {
 			subtest.Errorf("WrongErrorMessage: 'SourceIsDirectory' vs '%v'", err)
 		}
@@ -6190,10 +6195,10 @@ func TestCachedOwnerNameResolvers(test *testing.T) {
 			subtest.Fatalf("UsernameInvalid: %v", usernameErr)
 		}
 		ownerNames := &ownerNameCache{
-			usernames: map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{
+			userIdUsernamesMap: map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{
 				missingUserId: cachedUsername,
 			},
-			groupNames: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+			groupIdGroupNamesMap: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
 		}
 
 		username, err := clerk.cachedUsernameResolver(ownerNames, missingUserId)
@@ -6211,15 +6216,15 @@ func TestCachedOwnerNameResolvers(test *testing.T) {
 			subtest.Fatalf("UserIdInvalid: %v", userIdErr)
 		}
 		ownerNames := &ownerNameCache{
-			usernames:  map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
-			groupNames: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
+			userIdUsernamesMap:   map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
+			groupIdGroupNamesMap: map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
 		}
 
 		_, err := clerk.cachedUsernameResolver(ownerNames, processUserId)
 		if err != nil {
 			subtest.Fatalf("UsernameLookupFailed: %v", err)
 		}
-		if _, isCached := ownerNames.usernames[processUserId]; !isCached {
+		if _, isCached := ownerNames.userIdUsernamesMap[processUserId]; !isCached {
 			subtest.Errorf("UsernameNotCached")
 		}
 	})
@@ -6232,17 +6237,21 @@ func TestCachedOwnerNameResolvers(test *testing.T) {
 			subtest.Fatalf("UserIdInvalid: %v", userIdErr)
 		}
 		ownerNames := &ownerNameCache{
-			usernames:       map[tkValueObject.UnixUserId]tkValueObject.UnixUsername{},
-			groupNames:      map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName{},
-			usernameErrors:  map[tkValueObject.UnixUserId]error{},
-			groupNameErrors: map[tkValueObject.UnixGroupId]error{},
+			userIdUsernamesMap: make(
+				map[tkValueObject.UnixUserId]tkValueObject.UnixUsername,
+			),
+			groupIdGroupNamesMap: make(
+				map[tkValueObject.UnixGroupId]tkValueObject.UnixGroupName,
+			),
+			userIdUsernameErrorsMap:   map[tkValueObject.UnixUserId]error{},
+			groupIdGroupNameErrorsMap: map[tkValueObject.UnixGroupId]error{},
 		}
 
 		_, firstErr := clerk.cachedUsernameResolver(ownerNames, missingUserId)
 		if firstErr == nil {
 			subtest.Fatalf("ExpectedUsernameLookupError")
 		}
-		if _, isCached := ownerNames.usernameErrors[missingUserId]; !isCached {
+		if _, isCached := ownerNames.userIdUsernameErrorsMap[missingUserId]; !isCached {
 			subtest.Errorf("UsernameLookupErrorNotCached")
 		}
 

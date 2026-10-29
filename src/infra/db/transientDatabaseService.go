@@ -9,11 +9,14 @@ import (
 	tkInfraDbModel "github.com/goinfinite/tk/src/infra/db/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 const (
 	errTransientDatabaseConnectionError string = "TransientDatabaseConnectionError"
 	errTransientDatabaseMigrationError  string = "TransientDatabaseMigrationError"
+	errTransientDatabaseReadError       string = "TransientDatabaseReadError"
+	errTransientDatabaseWriteError      string = "TransientDatabaseWriteError"
 )
 
 var ErrKeyNotFound = errors.New("KeyNotFound")
@@ -25,15 +28,26 @@ type TransientDatabaseService struct {
 func NewTransientDatabaseService() (*TransientDatabaseService, error) {
 	ormSvc, err := gorm.Open(
 		sqlite.Open("file::memory:?cache=shared"),
-		&gorm.Config{NowFunc: func() time.Time { return time.Now().UTC() }},
+		&gorm.Config{
+			NowFunc: func() time.Time { return time.Now().UTC() },
+			Logger:  gormLogger.Default.LogMode(gormLogger.Silent),
+		},
 	)
 	if err != nil {
+		slog.Error(
+			"TransientDatabaseConnectionError",
+			slog.String("error", err.Error()),
+		)
 		return nil, errors.New(errTransientDatabaseConnectionError)
 	}
 
 	err = ormSvc.AutoMigrate(&tkInfraDbModel.KeyValue{})
 	if err != nil {
-		return nil, errors.New(errTransientDatabaseMigrationError + ": " + err.Error())
+		slog.Error(
+			"TransientDatabaseMigrationError",
+			slog.String("error", err.Error()),
+		)
+		return nil, errors.New(errTransientDatabaseMigrationError)
 	}
 
 	return &TransientDatabaseService{Handler: ormSvc}, nil
@@ -51,8 +65,8 @@ func (service *TransientDatabaseService) Has(key string) bool {
 	if result.Error != nil {
 		slog.Error(
 			"TransientDatabaseKeyCountFailed",
-			slog.String("key", key),
-			slog.String("err", result.Error.Error()),
+			slog.Int("keyLength", len(key)),
+			slog.String("error", result.Error.Error()),
 		)
 		return false
 	}
@@ -64,7 +78,12 @@ func (service *TransientDatabaseService) Read(key string) (string, error) {
 	var keyValue tkInfraDbModel.KeyValue
 	result := service.unexpiredKeyQueryBuilder(key).Find(&keyValue)
 	if result.Error != nil {
-		return "", result.Error
+		slog.Error(
+			"TransientDatabaseReadError",
+			slog.Int("keyLength", len(key)),
+			slog.String("error", result.Error.Error()),
+		)
+		return "", errors.New(errTransientDatabaseReadError)
 	}
 
 	if result.RowsAffected == 0 {
@@ -84,5 +103,14 @@ func (service *TransientDatabaseService) Set(key string, value string, ttlPtr *t
 
 	result := service.Handler.Clauses(clause.OnConflict{UpdateAll: true}).
 		Create(&keyValue)
-	return result.Error
+	if result.Error != nil {
+		slog.Error(
+			"TransientDatabaseWriteError",
+			slog.Int("keyLength", len(key)),
+			slog.String("error", result.Error.Error()),
+		)
+		return errors.New(errTransientDatabaseWriteError)
+	}
+
+	return nil
 }

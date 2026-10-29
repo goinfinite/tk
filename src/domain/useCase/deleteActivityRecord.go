@@ -14,7 +14,23 @@ func DeleteActivityRecord(
 ) error {
 	err := activityRecordCmdRepo.Delete(deleteDto)
 	if err != nil {
-		slog.Error("DeleteActivityRecordError", slog.String("err", err.Error()))
+		logAttributes := []any{
+			slog.String("error", err.Error()),
+		}
+		logAttributes = append(
+			logAttributes,
+			activityRecordLogAttributesBuilder(activityRecordLogAttributesInput{
+				RecordId:          deleteDto.RecordId,
+				RecordLevel:       deleteDto.RecordLevel,
+				RecordCode:        deleteDto.RecordCode,
+				AffectedResources: deleteDto.AffectedResources,
+				OperatorSri:       deleteDto.OperatorSri,
+				OperatorIpAddress: deleteDto.OperatorIpAddress,
+				CreatedBeforeAt:   deleteDto.CreatedBeforeAt,
+				CreatedAfterAt:    deleteDto.CreatedAfterAt,
+			})...,
+		)
+		slog.Error("DeleteActivityRecordError", logAttributes...)
 		return errors.New("DeleteActivityRecordInfraError")
 	}
 

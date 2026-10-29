@@ -1,6 +1,8 @@
 package entity_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	tkEntity "github.com/goinfinite/tk/src/domain/entity"
@@ -289,11 +291,14 @@ func TestNewX509CertificateFromEnvelopedCertificate(test *testing.T) {
 		}
 
 		expectedError := "ParseCertificateFailed"
-		if err.Error() != expectedError {
+		if !strings.Contains(err.Error(), expectedError) {
 			subtest.Errorf(
 				"UnexpectedError: got '%s', expected '%s'",
 				err.Error(), expectedError,
 			)
+		}
+		if errors.Unwrap(err) == nil {
+			subtest.Errorf("ExpectedWrappedParseCertificateError")
 		}
 	})
 }

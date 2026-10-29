@@ -1,6 +1,26 @@
 # Changelog
 
 ```log
+0.4.4 - 2026/10/29
+feat: add ShellEscape.Join. It quotes every argument and joins the slice with one space.
+feat: add QueryFieldName, MatchPattern, and ParseFieldMatchPatterns. QueryFieldName accepts 1-256 characters, starts with a letter, and allows letters, digits, underscores, dots, and hyphens. MatchPattern accepts equals, contains, begins-with, and ends-with; nil or empty input resolves to equals. ParseFieldMatchPatterns turns a semicolon-separated field:pattern list into a map keyed by QueryFieldName.
+fix: NewQueryFieldName revalidates typed values, so QueryFieldName("1name") fails with InvalidQueryFieldName.
+feat: add UiRequestInputReader for DataTable/Carousel fragment query params. It reads configured scalar, multi-select, and range filters, composes the unprefixed PaginationQueryParamsInputReader, copies BaseInput shallowly, and injects operatorAccountId, operatorSri, and operatorIpAddress from the Echo context. A missing or wrong-type operator account ID fails with OperatorAccountIdNotFound, a missing operator IP address falls back to requester IP extraction and fails with InvalidOperatorIpAddress when extraction fails, and query-supplied operator fields are overwritten.
+feat: add ErrorStatusHandler middleware. It maps a handler error to a configured HTTP status code through errors.Is and emits the standard API response envelope with the matched sentinel's message; a nil error or a direct *echo.HTTPError passes through, a committed response is not overwritten, a mapped status outside 400-599 fails closed to 500, unmapped errors and mapped 5xx errors log at error level with request context, and ambiguous mappings and invalid statuses log at warn level.
+docs: document the new helpers and middleware in the layer READMEs, context files, and feature map.
+fix: check close and setenv errors in FileDeserializer, DnsLookup, EnvsInspector, and PanicHandler; log a panic response emission failure; remove redundant embedded Header selectors in DnsLookup.
+fix: wrap non-sensitive underlying causes in Cypher, database, pagination, deserializer, and EnvsInspector errors instead of flattening them into strings; EnvsInspector reports invalid .env content through ErrEnvsInspectorEnvLoad without echoing the file line.
+fix: redact YAML source lines and parser values from deserializer errors while keeping line and column details, and enforce 0600 permissions on panic logs.
+fix: add request, path, and target details to activity record, PanicHandler, RequesterIpExtractor, Shell, and CLI error logs; StringSliceValueObjectParser no longer logs raw invalid values.
+refactor: prefix every slog message with the owning component so each log entry identifies its source.
+refactor: use specific typed fields in activity record and request logs, normalize log keys, and log infrastructure causes instead of embedding them in returned errors.
+fix: return concise errors from activity record pagination and database initialization while logging the cause with context; cache the requester IP extractor per ErrorStatusHandler.
+fix: silence GORM SQL logging and log database causes with structured fields so keys, values, and query parameters do not reach stderr.
+fix: return concise errors from file deserialization, environment inspection, and activity record queries while logging causes with structured fields; tolerated configuration logs use warn level.
+refactor: name map variables by their key and value composition, such as fieldNameMatchPatternsMap and errorStatusCodesMap.
+breaking: ErrActivityRecordNotFound is now an error sentinel instead of a string constant. Callers must use errors.Is.
+breaking: PaginationQueryParamsReader is now PaginationQueryParamsInputReader, and PaginationParser is now PaginationDtoParser. Callers must update both names.
+
 0.4.3 - 2026/10/26
 perf: add indexes to the trail database for activity record audit queries. activity_records indexes (created_at), (operator_sri, created_at), and (record_code, operator_ip_address, created_at). activity_records_affected_resources indexes (activity_record_id) and (system_resource_identifier, activity_record_id).
 feat: RequesterIpExtractor accepts IP_EXTRACT_CONFIRMATION_HEADERS. When set, forwarding headers are trusted only when a configured confirmation header is present. HeaderName=secret requires a constant-time value match; HeaderName= is presence-only. Missing headers, wrong values, mixed lists, and invalid configuration resolve to RemoteAddr. Confirmation header names and values are not logged. Unset or empty preserves the current behavior.

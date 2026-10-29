@@ -56,7 +56,11 @@ func StringSliceValueObjectParser[TypedObject any](
 
 		valueObject, err := valueObjectConstructor(rawValue)
 		if err != nil {
-			slog.Debug(err.Error(), slog.Any("rawValue", rawValue))
+			slog.Debug(
+				"StringSliceValueObjectParserError",
+				slog.String("error", err.Error()),
+				slog.String("rawValueType", reflect.TypeOf(rawValue).String()),
+			)
 			continue
 		}
 

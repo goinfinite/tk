@@ -108,7 +108,8 @@ func (reader ApiRequestInputReader) Reader(echoContext echo.Context) (map[string
 	contentType := echoContext.Request().Header.Get("Content-Type")
 	switch {
 	case strings.HasPrefix(contentType, "application/json"):
-		if err := echoContext.Bind(&requestBody); err != nil {
+		bindErr := echoContext.Bind(&requestBody)
+		if bindErr != nil {
 			return nil, echo.NewHTTPError(http.StatusBadRequest, "InvalidJsonBody")
 		}
 

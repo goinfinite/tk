@@ -161,7 +161,7 @@ func TestPaginationQueryBuilder(test *testing.T) {
 				ItemsPerPage: 3,
 				SortBy:       &sortByUnknown,
 			},
-			expectedError: "UnknownPaginationSortFieldError: notAField",
+			expectedError: "UnknownPaginationSortFieldError",
 		},
 	}
 

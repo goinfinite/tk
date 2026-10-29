@@ -132,7 +132,8 @@ func TestShell(test *testing.T) {
 		}
 
 		runCapture := func() {
-			if _, runErr := NewShell(settings).Run(); runErr != nil {
+			_, runErr := NewShell(settings).Run()
+			if runErr != nil {
 				subtest.Fatalf("RunFailed: %v", runErr)
 			}
 		}

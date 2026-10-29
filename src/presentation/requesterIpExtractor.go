@@ -22,18 +22,20 @@ const (
 	ipExtractRemoteAddrKeyword             string = "RemoteAddr"
 )
 
+type httpHeaderValueMap map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue
+
 type RequesterIpExtractor struct {
-	extractionHeaders   []tkValueObject.HttpHeader
-	confirmationHeaders map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue
-	trustedCidrBlocks   []tkValueObject.CidrBlock
+	extractionHeaders           []tkValueObject.HttpHeader
+	confirmationHeaderValuesMap httpHeaderValueMap
+	trustedCidrBlocks           []tkValueObject.CidrBlock
 }
 
 func NewRequesterIpExtractor() RequesterIpExtractor {
 	cidrBlocks, cidrsReadingErr := tkInfra.TrustedCidrsReader()
 	if cidrsReadingErr != nil {
 		slog.Debug(
-			"TrustedCidrsReaderError",
-			slog.String("err", cidrsReadingErr.Error()),
+			"RequesterIpExtractorTrustedCidrsReaderError",
+			slog.String("error", cidrsReadingErr.Error()),
 		)
 	}
 
@@ -41,7 +43,7 @@ func NewRequesterIpExtractor() RequesterIpExtractor {
 		trustedCidrBlocks: cidrBlocks,
 	}
 	extractor.extractionHeaders = extractor.readExtractionHeaders()
-	extractor.confirmationHeaders = extractor.readConfirmationHeaders()
+	extractor.confirmationHeaderValuesMap = extractor.readConfirmationHeaders()
 
 	return extractor
 }
@@ -56,8 +58,8 @@ func (RequesterIpExtractor) readExtractionHeaders() []tkValueObject.HttpHeader {
 	for rawHeader := range strings.SplitSeq(rawEnvVal, ",") {
 		httpHeader, err := tkValueObject.NewHttpHeader(rawHeader)
 		if err != nil {
-			slog.Debug(
-				"InvalidIpExtractHeaderName",
+			slog.Warn(
+				"RequesterIpExtractorInvalidHeaderName",
 				slog.String("headerName", rawHeader),
 			)
 			continue
@@ -81,7 +83,7 @@ func (RequesterIpExtractor) readExtractionHeaders() []tkValueObject.HttpHeader {
 	return extractionHeaders
 }
 
-func (RequesterIpExtractor) readConfirmationHeaders() map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue {
+func (RequesterIpExtractor) readConfirmationHeaders() httpHeaderValueMap {
 	rawHeadersList := strings.TrimSpace(
 		os.Getenv(ipExtractConfirmationHeadersEnvVarName),
 	)
@@ -91,28 +93,29 @@ func (RequesterIpExtractor) readConfirmationHeaders() map[tkValueObject.HttpHead
 
 	hasPresenceOnlyHeader := false
 	hasValueCheckedHeader := false
-	confirmationHeaders := map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
-	for headerIndex, rawHeader := range strings.Split(rawHeadersList, ",") {
+	confirmationHeaderValuesMap := make(httpHeaderValueMap)
+	rawHeaders := strings.Split(rawHeadersList, ",")
+	for headerIndex, rawHeader := range rawHeaders {
 		rawHeaderName, rawExpectedValue, _ := strings.Cut(rawHeader, "=")
 
 		header, headerErr := tkValueObject.NewHttpHeader(rawHeaderName)
 		if headerErr != nil {
-			slog.Error(
-				"InvalidIpExtractConfirmationHeaderName",
+			slog.Warn(
+				"RequesterIpExtractorInvalidConfirmationHeaderName",
 				slog.Int("headerIndex", headerIndex),
 			)
-			return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+			return httpHeaderValueMap{}
 		}
 
 		expectedValue, expectedValueErr := tkValueObject.NewHttpHeaderValue(
 			rawExpectedValue,
 		)
 		if expectedValueErr != nil {
-			slog.Error(
-				"InvalidIpExtractConfirmationHeaderValue",
+			slog.Warn(
+				"RequesterIpExtractorInvalidConfirmationHeaderValue",
 				slog.Int("headerIndex", headerIndex),
 			)
-			return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+			return httpHeaderValueMap{}
 		}
 
 		isExpectedValueRequired := expectedValue.String() != ""
@@ -120,15 +123,18 @@ func (RequesterIpExtractor) readConfirmationHeaders() map[tkValueObject.HttpHead
 			!isExpectedValueRequired
 		hasValueCheckedHeader = hasValueCheckedHeader ||
 			isExpectedValueRequired
-		confirmationHeaders[header.ReadAsLowerCase()] = expectedValue
+		confirmationHeaderValuesMap[header.ReadAsLowerCase()] = expectedValue
 	}
 
 	if hasPresenceOnlyHeader && hasValueCheckedHeader {
-		slog.Error("MixedIpExtractConfirmationHeaders")
-		return map[tkValueObject.HttpHeader]tkValueObject.HttpHeaderValue{}
+		slog.Warn(
+			"RequesterIpExtractorMixedConfirmationHeaders",
+			slog.Int("headerCount", len(rawHeaders)),
+		)
+		return httpHeaderValueMap{}
 	}
 
-	return confirmationHeaders
+	return confirmationHeaderValuesMap
 }
 
 func (extractor RequesterIpExtractor) remoteAddrParser(
@@ -230,7 +236,7 @@ func (extractor RequesterIpExtractor) firstChainEntryIpExtractor(
 func (extractor RequesterIpExtractor) hasPassingConfirmationHeader(
 	httpRequest *http.Request,
 ) bool {
-	for headerName, expectedValue := range extractor.confirmationHeaders {
+	for headerName, expectedValue := range extractor.confirmationHeaderValuesMap {
 		headerValues := httpRequest.Header.Values(headerName.String())
 		for _, headerValue := range headerValues {
 			if headerValue == "" {
@@ -268,7 +274,7 @@ func (extractor RequesterIpExtractor) Execute(
 		return remoteAddrIpAddress, nil
 	}
 
-	isConfirmationGateFailed := extractor.confirmationHeaders != nil &&
+	isConfirmationGateFailed := extractor.confirmationHeaderValuesMap != nil &&
 		!extractor.hasPassingConfirmationHeader(httpRequest)
 	if isConfirmationGateFailed {
 		return remoteAddrIpAddress, nil

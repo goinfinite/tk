@@ -67,8 +67,8 @@ func NewX509KeyUsageSliceFromStdlib(
 			keyUsage, err := NewX509KeyUsage(rawKeyUsagePair.name)
 			if err != nil {
 				slog.Debug(
-					"SkipInvalidKeyUsage",
-					slog.String("name", rawKeyUsagePair.name),
+					"X509KeyUsageSkipInvalidKeyUsage",
+					slog.String("keyUsageName", rawKeyUsagePair.name),
 				)
 				continue
 			}

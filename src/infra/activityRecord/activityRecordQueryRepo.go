@@ -84,22 +84,34 @@ func (repo *ActivityRecordQueryRepo) Read(
 		repo.filteredQueryBuilder(requestDto), requestDto.Pagination, "",
 	)
 	if err != nil {
-		return responseDto, errors.New("PaginationQueryBuilderError: " + err.Error())
+		slog.Error(
+			"ActivityRecordQueryRepoPaginationQueryBuilderError",
+			slog.Int("pageNumber", int(requestDto.Pagination.PageNumber)),
+			slog.Int("itemsPerPage", int(requestDto.Pagination.ItemsPerPage)),
+			slog.String("error", err.Error()),
+		)
+		return responseDto, errors.New("PaginationQueryBuilderError")
 	}
 
 	recordModels := []tkInfraDbModel.ActivityRecord{}
 	err = paginatedDbQuery.Preload("AffectedResources").Find(&recordModels).Error
 	if err != nil {
-		return responseDto, err
+		slog.Error(
+			"ActivityRecordQueryRepoFindError",
+			slog.Int("pageNumber", int(requestDto.Pagination.PageNumber)),
+			slog.Int("itemsPerPage", int(requestDto.Pagination.ItemsPerPage)),
+			slog.String("error", err.Error()),
+		)
+		return responseDto, errors.New("ActivityRecordQueryRepoFindError")
 	}
 
 	for _, recordModel := range recordModels {
 		activityRecordEntity, err := recordModel.ToEntity()
 		if err != nil {
-			slog.Debug(
+			slog.Warn(
 				"ActivityRecordModelToEntityError",
-				slog.Uint64("id", recordModel.ID),
-				slog.String("err", err.Error()),
+				slog.Uint64("activityRecordId", recordModel.ID),
+				slog.String("error", err.Error()),
 			)
 			continue
 		}
@@ -120,7 +132,13 @@ func (repo *ActivityRecordQueryRepo) Count(
 	var itemsTotal int64
 	err = repo.filteredQueryBuilder(requestDto).Count(&itemsTotal).Error
 	if err != nil {
-		return 0, err
+		slog.Error(
+			"ActivityRecordQueryRepoCountError",
+			slog.Int("pageNumber", int(requestDto.Pagination.PageNumber)),
+			slog.Int("itemsPerPage", int(requestDto.Pagination.ItemsPerPage)),
+			slog.String("error", err.Error()),
+		)
+		return 0, errors.New("ActivityRecordQueryRepoCountError")
 	}
 
 	return uint64(itemsTotal), nil
@@ -136,7 +154,7 @@ func (repo *ActivityRecordQueryRepo) ReadFirst(
 	}
 
 	if len(responseDto.ActivityRecords) == 0 {
-		return activityRecord, errors.New(tkUseCase.ErrActivityRecordNotFound)
+		return activityRecord, tkUseCase.ErrActivityRecordNotFound
 	}
 
 	return responseDto.ActivityRecords[0], nil
