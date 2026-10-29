@@ -305,7 +305,7 @@ func (shell Shell) Run() (stdoutStr string, err error) {
 	runPlan.Err = runPlan.ExecCmd.Run()
 	closeErr := shell.closeFileHandler(runPlan.StdoutFileHandler)
 	if closeErr != nil {
-		slog.Warn(
+		slog.Error(
 			"ShellStdoutFileCloseFailed",
 			slog.String("filePath", runPlan.StdoutFileHandler.Name()),
 			slog.String("error", closeErr.Error()),
@@ -313,7 +313,7 @@ func (shell Shell) Run() (stdoutStr string, err error) {
 	}
 	closeErr = shell.closeFileHandler(runPlan.StderrFileHandler)
 	if closeErr != nil {
-		slog.Warn(
+		slog.Error(
 			"ShellStderrFileCloseFailed",
 			slog.String("filePath", runPlan.StderrFileHandler.Name()),
 			slog.String("error", closeErr.Error()),
