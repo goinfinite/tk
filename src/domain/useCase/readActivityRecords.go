@@ -21,6 +21,9 @@ func ReadActivityRecords(
 ) (responseDto tkDto.ReadActivityRecordsResponse, err error) {
 	responseDto, err = activityRecordQueryRepo.Read(requestDto)
 	if err != nil {
+		if errors.Is(err, ErrActivityRecordNotFound) {
+			return responseDto, ErrActivityRecordNotFound
+		}
 		logAttributes := []any{
 			slog.String("error", err.Error()),
 		}
@@ -39,9 +42,6 @@ func ReadActivityRecords(
 			})...,
 		)
 		slog.Error("ReadActivityRecordsInfraError", logAttributes...)
-		if errors.Is(err, ErrActivityRecordNotFound) {
-			return responseDto, ErrActivityRecordNotFound
-		}
 		return responseDto, errors.New("ReadActivityRecordsInfraError")
 	}
 
