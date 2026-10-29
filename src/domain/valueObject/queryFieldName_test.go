@@ -16,6 +16,7 @@ func TestNewQueryFieldName(test *testing.T) {
 			{"account_id", QueryFieldName("account_id")},
 			{"account-name", QueryFieldName("account-name")},
 			{"account.name", QueryFieldName("account.name")},
+			{QueryFieldName("name"), QueryFieldName("name")},
 			{"a", QueryFieldName("a")},
 			{strings.Repeat("a", 256), QueryFieldName(strings.Repeat("a", 256))},
 		}
@@ -46,6 +47,7 @@ func TestNewQueryFieldName(test *testing.T) {
 			{"", "QueryFieldNameCannotBeEmpty"},
 			{"   ", "QueryFieldNameCannotBeEmpty"},
 			{"1name", "InvalidQueryFieldName"},
+			{QueryFieldName("1name"), "InvalidQueryFieldName"},
 			{"_name", "InvalidQueryFieldName"},
 			{"na me", "InvalidQueryFieldName"},
 			{"na*me", "InvalidQueryFieldName"},

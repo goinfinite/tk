@@ -14,7 +14,7 @@ type QueryFieldName string
 func NewQueryFieldName(value any) (queryFieldName QueryFieldName, err error) {
 	existentQueryFieldName, isQueryFieldName := value.(QueryFieldName)
 	if isQueryFieldName {
-		return existentQueryFieldName, nil
+		value = existentQueryFieldName.String()
 	}
 
 	stringValue, err := tkVoUtil.InterfaceToString(value)
