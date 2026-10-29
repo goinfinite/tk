@@ -53,8 +53,8 @@ func NewX509DistinguishedNameFromPkixName(
 		)
 		if err != nil {
 			slog.Debug(
-				"SkipInvalidOrganizationalUnit",
-				slog.String("value", rawOrganizationalUnit),
+				"X509DistinguishedNameSkipInvalidOrganizationalUnit",
+				slog.String("organizationalUnit", rawOrganizationalUnit),
 			)
 			continue
 		}

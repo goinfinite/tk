@@ -9,7 +9,7 @@ import (
 func TestIsAnyError(test *testing.T) {
 	errA := errors.New("ErrA")
 	errB := errors.New("ErrB")
-	wrappedA := fmt.Errorf("context: %w", errA)
+	wrappedA := fmt.Errorf("ContextError: %w", errA)
 	unrelatedErr := errors.New("ErrC")
 
 	testCases := []struct {

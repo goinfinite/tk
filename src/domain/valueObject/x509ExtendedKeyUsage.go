@@ -42,7 +42,7 @@ func NewX509ExtendedKeyUsageSliceFromStdlib(
 	stdlibExtendedKeyUsages []x509.ExtKeyUsage,
 ) ([]X509ExtendedKeyUsage, error) {
 	var extendedKeyUsageSlice []X509ExtendedKeyUsage
-	extendedKeyUsageMap := map[x509.ExtKeyUsage]string{
+	extendedKeyUsageNamesMap := map[x509.ExtKeyUsage]string{
 		x509.ExtKeyUsageServerAuth:      "serverAuth",
 		x509.ExtKeyUsageClientAuth:      "clientAuth",
 		x509.ExtKeyUsageCodeSigning:     "codeSigning",
@@ -53,11 +53,13 @@ func NewX509ExtendedKeyUsageSliceFromStdlib(
 
 	for _, stdlibExtendedKeyUsage := range stdlibExtendedKeyUsages {
 		extendedKeyUsageName, extendedKeyUsageExists :=
-			extendedKeyUsageMap[stdlibExtendedKeyUsage]
+			extendedKeyUsageNamesMap[stdlibExtendedKeyUsage]
 		if !extendedKeyUsageExists {
 			slog.Debug(
-				"SkipUnsupportedExtendedKeyUsage",
-				slog.Int("value", int(stdlibExtendedKeyUsage)),
+				"X509ExtendedKeyUsageSkipUnsupportedKeyUsage",
+				slog.Int(
+					"extendedKeyUsageOid", int(stdlibExtendedKeyUsage),
+				),
 			)
 			continue
 		}
@@ -66,8 +68,8 @@ func NewX509ExtendedKeyUsageSliceFromStdlib(
 		)
 		if err != nil {
 			slog.Debug(
-				"SkipInvalidExtendedKeyUsage",
-				slog.String("name", extendedKeyUsageName),
+				"X509ExtendedKeyUsageSkipInvalidKeyUsage",
+				slog.String("extendedKeyUsageName", extendedKeyUsageName),
 			)
 			continue
 		}

@@ -15,7 +15,8 @@ func NewMailAddress(value any) (mailAddress MailAddress, err error) {
 		return mailAddress, errors.New("MailAddressMustBeString")
 	}
 
-	if _, err := mail.ParseAddress(stringValue); err != nil {
+	_, parseErr := mail.ParseAddress(stringValue)
+	if parseErr != nil {
 		return mailAddress, errors.New("InvalidMailAddress")
 	}
 
