@@ -32,7 +32,7 @@ func NewTrailDatabaseService(extraModelsPtrs []any) (*TrailDatabaseService, erro
 	if rawDatabaseFilePath == "" {
 		return nil, errors.New(errTrailDatabaseFilePathNotSet)
 	}
-	rawDatabaseFilePath, err := filepath.Abs(rawDatabaseFilePath)
+	absoluteDatabaseFilePath, err := filepath.Abs(rawDatabaseFilePath)
 	if err != nil {
 		slog.Error(
 			"TrailDatabaseFilePathResolutionError",
@@ -43,7 +43,7 @@ func NewTrailDatabaseService(extraModelsPtrs []any) (*TrailDatabaseService, erro
 	}
 
 	databaseFilePath, err := tkValueObject.NewUnixAbsoluteFilePath(
-		rawDatabaseFilePath, false,
+		absoluteDatabaseFilePath, false,
 	)
 	if err != nil {
 		slog.Error(
