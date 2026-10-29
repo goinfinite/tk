@@ -179,12 +179,14 @@ func TestUiRequestInputReader(test *testing.T) {
 			Filters: []UiQueryParamFilter{
 				{Key: "status"},
 				{
-					Key:  "tags",
-					Kind: UiQueryParamFilterKindMulti,
+					Key:            "tags",
+					QueryParamName: "tag",
+					Kind:           UiQueryParamFilterKindMulti,
 				},
 				{
-					Key:  "cpu",
-					Kind: UiQueryParamFilterKindRange,
+					Key:            "cpu",
+					QueryParamName: "cores",
+					Kind:           UiQueryParamFilterKindRange,
 				},
 			},
 		}
@@ -398,6 +400,50 @@ func TestUiRequestInputReader(test *testing.T) {
 		if err == nil || err.Error() != "OperatorAccountIdNotFound" {
 			subtest.Fatalf(
 				"ExpectedError: 'OperatorAccountIdNotFound', got: %v", err,
+			)
+		}
+		if requestInput != nil {
+			subtest.Errorf("ExpectedNilRequestInput")
+		}
+	})
+
+	test.Run("ExtractsOperatorIpAddressWhenMissingFromContext", func(subtest *testing.T) {
+		subtest.Setenv("IP_EXTRACT_HEADER", "")
+		subtest.Setenv("IP_EXTRACT_CONFIRMATION_HEADERS", "")
+		subtest.Setenv("TRUSTED_IPS", "")
+		subtest.Setenv("TRUSTED_CIDRS", "")
+
+		echoContext := newEchoContext("/?status=running")
+		echoContext.Set("operatorAccountId", tkValueObject.AccountId(7))
+
+		reader := UiRequestInputReader{
+			Filters: []UiQueryParamFilter{{Key: "status"}},
+		}
+
+		requestInput, err := reader.Read(echoContext)
+		if err != nil {
+			subtest.Fatalf("UnexpectedError: %v", err)
+		}
+
+		assertValue(
+			subtest, requestInput, "operatorIpAddress",
+			tkValueObject.IpAddress("192.0.2.1"),
+		)
+	})
+
+	test.Run("InvalidOperatorIpAddressReturnsError", func(subtest *testing.T) {
+		echoContext := newEchoContext("/?status=running")
+		echoContext.Set("operatorAccountId", tkValueObject.AccountId(7))
+		echoContext.Request().RemoteAddr = "not-an-ip-address"
+
+		reader := UiRequestInputReader{
+			Filters: []UiQueryParamFilter{{Key: "status"}},
+		}
+
+		requestInput, err := reader.Read(echoContext)
+		if err == nil || err.Error() != "InvalidOperatorIpAddress" {
+			subtest.Fatalf(
+				"ExpectedError: 'InvalidOperatorIpAddress', got: %v", err,
 			)
 		}
 		if requestInput != nil {
