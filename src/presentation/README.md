@@ -79,26 +79,26 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   envsValidationErr := envsInspector.Inspect()
   ```
 
-- **PaginationParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests. A zero itemsPerPage fails with `InvalidItemsPerPage`; a fractional pageNumber or itemsPerPage fails with `InvalidPageNumber` or `InvalidItemsPerPage`.
+- **PaginationDtoParser**: Parse pagination parameters like pageNumber, itemsPerPage, lastSeenId, sortBy, and sortDirection from HTTP requests into a `tkDto.Pagination`. A zero itemsPerPage fails with `InvalidItemsPerPage`; a fractional pageNumber or itemsPerPage fails with `InvalidPageNumber` or `InvalidItemsPerPage`.
 
   ```go
   defaultPagination := tkDto.Pagination{PageNumber: 0, ItemsPerPage: 10}
   untrustedInput := map[string]any{"pageNumber": 1, "itemsPerPage": 20}
-  parsedPagination, paginationParsingErr := PaginationParser(
+  parsedPagination, paginationParsingErr := PaginationDtoParser(
     defaultPagination, untrustedInput,
   )
   ```
 
-- **PaginationQueryParamsReader**: Read pagination query params and caller-listed optional params from an Echo context into the untrusted input map that `PaginationParser` consumes. It reads `pageNumber`, `itemsPerPage`, `sortBy`, `sortDirection`, and `lastSeenId`. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and `PaginationParser` returns the default. A zero `itemsPerPage` is dropped. Optional params enter the map when present and non-empty, with no conversion; a pagination key listed among them is ignored, so the converted value stands. The reader writes no defaults; the liaison owns them through `PaginationParser`.
+- **PaginationQueryParamsInputReader**: Read pagination query params and caller-listed optional params from an Echo context into the untrusted input map that `PaginationDtoParser` consumes. It reads `pageNumber`, `itemsPerPage`, `sortBy`, `sortDirection`, and `lastSeenId`. A pagination value enters the map only when its tk conversion succeeds, so a malformed value stays out and `PaginationDtoParser` returns the default. A zero `itemsPerPage` is dropped. Optional params enter the map when present and non-empty, with no conversion; a pagination key listed among them is ignored, so the converted value stands. The reader writes no defaults; the liaison owns them through `PaginationDtoParser`.
 
   ```go
   optionalParamNames := []string{"nature", "name", "type", "status"}
-  untrustedInput := tkPresentation.PaginationQueryParamsReader(
+  untrustedInput := tkPresentation.PaginationQueryParamsInputReader(
     echoContext, optionalParamNames,
   )
   ```
 
-- **UiRequestInputReader**: Read DataTable/Carousel fragment query params into the liaison input map. It reads configured filters by `Key` and `QueryParamName`, with scalar, multi-select, and range kinds; range filters use `Min`/`Max` suffixes and return `{min, max}`. It composes `PaginationQueryParamsReader` for the unprefixed pagination keys, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context after reading query params. The fragment route identifies the component, so there is no component prefix. A missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`; query-supplied operator fields are overwritten. Pagination defaults stay with the liaison factory.
+- **UiRequestInputReader**: Read DataTable/Carousel fragment query params into the liaison input map. It reads configured filters by `Key` and `QueryParamName`, with scalar, multi-select, and range kinds; range filters use `Min`/`Max` suffixes and return `{min, max}`. It composes `PaginationQueryParamsInputReader` for the unprefixed pagination keys, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context after reading query params. The fragment route identifies the component, so there is no component prefix. A missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`; query-supplied operator fields are overwritten. When `operatorIpAddress` is absent from the Echo context, the reader extracts the requester IP from the request and fails with `InvalidOperatorIpAddress` if extraction fails. Pagination defaults stay with the liaison factory.
 
   ```go
   reader := tkPresentation.UiRequestInputReader{
@@ -122,7 +122,7 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
 
   Map DataTable/Carousel kinds to the reader kinds: text and enum filters are scalar, multi-enum filters are multi, and number/date ranges are range. Add a scalar filter for the search placeholder when the table has a search box. The `QueryUrlTemplate` must map `{sortKey}` to `sortBy` for the pagination reader. Filters and pagination override `BaseInput`; operator fields always win.
 
-- **ParseFieldMatchPatterns**: Parse a semicolon-separated list of `field:pattern` pairs into a map keyed by `FieldName`. Each entry is trimmed. An empty pattern after the colon defaults to `equals`. Field names keep their case. A missing colon fails with `InvalidFieldMatchPattern`; an invalid field name returns the `FieldName` constructor error (`FieldNameCannotBeEmpty`, `FieldNameTooBig`, or `InvalidFieldName`); an input that cannot convert to a string fails with `FieldMatchPatternsMustBeString`.
+- **ParseFieldMatchPatterns**: Parse a semicolon-separated list of `field:pattern` pairs into a map keyed by `QueryFieldName`. Each entry is trimmed. An empty pattern after the colon defaults to `equals`. Field names keep their case. A missing colon fails with `InvalidFieldMatchPattern`; an invalid field name returns the `QueryFieldName` constructor error (`QueryFieldNameCannotBeEmpty`, `QueryFieldNameTooBig`, or `InvalidQueryFieldName`); an input that cannot convert to a string fails with `FieldMatchPatternsMustBeString`.
 
   ```go
   fieldMatchPatterns, parsingErr := ParseFieldMatchPatterns(

@@ -176,8 +176,8 @@ Reads DataTable/Carousel fragment query params into the liaison input map and in
 
 **Flow:**
 
-1. `src/presentation/uiRequestInputReader.go` — `UiRequestInputReader.Read` reads configured filters by `Key`/`QueryParamName` (scalar, multi-select, range), composes `PaginationQueryParamsReader`, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context; a missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`, and query-supplied operator fields are overwritten
-2. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the unprefixed pagination keys; malformed values stay out and no defaults are written
+1. `src/presentation/uiRequestInputReader.go` — `UiRequestInputReader.Read` reads configured filters by `Key`/`QueryParamName` (scalar, multi-select, range), composes `PaginationQueryParamsInputReader`, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context; a missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`, a missing operator IP address falls back to requester IP extraction and fails with `InvalidOperatorIpAddress` when extraction fails, and query-supplied operator fields are overwritten
+2. `src/presentation/paginationQueryParamsInputReader.go` — `PaginationQueryParamsInputReader` reads the unprefixed pagination keys; malformed values stay out and no defaults are written
 
 ---
 
@@ -197,8 +197,8 @@ Parses pagination parameters from untrusted input into a typed Pagination DTO.
 
 **Flow:**
 
-1. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the unprefixed pagination query params and caller-listed optional params into the untrusted input map; a value that fails its tk conversion stays out, and no defaults are written
-2. `src/presentation/paginationParser.go` — `PaginationParser` extracts page number, items per page, sort by, sort direction, and last-seen-id from an input map
+1. `src/presentation/paginationQueryParamsInputReader.go` — `PaginationQueryParamsInputReader` reads the unprefixed pagination query params and caller-listed optional params into the untrusted input map; a value that fails its tk conversion stays out, and no defaults are written
+2. `src/presentation/paginationDtoParser.go` — `PaginationDtoParser` extracts page number, items per page, sort by, sort direction, and last-seen-id from an input map
 
 ---
 
@@ -278,8 +278,8 @@ Parses opt-in per-field match operators from a request parameter into typed valu
 
 **Flow:**
 
-1. `src/presentation/fieldMatchPatternsParser.go` — `ParseFieldMatchPatterns` splits a semicolon-separated list of `field:pattern` pairs, trims each entry, validates the field name through `NewFieldName`, and returns a map keyed by `FieldName`
-2. `src/domain/valueObject/fieldName.go` — `NewFieldName` enforces a 1-64 character field name that starts with a letter and allows letters, digits, underscores, dots, and hyphens
+1. `src/presentation/fieldMatchPatternsParser.go` — `ParseFieldMatchPatterns` splits a semicolon-separated list of `field:pattern` pairs, trims each entry, validates the field name through `NewQueryFieldName`, and returns a map keyed by `QueryFieldName`
+2. `src/domain/valueObject/queryFieldName.go` — `NewQueryFieldName` enforces a 1-256 character field name that starts with a letter and allows letters, digits, underscores, dots, and hyphens
 3. `src/domain/valueObject/matchPattern.go` — `NewMatchPattern` validates `equals`, `contains`, `begins-with`, and `ends-with`; nil or empty input resolves to `equals`
 
 ---
