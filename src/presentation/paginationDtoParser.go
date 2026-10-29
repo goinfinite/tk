@@ -8,7 +8,7 @@ import (
 	tkVoUtil "github.com/goinfinite/tk/src/domain/valueObject/util"
 )
 
-func PaginationParser(
+func PaginationDtoParser(
 	defaultPagination tkDto.Pagination,
 	untrustedInput map[string]any,
 ) (parsedPagination tkDto.Pagination, err error) {

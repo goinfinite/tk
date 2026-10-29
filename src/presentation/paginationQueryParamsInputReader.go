@@ -20,7 +20,7 @@ func queryParamConverter[TargetType any](
 	convertedValue, conversionErr := converter(rawValue)
 	if conversionErr != nil {
 		slog.Debug(
-			"PaginationQueryParamsReaderInvalidParam",
+			"PaginationQueryParamsInputReaderInvalidParam",
 			slog.String("paramName", paramName),
 			slog.String("error", conversionErr.Error()),
 		)
@@ -30,7 +30,7 @@ func queryParamConverter[TargetType any](
 	return convertedValue, false
 }
 
-func PaginationQueryParamsReader(
+func PaginationQueryParamsInputReader(
 	echoContext echo.Context, optionalParamNames []string,
 ) map[string]any {
 	requestParams := map[string]any{}

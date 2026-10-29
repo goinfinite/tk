@@ -144,7 +144,7 @@ func (reader UiRequestInputReader) Read(
 	requestInput := map[string]any{}
 	maps.Copy(requestInput, reader.BaseInput)
 	maps.Copy(requestInput, reader.filtersReader(echoContext))
-	maps.Copy(requestInput, PaginationQueryParamsReader(echoContext, nil))
+	maps.Copy(requestInput, PaginationQueryParamsInputReader(echoContext, nil))
 	maps.Copy(requestInput, operatorContext)
 
 	return requestInput, nil

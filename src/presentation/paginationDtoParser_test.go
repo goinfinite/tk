@@ -7,7 +7,7 @@ import (
 	tkValueObject "github.com/goinfinite/tk/src/domain/valueObject"
 )
 
-func TestPaginationParser(test *testing.T) {
+func TestPaginationDtoParser(test *testing.T) {
 	test.Run("SuccessWithAllValidFields", func(subtest *testing.T) {
 		testCaseStructs := []struct {
 			inputMap       map[string]any
@@ -59,7 +59,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			actualOutput, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -168,7 +168,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			actualOutput, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			actualOutput, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -238,7 +238,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			_, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -306,7 +306,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			_, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -350,7 +350,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			_, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -391,7 +391,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			_, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -432,7 +432,7 @@ func TestPaginationParser(test *testing.T) {
 		}
 
 		for _, testCase := range testCaseStructs {
-			_, conversionErr := PaginationParser(defaultPagination, testCase.inputMap)
+			_, conversionErr := PaginationDtoParser(defaultPagination, testCase.inputMap)
 			if testCase.expectError && conversionErr == nil {
 				subtest.Errorf("MissingExpectedError: [%v]", testCase.inputMap)
 			}
@@ -448,7 +448,7 @@ func TestPaginationParser(test *testing.T) {
 			ItemsPerPage: 10,
 		}
 
-		actualOutput, conversionErr := PaginationParser(defaultPagination, nil)
+		actualOutput, conversionErr := PaginationDtoParser(defaultPagination, nil)
 		if conversionErr != nil {
 			subtest.Errorf("UnexpectedError: '%s'", conversionErr.Error())
 		}
