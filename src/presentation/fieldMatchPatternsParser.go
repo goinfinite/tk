@@ -9,10 +9,10 @@ import (
 )
 
 func ParseFieldMatchPatterns(input any) (
-	fieldNameMatchPatternsMap map[tkValueObject.FieldName]tkValueObject.MatchPattern,
+	fieldNameMatchPatternsMap map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern,
 	err error,
 ) {
-	fieldNameMatchPatternsMap = map[tkValueObject.FieldName]tkValueObject.MatchPattern{}
+	fieldNameMatchPatternsMap = map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{}
 	if input == nil {
 		return fieldNameMatchPatternsMap, nil
 	}
@@ -35,7 +35,7 @@ func ParseFieldMatchPatterns(input any) (
 			return fieldNameMatchPatternsMap, errors.New("InvalidFieldMatchPattern")
 		}
 
-		fieldName, err := tkValueObject.NewFieldName(rawFieldName)
+		fieldName, err := tkValueObject.NewQueryFieldName(rawFieldName)
 		if err != nil {
 			return fieldNameMatchPatternsMap, err
 		}

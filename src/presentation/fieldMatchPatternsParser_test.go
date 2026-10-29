@@ -9,49 +9,49 @@ import (
 )
 
 func TestParseFieldMatchPatterns(test *testing.T) {
-	fieldNameFactory := func(value string) tkValueObject.FieldName {
-		return tkValueObject.FieldName(value)
+	fieldNameFactory := func(value string) tkValueObject.QueryFieldName {
+		return tkValueObject.QueryFieldName(value)
 	}
 
 	testCases := []struct {
 		name           string
 		input          any
-		expectedOutput map[tkValueObject.FieldName]tkValueObject.MatchPattern
+		expectedOutput map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern
 		expectedErr    string
 	}{
 		{
 			name:           "NilInput",
 			input:          nil,
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 		},
 		{
 			name:           "UnconvertibleInput",
 			input:          map[string]any{"name": "contains"},
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 			expectedErr:    "FieldMatchPatternsMustBeString",
 		},
 		{
 			name:           "NumericInputBecomesInvalidFieldMatchPattern",
 			input:          123,
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 			expectedErr:    "InvalidFieldMatchPattern",
 		},
 		{
 			name:           "EmptyInput",
 			input:          "",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 		},
 		{
 			name:  "SingleField",
 			input: "name:contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"): tkValueObject.MatchPatternContains,
 			},
 		},
 		{
 			name:  "MultipleFields",
 			input: "name:contains;status:equals",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"):   tkValueObject.MatchPatternContains,
 				fieldNameFactory("status"): tkValueObject.MatchPatternEquals,
 			},
@@ -59,7 +59,7 @@ func TestParseFieldMatchPatterns(test *testing.T) {
 		{
 			name:  "TrimsWhitespaceAndSpacedPatterns",
 			input: " name : begins with ; status : ends-with ",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"):   tkValueObject.MatchPatternBeginsWith,
 				fieldNameFactory("status"): tkValueObject.MatchPatternEndsWith,
 			},
@@ -67,72 +67,72 @@ func TestParseFieldMatchPatterns(test *testing.T) {
 		{
 			name:  "EmptyPatternDefaultsToEquals",
 			input: "name:",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"): tkValueObject.MatchPatternEquals,
 			},
 		},
 		{
 			name:  "SkipsEmptySegments",
 			input: ";; name:contains ;;",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"): tkValueObject.MatchPatternContains,
 			},
 		},
 		{
 			name:  "DuplicateFieldLastValueWins",
 			input: "name:contains;name:equals",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("name"): tkValueObject.MatchPatternEquals,
 			},
 		},
 		{
-			name:  "PreservesFieldNameCase",
+			name:  "PreservesQueryFieldNameCase",
 			input: "Name:contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("Name"): tkValueObject.MatchPatternContains,
 			},
 		},
 		{
-			name:  "DottedFieldName",
+			name:  "DottedQueryFieldName",
 			input: "account.name:contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{
 				fieldNameFactory("account.name"): tkValueObject.MatchPatternContains,
 			},
 		},
 		{
 			name:           "MissingSeparator",
 			input:          "name",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 			expectedErr:    "InvalidFieldMatchPattern",
 		},
 		{
-			name:           "EmptyFieldName",
+			name:           "EmptyQueryFieldName",
 			input:          ":contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
-			expectedErr:    "FieldNameCannotBeEmpty",
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
+			expectedErr:    "QueryFieldNameCannotBeEmpty",
 		},
 		{
-			name:           "InvalidFieldNameWithSpace",
+			name:           "InvalidQueryFieldNameWithSpace",
 			input:          "na me:contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
-			expectedErr:    "InvalidFieldName",
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
+			expectedErr:    "InvalidQueryFieldName",
 		},
 		{
-			name:           "InvalidFieldNameWithWildcard",
+			name:           "InvalidQueryFieldNameWithWildcard",
 			input:          "na*me:contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
-			expectedErr:    "InvalidFieldName",
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
+			expectedErr:    "InvalidQueryFieldName",
 		},
 		{
-			name:           "FieldNameTooBig",
-			input:          strings.Repeat("a", 65) + ":contains",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
-			expectedErr:    "FieldNameTooBig",
+			name:           "QueryFieldNameTooBig",
+			input:          strings.Repeat("a", 257) + ":contains",
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
+			expectedErr:    "QueryFieldNameTooBig",
 		},
 		{
 			name:           "InvalidMatchPattern",
 			input:          "name:starts-with",
-			expectedOutput: map[tkValueObject.FieldName]tkValueObject.MatchPattern{},
+			expectedOutput: map[tkValueObject.QueryFieldName]tkValueObject.MatchPattern{},
 			expectedErr:    "InvalidMatchPattern",
 		},
 	}
