@@ -41,7 +41,7 @@ Removes an activity record by ID or filter criteria.
 **Flow:**
 
 1. `src/domain/dto/deleteActivityRecord.go` — input DTO with deletion filters
-2. `src/domain/useCase/deleteActivityRecord.go` — orchestrates deletion; wraps infra errors as domain errors
+2. `src/domain/useCase/deleteActivityRecord.go` — orchestrates deletion; logs infra errors and returns a domain error
 3. `src/domain/repository/activityRecordCmdRepo.go` — interface declaring the `Delete` method
 4. `src/infra/activityRecord/activityRecordCmdRepo.go` — GORM implementation: transforms DTO to model conditions and deletes
 
@@ -85,7 +85,7 @@ Runs subprocess commands with configurable timeout, user, working directory, and
 **Flow:**
 
 1. `src/infra/shell.go` — `NewShell` configures a command; `Run` executes it under an optional context deadline (SIGTERM, then SIGKILL; exit 124 `CommandDeadlineExceeded`), with optional user switching and clean-environment support, capturing stdout/stderr
-2. `src/infra/shellEscape.go` — `Quote` escapes shell arguments for safe interpolation
+2. `src/infra/shellEscape.go` — `Quote` escapes one shell argument for safe interpolation; `Join` quotes every argument and joins the slice into one command string
 
 ---
 
@@ -166,7 +166,18 @@ Reads and merges HTTP request input from path parameters, query strings, and req
 
 **Flow:**
 
-1. `src/presentation/requestInputReader.go` — `ApiRequestInputReader.Reader` merges request body, query params, route params, operator context, and multipart file uploads; supports dot-notation keys for hierarchical maps; uploads are grouped under the `files` key by form field as `map[string][]*multipart.FileHeader`
+1. `src/presentation/apiRequestInputReader.go` — `ApiRequestInputReader.Reader` merges request body, query params, route params, operator context, and multipart file uploads; supports dot-notation keys for hierarchical maps; uploads are grouped under the `files` key by form field as `map[string][]*multipart.FileHeader`
+
+---
+
+## UI Request Input Reading
+
+Reads DataTable/Carousel fragment query params into the liaison input map and injects the authenticated operator.
+
+**Flow:**
+
+1. `src/presentation/uiRequestInputReader.go` — `UiRequestInputReader.Read` reads configured filters by `Key`/`QueryParamName` (scalar, multi-select, range), composes `PaginationQueryParamsReader`, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context; a missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`, and query-supplied operator fields are overwritten
+2. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the unprefixed pagination keys; malformed values stay out and no defaults are written
 
 ---
 
@@ -186,7 +197,7 @@ Parses pagination parameters from untrusted input into a typed Pagination DTO.
 
 **Flow:**
 
-1. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the pagination query params and caller-listed optional params into the untrusted input map; a value that fails its tk conversion stays out, and no defaults are written
+1. `src/presentation/paginationQueryParamsReader.go` — `PaginationQueryParamsReader` reads the unprefixed pagination query params and caller-listed optional params into the untrusted input map; a value that fails its tk conversion stays out, and no defaults are written
 2. `src/presentation/paginationParser.go` — `PaginationParser` extracts page number, items per page, sort by, sort direction, and last-seen-id from an input map
 
 ---
@@ -260,3 +271,23 @@ Keeps ephemeral key-value pairs in a shared in-memory SQLite database. The data 
 1. `src/infra/db/transientDatabaseService.go` — `NewTransientDatabaseService` opens the shared in-memory database and migrates the `KeyValue` model; `Has`, `Read`, and `Set` check, fetch, and upsert entries; `Set` accepts an optional time-to-live and `Read`/`Has` treat expired entries as missing; `Read` returns `ErrKeyNotFound` for a missing key
 
 ---
+
+## Field Match Pattern Parsing
+
+Parses opt-in per-field match operators from a request parameter into typed value objects.
+
+**Flow:**
+
+1. `src/presentation/fieldMatchPatternsParser.go` — `ParseFieldMatchPatterns` splits a semicolon-separated list of `field:pattern` pairs, trims each entry, validates the field name through `NewFieldName`, and returns a map keyed by `FieldName`
+2. `src/domain/valueObject/fieldName.go` — `NewFieldName` enforces a 1-64 character field name that starts with a letter and allows letters, digits, underscores, dots, and hyphens
+3. `src/domain/valueObject/matchPattern.go` — `NewMatchPattern` validates `equals`, `contains`, `begins-with`, and `ends-with`; nil or empty input resolves to `equals`
+
+---
+
+## Error Status Mapping
+
+Maps a handler error to an HTTP status code and emits the standard API response envelope.
+
+**Flow:**
+
+1. `src/presentation/middleware/errorStatusHandler.go` — `ErrorStatusHandler.ApiHandler` calls the next handler, passes a nil error or a direct `*echo.HTTPError` through, and matches a returned error against a `map[error]tkValueObject.HttpStatusCode` through `errors.Is`; a match emits the mapped status with the matched sentinel's message, a committed response is not overwritten, a mapped status outside 400-599 fails closed to 500, and an unmapped, ambiguous, or mapped 5xx error is logged

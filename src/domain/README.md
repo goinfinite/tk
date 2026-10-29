@@ -4,7 +4,11 @@ Business logic layer of Infinite Toolkit _(TK)_. It holds validated value object
 
 ## Value Objects
 
-The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, UnixAbsoluteGlobPath, UnixFilePermissions, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, and many more. Table-driven tests cover the validation rules.
+The library offers a diverse range of value objects (VO) to represent domain entities. Each VO is designed to guarantee type safety and provide validation. Examples include MailAddress, Password, Url, IpAddress, UnixAbsoluteFilePath, UnixAbsoluteGlobPath, UnixFilePermissions, HttpMethod, CountryCode, CurrencyCode, SystemResourceIdentifier, CatalogItemName, ScheduledTaskName, CronSchedule, FieldName, MatchPattern, and many more. Table-driven tests cover the validation rules.
+
+**FieldName** represents a request field name. It starts with a letter, allows letters, digits, underscores, dots, and hyphens, and is limited to 64 characters.
+
+**MatchPattern** represents a field comparison operator: `equals`, `contains`, `begins-with`, or `ends-with`. The constructor lowercases the input and replaces spaces with hyphens, so `Begins With` becomes `begins-with`. A nil or empty input resolves to `equals`.
 
 ## Entities
 

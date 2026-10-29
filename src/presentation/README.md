@@ -16,6 +16,15 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
 
 - **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
 
+- **ErrorStatusHandler**: Map a handler error to an HTTP status code and emit the standard API response envelope. The constructor takes `map[error]tkValueObject.HttpStatusCode`. A nil error and a direct `*echo.HTTPError` pass through unchanged. A committed response is not overwritten; the error is logged and returned. A returned error matches through `errors.Is`, so a wrapped sentinel error keeps its mapping. A match responds with the mapped status and the matched sentinel's message, so a wrapper's text does not reach the client. A mapped status outside 400-599 fails closed to 500 with a generic message. An unmapped error or a mapped 5xx is logged at error level. An ambiguous match or an invalid mapped status is logged at warn level. Log entries include the request method, path, route, request ID, and operator identity when available. An unmapped or ambiguous error responds with 500 and a generic message.
+
+  ```go
+  errorStatusHandler := NewErrorStatusHandler(map[error]tkValueObject.HttpStatusCode{
+      errRecordNotFound: tkValueObject.HttpStatusCodeNotFound,
+  })
+  echoInstance.Use(errorStatusHandler.ApiHandler)
+  ```
+
 ## Helpers
 
 - **RequiredParamsInspector**: Check that every required parameter is present in a request input map before further parsing.
@@ -86,6 +95,38 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   optionalParamNames := []string{"nature", "name", "type", "status"}
   untrustedInput := tkPresentation.PaginationQueryParamsReader(
     echoContext, optionalParamNames,
+  )
+  ```
+
+- **UiRequestInputReader**: Read DataTable/Carousel fragment query params into the liaison input map. It reads configured filters by `Key` and `QueryParamName`, with scalar, multi-select, and range kinds; range filters use `Min`/`Max` suffixes and return `{min, max}`. It composes `PaginationQueryParamsReader` for the unprefixed pagination keys, copies `BaseInput` shallowly, and injects `operatorAccountId`, `operatorSri`, and `operatorIpAddress` from the Echo context after reading query params. The fragment route identifies the component, so there is no component prefix. A missing or wrong-type operator account ID fails with `OperatorAccountIdNotFound`; query-supplied operator fields are overwritten. Pagination defaults stay with the liaison factory.
+
+  ```go
+  reader := tkPresentation.UiRequestInputReader{
+    Filters: []tkPresentation.UiQueryParamFilter{
+      {Key: "status"},
+      {
+        Key:            "tags",
+        QueryParamName: "tag",
+        Kind:           tkPresentation.UiQueryParamFilterKindMulti,
+      },
+      {
+        Key:            "cpu",
+        QueryParamName: "cores",
+        Kind:           tkPresentation.UiQueryParamFilterKindRange,
+      },
+    },
+    BaseInput: map[string]any{"withMetrics": true},
+  }
+  input, readingErr := reader.Read(echoContext)
+  ```
+
+  Map DataTable/Carousel kinds to the reader kinds: text and enum filters are scalar, multi-enum filters are multi, and number/date ranges are range. Add a scalar filter for the search placeholder when the table has a search box. The `QueryUrlTemplate` must map `{sortKey}` to `sortBy` for the pagination reader. Filters and pagination override `BaseInput`; operator fields always win.
+
+- **ParseFieldMatchPatterns**: Parse a semicolon-separated list of `field:pattern` pairs into a map keyed by `FieldName`. Each entry is trimmed. An empty pattern after the colon defaults to `equals`. Field names keep their case. A missing colon fails with `InvalidFieldMatchPattern`; an invalid field name returns the `FieldName` constructor error (`FieldNameCannotBeEmpty`, `FieldNameTooBig`, or `InvalidFieldName`); an input that cannot convert to a string fails with `FieldMatchPatternsMustBeString`.
+
+  ```go
+  fieldMatchPatterns, parsingErr := ParseFieldMatchPatterns(
+    "name:contains;status:equals",
   )
   ```
 

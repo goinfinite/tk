@@ -166,10 +166,11 @@ Infrastructure layer of Infinite Toolkit _(TK)_. It implements I/O: file, shell,
   })
   ```
 
-- **ShellEscape**: Quote a string for safe interpolation into a POSIX shell command, or strip non-printable characters.
+- **ShellEscape**: Quote a string for safe interpolation into a POSIX shell command, join an argument slice into a command string, or strip non-printable characters. `Quote` leaves an argument that needs no quoting unchanged. `Join` always quotes every argument and separates them with one space.
 
   ```go
   escapedArg := ShellEscape{}.Quote("hello world")
+  commandArgs := ShellEscape{}.Join([]string{"echo", "hello world"})
   printableStr := ShellEscape{}.StripUnsafe("hello\x00world")
   ```
 
