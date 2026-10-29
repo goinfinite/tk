@@ -8,17 +8,26 @@ import (
 )
 
 // CreateActivityRecord persists an activity record as a non-blocking side effect.
-// Errors are logged but not returned to avoid failing the caller's primary operation.
+// Errors are logged but not returned so the caller's primary operation succeeds.
 func CreateActivityRecord(
 	activityRecordCmdRepo tkRepository.ActivityRecordCmdRepo,
 	createDto tkDto.CreateActivityRecord,
 ) {
 	err := activityRecordCmdRepo.Create(createDto)
 	if err != nil {
-		slog.Error(
-			"CreateActivityRecordInfraError",
-			slog.String("err", err.Error()),
-			slog.String("recordCode", createDto.RecordCode.String()),
+		logAttributes := []any{
+			slog.String("error", err.Error()),
+		}
+		logAttributes = append(
+			logAttributes,
+			activityRecordLogAttributesBuilder(activityRecordLogAttributesInput{
+				RecordLevel:       &createDto.RecordLevel,
+				RecordCode:        &createDto.RecordCode,
+				AffectedResources: createDto.AffectedResources,
+				OperatorSri:       createDto.OperatorSri,
+				OperatorIpAddress: createDto.OperatorIpAddress,
+			})...,
 		)
+		slog.Error("CreateActivityRecordInfraError", logAttributes...)
 	}
 }
