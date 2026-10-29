@@ -11,16 +11,25 @@ var shellEscapeEscapableCharsRegex = regexp.MustCompile(`[^\w@%+=:,./-]`)
 type ShellEscape struct {
 }
 
-func (ShellEscape) Quote(inputStr string) string {
-	if len(inputStr) == 0 {
-		return "''"
-	}
+func (ShellEscape) quoteAlways(inputStr string) string {
+	return "'" + strings.ReplaceAll(inputStr, "'", "'\"'\"'") + "'"
+}
 
-	if !shellEscapeEscapableCharsRegex.MatchString(inputStr) {
+func (shellEscape ShellEscape) Quote(inputStr string) string {
+	if len(inputStr) > 0 && !shellEscapeEscapableCharsRegex.MatchString(inputStr) {
 		return inputStr
 	}
 
-	return "'" + strings.ReplaceAll(inputStr, "'", "'\"'\"'") + "'"
+	return shellEscape.quoteAlways(inputStr)
+}
+
+func (shellEscape ShellEscape) Join(arguments []string) string {
+	quotedArguments := make([]string, 0, len(arguments))
+	for _, argument := range arguments {
+		quotedArguments = append(quotedArguments, shellEscape.quoteAlways(argument))
+	}
+
+	return strings.Join(quotedArguments, " ")
 }
 
 func (ShellEscape) StripUnsafe(inputStr string) string {
