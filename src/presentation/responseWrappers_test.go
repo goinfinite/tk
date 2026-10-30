@@ -245,7 +245,7 @@ func TestLiaisonApiResponseEmitter(test *testing.T) {
 			httpRecorder := httptest.NewRecorder()
 			echoContext := echoInstance.NewContext(httpRequest, httpRecorder)
 
-			liaisonResponse := NewLiaisonResponse(
+			liaisonResponse := newLiaisonResponse(
 				testCase.liaisonStatus, testCase.body, testCase.readableMessage,
 			)
 
@@ -301,81 +301,70 @@ func TestLiaisonApiResponseEmitter(test *testing.T) {
 	}
 }
 
-func TestNewLiaisonResponse(test *testing.T) {
+func TestLiaisonResponseStatusIsError(test *testing.T) {
 	testCases := []struct {
-		name                    string
-		status                  LiaisonResponseStatus
-		readableMessage         string
-		body                    any
-		expectedStatus          LiaisonResponseStatus
-		expectedReadableMessage string
-		expectedBody            any
+		name     string
+		status   LiaisonResponseStatus
+		expected bool
 	}{
+		{name: "Success", status: LiaisonResponseStatusSuccess, expected: false},
+		{name: "Created", status: LiaisonResponseStatusCreated, expected: false},
+		{name: "Accepted", status: LiaisonResponseStatusAccepted, expected: false},
+		{name: "MultiStatus", status: LiaisonResponseStatusMultiStatus, expected: false},
+		{name: "UserError", status: LiaisonResponseStatusUserError, expected: true},
+		{name: "Unauthorized", status: LiaisonResponseStatusUnauthorized, expected: true},
+		{name: "Forbidden", status: LiaisonResponseStatusForbidden, expected: true},
+		{name: "NotFound", status: LiaisonResponseStatusNotFound, expected: true},
+		{name: "Timeout", status: LiaisonResponseStatusTimeout, expected: true},
+		{name: "Conflict", status: LiaisonResponseStatusConflict, expected: true},
+		{name: "RateLimited", status: LiaisonResponseStatusRateLimited, expected: true},
+		{name: "InfraError", status: LiaisonResponseStatusInfraError, expected: true},
+		{name: "UnknownError", status: LiaisonResponseStatusUnknownError, expected: true},
 		{
-			name:                    "SuccessStatus",
-			status:                  LiaisonResponseStatusSuccess,
-			readableMessage:         "DataRetrievedSuccessfully",
-			body:                    []string{"item1", "item2"},
-			expectedStatus:          LiaisonResponseStatusSuccess,
-			expectedReadableMessage: "DataRetrievedSuccessfully",
-			expectedBody:            []string{"item1", "item2"},
+			name:     "ServiceUnavailable",
+			status:   LiaisonResponseStatusServiceUnavailable,
+			expected: true,
 		},
-		{
-			name:                    "CreatedStatus",
-			status:                  LiaisonResponseStatusCreated,
-			readableMessage:         "ResourceCreated",
-			body:                    map[string]int{"id": 123},
-			expectedStatus:          LiaisonResponseStatusCreated,
-			expectedReadableMessage: "ResourceCreated",
-			expectedBody:            map[string]int{"id": 123},
-		},
-		{
-			name:                    "UserErrorStatus",
-			status:                  LiaisonResponseStatusUserError,
-			readableMessage:         "ValidationFailed",
-			body:                    nil,
-			expectedStatus:          LiaisonResponseStatusUserError,
-			expectedReadableMessage: "ValidationFailed",
-			expectedBody:            nil,
-		},
+		{name: "Empty", status: LiaisonResponseStatus(""), expected: false},
 	}
 
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(subtest *testing.T) {
-			result := NewLiaisonResponse(
-				testCase.status,
-				testCase.body,
-				testCase.readableMessage,
-			)
-
-			if result.Status != testCase.expectedStatus {
+			if testCase.status.isError() != testCase.expected {
 				subtest.Errorf(
-					"StatusMismatch: expected %s, got %s",
-					testCase.expectedStatus, result.Status,
+					"IsErrorMismatch: expected '%v', got '%v'",
+					testCase.expected, testCase.status.isError(),
 				)
 			}
+		})
+	}
+}
 
-			if result.ReadableMessage != testCase.expectedReadableMessage {
+func TestLiaisonResponseStatusIsServerError(test *testing.T) {
+	testCases := []struct {
+		name     string
+		status   LiaisonResponseStatus
+		expected bool
+	}{
+		{name: "Success", status: LiaisonResponseStatusSuccess, expected: false},
+		{name: "UserError", status: LiaisonResponseStatusUserError, expected: false},
+		{name: "NotFound", status: LiaisonResponseStatusNotFound, expected: false},
+		{name: "InfraError", status: LiaisonResponseStatusInfraError, expected: true},
+		{name: "UnknownError", status: LiaisonResponseStatusUnknownError, expected: true},
+		{
+			name:     "ServiceUnavailable",
+			status:   LiaisonResponseStatusServiceUnavailable,
+			expected: true,
+		},
+		{name: "Empty", status: LiaisonResponseStatus(""), expected: false},
+	}
+
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(subtest *testing.T) {
+			if testCase.status.isServerError() != testCase.expected {
 				subtest.Errorf(
-					"ReadableMessageMismatch: expected %s, got %s",
-					testCase.expectedReadableMessage, result.ReadableMessage,
-				)
-			}
-
-			actualJson, err := json.Marshal(result.Body)
-			if err != nil {
-				subtest.Fatalf("ActualJsonMarshalingFailed: %v", err)
-			}
-
-			expectedJson, err := json.Marshal(testCase.expectedBody)
-			if err != nil {
-				subtest.Fatalf("ExpectedJsonMarshalingFailed: %v", err)
-			}
-
-			if string(actualJson) != string(expectedJson) {
-				subtest.Errorf(
-					"BodyMismatch: expected '%s', got '%s'",
-					string(expectedJson), string(actualJson),
+					"IsServerErrorMismatch: expected '%v', got '%v'",
+					testCase.expected, testCase.status.isServerError(),
 				)
 			}
 		})
@@ -513,11 +502,13 @@ replace github.com/goinfinite/tk => ` + projectRoot + `
 import tkPresentation "github.com/goinfinite/tk/src/presentation"
 
 func main() {
-	liaisonResponse := tkPresentation.NewLiaisonResponse(
-		tkPresentation.LiaisonResponseStatus("` + string(testCase.status) + `"),
-		map[string]any{"test": "data"},
-		"` + testCase.readableMessage + `",
-	)
+	liaisonResponse := tkPresentation.LiaisonResponse{
+		Status: tkPresentation.LiaisonResponseStatus(
+			"` + string(testCase.status) + `",
+		),
+		Body:            map[string]any{"test": "data"},
+		ReadableMessage: "` + testCase.readableMessage + `",
+	}
 	tkPresentation.LiaisonCliResponseRenderer(liaisonResponse)
 }`
 

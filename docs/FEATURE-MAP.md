@@ -284,10 +284,12 @@ Parses opt-in per-field match operators from a request parameter into typed valu
 
 ---
 
-## Error Status Mapping
+## Liaison Response Building
 
-Maps a handler error to an HTTP status code and emits the standard API response envelope.
+Builds the shared liaison response for API, CLI, and downstream UI, including central app-error mapping.
 
 **Flow:**
 
-1. `src/presentation/middleware/errorStatusHandler.go` — `ErrorStatusHandler.ApiHandler` calls the next handler, passes a nil error or a direct `*echo.HTTPError` through, and matches a returned error against a `map[error]tkValueObject.HttpStatusCode` through `errors.Is`; a match emits the mapped status with the matched sentinel's message, a committed response is not overwritten, a mapped status outside 400-599 fails closed to 500, and an unmapped, ambiguous, or mapped 5xx error is logged
+1. `src/presentation/liaisonResponder.go` — `LiaisonResponder` builds success responses through `Success`, `Created`, `Accepted`, and `MultiStatus`, builds `UserError` responses through `InputError`, and maps use-case errors through `AppError`; a match uses the mapped status and the matched sentinel's message in both the body and the readable message, and an unmapped, ambiguous, or success-mapped error fails closed to `UnknownError` with `InternalServerError` and logs the cause. Use-case sentinels are the public error contract; the use case hides infra errors behind them
+2. `src/presentation/liaisonErrorStatusResolver.go` — internal resolver matches the error against a `map[error]LiaisonResponseStatus` through `errors.Is` and returns the mapped status, match count, and matched sentinel
+3. `src/presentation/responseWrappers.go` — `LiaisonApiResponseEmitter` maps the response status to an HTTP code and the standard API envelope; `LiaisonCliResponseRenderer` maps the same status to a CLI exit code and JSON output; downstream UI presenters branch on the same status
