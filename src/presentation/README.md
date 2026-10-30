@@ -16,15 +16,6 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
 
 - **LogHandler**: Configure logging levels via `LOG_LEVEL` environment variable and initialize structured logging with slog and Zerolog.
 
-- **ErrorStatusHandler**: Map a handler error to an HTTP status code and emit the standard API response envelope. The constructor takes `map[error]tkValueObject.HttpStatusCode`. A nil error and a direct `*echo.HTTPError` pass through unchanged. A committed response is not overwritten; the error is logged and returned. A returned error matches through `errors.Is`, so a wrapped sentinel error keeps its mapping. A match responds with the mapped status and the matched sentinel's message, so a wrapper's text does not reach the client. A mapped status outside 400-599 fails closed to 500 with a generic message. An unmapped error or a mapped 5xx is logged at error level. An ambiguous match or an invalid mapped status is logged at warn level. Log entries include the request method, path, route, request ID, and operator identity when available. An unmapped or ambiguous error responds with 500 and a generic message.
-
-  ```go
-  errorStatusHandler := NewErrorStatusHandler(map[error]tkValueObject.HttpStatusCode{
-      errRecordNotFound: tkValueObject.HttpStatusCodeNotFound,
-  })
-  echoInstance.Use(errorStatusHandler.ApiHandler)
-  ```
-
 ## Helpers
 
 - **RequiredParamsInspector**: Check that every required parameter is present in a request input map before further parsing.
@@ -146,20 +137,36 @@ Presentation layer of Infinite Toolkit _(TK)_. It parses untrusted input, wraps 
   fmt.Println(parsedTimeParams["createdAt"])
   ```
 
-- **ResponseWrapper**: A wrapper struct for liaison responses and when needed, used to emit API and CLI responses.
+- **LiaisonResponder**: Build liaison responses with the outcome already set. Create it once with `map[error]LiaisonResponseStatus` and inject it into liaisons. `Success`, `Created`, `Accepted`, and `MultiStatus` build success responses. `InputError` builds a `UserError` response for invalid request input. `AppError` maps a use-case error through `errors.Is`; a match uses the mapped status and the matched sentinel's message in both `Body` and `ReadableMessage`, while an unmapped, ambiguous, or success-mapped error uses `UnknownError` with `InternalServerError` and logs the cause. The API emitter, CLI renderer, and downstream UI presenters only translate `LiaisonResponseStatus` to their own transport. The responder logs mapping failures and mapped server errors without request context; API handlers that need request-scoped logging should log 5xx responses at the Echo boundary.
+
+  ```go
+  responder := NewLiaisonResponder(
+      map[error]LiaisonResponseStatus{
+          errRecordNotFound: LiaisonResponseStatusNotFound,
+      },
+  )
+
+  func (liaison *X) Do(input map[string]any) LiaisonResponse {
+      username, err := valueObject.NewUsername(input["username"])
+      if err != nil {
+          return liaison.responder.InputError(err.Error())
+      }
+
+      result, err := useCase.Execute(...)
+      if err != nil {
+          return liaison.responder.AppError(err)
+      }
+
+      return liaison.responder.Success(result, "OperationCompleted")
+  }
+  ```
+
+- **ResponseWrapper**: The API and CLI response types and emitters. `ApiResponseWrapper` is the standard HTTP envelope. `LiaisonApiResponseEmitter` maps a `LiaisonResponse` to its HTTP status and writes the envelope; `LiaisonCliResponseRenderer` writes the CLI JSON and exits with the mapped code.
 
   ```go
   apiResponse := NewApiResponseWrapper(201, accountEntity, "AccountCreatedSuccessfully")
 
-  liaisonResponse := NewLiaisonResponse(
-    LiaisonResponseStatusCreated, accountEntity, "AccountCreatedSuccessfully",
-  )
-
-  err := errors.New("AccountNotFound")
-
-  liaisonResponseNoMessage := NewLiaisonResponseNoMessage(
-    LiaisonResponseStatusSuccess, err.Error(),
-  )
+  liaisonResponse := responder.Success(accountEntity, "AccountRetrievedSuccessfully")
 
   liaisonApiEmissionErr := LiaisonApiResponseEmitter(echoContext, liaisonResponse)
 
