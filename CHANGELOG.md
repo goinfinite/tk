@@ -1,6 +1,11 @@
 # Changelog
 
 ```log
+0.4.5 - 2026/10/30
+feat: add LiaisonResponder. It builds success responses through Success, Created, Accepted, and MultiStatus, builds UserError responses through InputError, and maps use-case errors through AppError. AppError uses errors.Is and returns the matched sentinel's message; unmapped, ambiguous, or success-mapped errors return UnknownError with InternalServerError and log the cause.
+breaking: remove the ErrorStatusHandler middleware and the public NewLiaisonResponse and NewLiaisonResponseNoMessage. Callers must build liaison responses through LiaisonResponder.
+docs: document the liaison responder flow and remove the middleware from the presentation README, context files, and feature map.
+
 0.4.4 - 2026/10/29
 feat: add ShellEscape.Join. It quotes every argument and joins the slice with one space.
 feat: add QueryFieldName, MatchPattern, and ParseFieldMatchPatterns. QueryFieldName accepts 1-256 characters, starts with a letter, and allows letters, digits, underscores, dots, and hyphens. MatchPattern accepts equals, contains, begins-with, and ends-with; nil or empty input resolves to equals. ParseFieldMatchPatterns turns a semicolon-separated field:pattern list into a map keyed by QueryFieldName.

@@ -51,19 +51,42 @@ const (
 	LiaisonResponseStatusServiceUnavailable LiaisonResponseStatus = "serviceUnavailable"
 )
 
+func (status LiaisonResponseStatus) isError() bool {
+	switch status {
+	case LiaisonResponseStatusUserError,
+		LiaisonResponseStatusUnauthorized,
+		LiaisonResponseStatusForbidden,
+		LiaisonResponseStatusNotFound,
+		LiaisonResponseStatusTimeout,
+		LiaisonResponseStatusConflict,
+		LiaisonResponseStatusRateLimited,
+		LiaisonResponseStatusInfraError,
+		LiaisonResponseStatusUnknownError,
+		LiaisonResponseStatusServiceUnavailable:
+		return true
+	}
+
+	return false
+}
+
+func (status LiaisonResponseStatus) isServerError() bool {
+	switch status {
+	case LiaisonResponseStatusInfraError,
+		LiaisonResponseStatusUnknownError,
+		LiaisonResponseStatusServiceUnavailable:
+		return true
+	}
+
+	return false
+}
+
 type LiaisonResponse struct {
 	Status          LiaisonResponseStatus `json:"status"`
 	Body            any                   `json:"body"`
 	ReadableMessage string                `json:"readableMessage"`
 }
 
-// The NewLiaisonResponse function is used when the response body contains complex data
-// that requires a more informative message to be displayed to the user. The readable message
-// field should describe the outcome of the operation in a clear and understandable manner,
-// providing valuable information about the result of the request. This is particularly handy in
-// scenarios where the body field contains details about the created resource, such as in POST
-// requests.
-func NewLiaisonResponse(
+func newLiaisonResponse(
 	status LiaisonResponseStatus,
 	body any,
 	readableMessage string,
@@ -73,16 +96,6 @@ func NewLiaisonResponse(
 		Body:            body,
 		ReadableMessage: readableMessage,
 	}
-}
-
-// The NewLiaisonResponseNoMessage function is used when the response body is the
-// message (string) that should be displayed to the user, so the readable message field
-// is not needed.
-func NewLiaisonResponseNoMessage(
-	status LiaisonResponseStatus,
-	body any,
-) LiaisonResponse {
-	return NewLiaisonResponse(status, body, "")
 }
 
 func LiaisonApiResponseEmitter(
@@ -222,8 +235,8 @@ func SimpleCliResponseRenderer(
 		status = LiaisonResponseStatusSuccess
 	}
 
-	liaisonResponse := NewLiaisonResponseNoMessage(
-		status, message,
+	liaisonResponse := newLiaisonResponse(
+		status, message, "",
 	)
 	LiaisonCliResponseRenderer(liaisonResponse)
 }
